@@ -1,0 +1,6 @@
+/bflow
+/bflow.exe
+/dist/
+.bflow/
+*.test
+coverage.out

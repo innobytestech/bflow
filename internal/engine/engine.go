@@ -1,0 +1,314 @@
+// Package engine conecta el núcleo de flujo con el mundo: carga el estado del
+// store, aplica el evento con flow.Apply y ejecuta los efectos contra el
+// tracker, git y el host. Solo conoce interfaces; los adaptadores los inyecta
+// cmd/bflow.
+package engine
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"innobytes.tech/bflow/internal/config"
+	"innobytes.tech/bflow/internal/flow"
+	"innobytes.tech/bflow/internal/output"
+	"innobytes.tech/bflow/internal/store"
+	"innobytes.tech/bflow/internal/tracker"
+	"innobytes.tech/bflow/internal/vcs"
+)
+
+// Verifier confirma que el check pasó sobre el código actual.
+type Verifier interface {
+	Verify(ctx context.Context, id string) (ok bool, detail string, err error)
+}
+
+// Engine ejecuta comandos de flujo.
+type Engine struct {
+	Cfg      *config.Config
+	Store    *store.Store
+	Tracker  tracker.Tracker
+	Git      vcs.Git  // nil: sin git (se registra la rama pero no se crea)
+	Host     vcs.Host // nil: sin host remoto (se da la URL de compare si se puede)
+	Verifier Verifier // nil: DONE se acepta sin verificar si no hay pasos de check
+	Now      func() time.Time
+	User     string
+}
+
+// Outcome es el resultado de un comando de flujo.
+type Outcome struct {
+	ID       string        `json:"id"`
+	From     flow.Phase    `json:"from,omitempty"`
+	To       flow.Phase    `json:"to,omitempty"` // vacío si la fase no cambió
+	Phase    flow.Phase    `json:"phase"`
+	Gate     string        `json:"gate,omitempty"`
+	Round    int           `json:"round"`
+	Branch   string        `json:"branch,omitempty"`
+	PR       *store.PR     `json:"pr,omitempty"`
+	Effects  []string      `json:"effects,omitempty"`
+	Warnings []string      `json:"warnings,omitempty"`
+	Next     output.Next   `json:"-"`
+	Record   *store.Record `json:"-"`
+}
+
+func (e *Engine) flowCfg() flow.Config { return e.Cfg.Flow.Core() }
+
+func (e *Engine) now() time.Time {
+	if e.Now != nil {
+		return e.Now()
+	}
+	return time.Now()
+}
+
+// apply es el camino único de todo comando que cambia estado.
+func (e *Engine) apply(ctx context.Context, id string, ev flow.Event, slug string) (Outcome, error) {
+	out := Outcome{ID: id}
+	if w, err := e.syncFirst(ctx, id); err != nil {
+		return out, err
+	} else {
+		out.Warnings = append(out.Warnings, w...)
+	}
+	var entries []store.Entry
+	rec, err := e.Store.Update(id, func(rec *store.Record, exists bool) error {
+		if !exists {
+			if ev.Kind != flow.EvStart {
+				if _, err := e.Tracker.Get(ctx, id); err != nil {
+					return trackerErr(id, err)
+				}
+				return &flow.Rejection{Code: "not_started", Reason: fmt.Sprintf("%s no ha empezado: bflow start %s --lane <full|light|hotfix>", id, id)}
+			}
+			task, err := e.Tracker.Get(ctx, id)
+			if err != nil {
+				return trackerErr(id, err)
+			}
+			if slug == "" {
+				slug = Slug(task.Title)
+			}
+			rec.Flow = flow.New(id, slug)
+			rec.Title, rec.URL = task.Title, task.URL
+		}
+
+		if ev.Kind == flow.EvReport && ev.Verdict == flow.DoneV && rec.Flow.Phase == flow.Implementing {
+			ok, detail, err := e.verify(ctx, id)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				return &flow.Rejection{Code: "check_required", Reason: "DONE requiere un check verde sobre el código actual: " + detail}
+			}
+			ev.CheckOK = true
+		}
+
+		fc := e.flowCfg()
+		before := rec.Flow
+		res, err := flow.Apply(fc, rec.Flow, ev)
+		if err != nil {
+			return err
+		}
+		rec.Flow = res.State
+		if g := rec.Flow.Gate; g == nil {
+			rec.GateSince = time.Time{}
+		} else if before.Gate == nil || before.Gate.Name != g.Name || before.Phase != rec.Flow.Phase {
+			rec.GateSince = e.now()
+		}
+		warns, err := e.runEffects(ctx, rec, res.Effects)
+		if err != nil {
+			rec.Flow = before
+			return err
+		}
+		out.Warnings = append(out.Warnings, warns...)
+		for _, fx := range res.Effects {
+			out.Effects = append(out.Effects, string(fx.Kind))
+		}
+		out.From = before.Phase
+		if before.Phase != rec.Flow.Phase {
+			out.To = rec.Flow.Phase
+		}
+		entries = append(entries, e.entry(id, ev, before, rec.Flow))
+		return nil
+	})
+	if err != nil {
+		return out, err
+	}
+	if err := e.Store.Append(entries...); err != nil {
+		out.Warnings = append(out.Warnings, "no se pudo escribir log.jsonl: "+err.Error())
+	}
+	out.Warnings = append(out.Warnings, e.afterTransition(rec)...)
+	e.updateStatusCache(rec)
+	e.fill(&out, rec)
+	return out, nil
+}
+
+func (e *Engine) fill(out *Outcome, rec store.Record) {
+	out.Phase = rec.Flow.Phase
+	out.Round = rec.Flow.Round
+	out.Branch = rec.Branch
+	out.PR = rec.PR
+	if rec.Flow.Gate != nil {
+		out.Gate = string(rec.Flow.Gate.Name)
+	}
+	out.Next = flow.NextFor(e.flowCfg(), rec.Flow)
+	r := rec
+	out.Record = &r
+}
+
+func (e *Engine) entry(id string, ev flow.Event, before, after flow.State) store.Entry {
+	en := store.Entry{TS: e.now(), ID: id, Event: string(ev.Kind), From: before.Phase, To: after.Phase,
+		Agent: ev.Agent, Verdict: string(ev.Verdict), Round: after.Round, Note: ev.Note, By: e.User}
+	if ev.Kind == flow.EvApprove || ev.Kind == flow.EvReject {
+		if before.Gate != nil {
+			en.Gate = string(before.Gate.Name)
+		}
+	}
+	if ev.Kind == flow.EvStart {
+		en.Data = map[string]any{"lane": string(ev.Lane)}
+	}
+	if after.Gate != nil && (before.Gate == nil || before.Gate.Name != after.Gate.Name || before.Phase != after.Phase) {
+		if en.Data == nil {
+			en.Data = map[string]any{}
+		}
+		en.Data["gate_opened"] = string(after.Gate.Name)
+	}
+	return en
+}
+
+func (e *Engine) verify(ctx context.Context, id string) (bool, string, error) {
+	if e.Verifier != nil {
+		return e.Verifier.Verify(ctx, id)
+	}
+	return true, "", nil
+}
+
+func trackerErr(id string, err error) error {
+	if errors.Is(err, tracker.ErrNotFound) {
+		return fmt.Errorf("%s no existe en el tracker", id)
+	}
+	return fmt.Errorf("tracker: %w", err)
+}
+
+// runEffects ejecuta los efectos de una transición. Rama y PR son
+// obligatorios: si fallan, la transición se aborta. Los del tracker no: si
+// fallan, el estado local avanza y quedan pendientes para reintentarse.
+func (e *Engine) runEffects(ctx context.Context, rec *store.Record, fxs []flow.Effect) ([]string, error) {
+	var warns []string
+	for _, fx := range fxs {
+		switch fx.Kind {
+		case flow.FxCreateBranch:
+			w, err := e.createBranch(ctx, rec, fx.Hotfix)
+			if err != nil {
+				return nil, err
+			}
+			warns = append(warns, w...)
+		case flow.FxOpenPR:
+			w, err := e.openPR(ctx, rec)
+			if err != nil {
+				return nil, err
+			}
+			warns = append(warns, w...)
+		default:
+			tfx := fx
+			if fx.Kind == flow.FxStampStart {
+				tfx.Phase = rec.Flow.Phase
+			}
+			if len(rec.Pending) > 0 {
+				rec.Pending = append(rec.Pending, tfx)
+				continue
+			}
+			if err := e.trackerEffect(ctx, rec.Flow.ID, tfx); err != nil {
+				rec.Pending = append(rec.Pending, tfx)
+				warns = append(warns, fmt.Sprintf("tracker: %s quedó pendiente (%v); se reintenta en el próximo comando o con bflow panel", tfx.Kind, err))
+			}
+		}
+	}
+	return warns, nil
+}
+
+func (e *Engine) trackerEffect(ctx context.Context, id string, fx flow.Effect) error {
+	switch fx.Kind {
+	case flow.FxTrackerState:
+		return e.Tracker.Transition(ctx, id, fx.Phase, tracker.Patch{})
+	case flow.FxStampStart:
+		return e.Tracker.Transition(ctx, id, fx.Phase, tracker.Patch{StampStart: e.now()})
+	case flow.FxComment:
+		return e.Tracker.Comment(ctx, id, fx.Body)
+	}
+	return fmt.Errorf("efecto desconocido %q", fx.Kind)
+}
+
+// syncPending reintenta los efectos pendientes en orden y se detiene en el
+// primero que vuelva a fallar.
+func (e *Engine) syncPending(ctx context.Context, rec *store.Record) []string {
+	for len(rec.Pending) > 0 {
+		if err := e.trackerEffect(ctx, rec.Flow.ID, rec.Pending[0]); err != nil {
+			return []string{fmt.Sprintf("tracker: %d efecto(s) pendiente(s) siguen sin sincronizar (%v)", len(rec.Pending), err)}
+		}
+		rec.Pending = rec.Pending[1:]
+	}
+	rec.Pending = nil
+	return nil
+}
+
+// Sync reintenta los efectos pendientes de una tarea. Devuelve cuántos aplicó.
+func (e *Engine) Sync(ctx context.Context, id string) (int, error) {
+	applied := 0
+	_, err := e.Store.Update(id, func(rec *store.Record, exists bool) error {
+		if !exists {
+			return store.ErrNotFound
+		}
+		before := len(rec.Pending)
+		e.syncPending(ctx, rec)
+		applied = before - len(rec.Pending)
+		return nil
+	})
+	return applied, err
+}
+
+// BranchName arma el nombre de la rama con el patrón configurado.
+func (e *Engine) BranchName(s flow.State) string {
+	prefix := e.Cfg.VCS.BranchPrefix.Feature
+	if s.Lane == flow.Hotfix {
+		prefix = e.Cfg.VCS.BranchPrefix.Hotfix
+	}
+	r := strings.NewReplacer("{prefix}", prefix, "{id}", s.ID, "{id_lower}", strings.ToLower(s.ID), "{slug}", s.Slug)
+	name := r.Replace(e.Cfg.VCS.BranchPattern)
+	return strings.TrimSuffix(name, "-")
+}
+
+func (e *Engine) createBranch(ctx context.Context, rec *store.Record, _ bool) ([]string, error) {
+	name := e.BranchName(rec.Flow)
+	rec.Branch = name
+	if e.Git == nil {
+		return []string{"sin git: la rama " + name + " se registró pero no se creó"}, nil
+	}
+	if dirty, err := e.Git.Dirty(ctx, e.Cfg.Check.CodePaths); err != nil {
+		return nil, fmt.Errorf("git: %w", err)
+	} else if len(dirty) > 0 {
+		return nil, &flow.Rejection{Code: "dirty_worktree", Reason: "hay cambios sin commitear en el código; guárdalos antes de crear la rama: " + strings.Join(dirty, ", ")}
+	}
+	base := e.Cfg.VCS.BaseBranch
+	how, err := e.Git.EnsureBranch(ctx, name, base)
+	if err != nil {
+		return nil, fmt.Errorf("git: %w", err)
+	}
+	return []string{fmt.Sprintf("rama %s (%s)", name, how)}, nil
+}
+
+// syncFirst reintenta los pendientes en su propia escritura, antes de la
+// transición: si la transición falla, lo sincronizado no se pierde (y no se
+// duplican comentarios en el siguiente intento).
+func (e *Engine) syncFirst(ctx context.Context, id string) ([]string, error) {
+	rec, err := e.Store.Load(id)
+	if errors.Is(err, store.ErrNotFound) || (err == nil && len(rec.Pending) == 0) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var warns []string
+	_, err = e.Store.Update(id, func(rec *store.Record, _ bool) error {
+		warns = e.syncPending(ctx, rec)
+		return nil
+	})
+	return warns, err
+}

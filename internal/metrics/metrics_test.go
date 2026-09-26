@@ -1,0 +1,140 @@
+package metrics
+
+import (
+	"testing"
+	"time"
+
+	"innobytes.tech/bflow/internal/flow"
+	"innobytes.tech/bflow/internal/store"
+)
+
+var t0 = time.Date(2026, 9, 26, 9, 0, 0, 0, time.UTC)
+
+func at(min int) time.Time { return t0.Add(time.Duration(min) * time.Minute) }
+
+func e(min int, event string, from, to flow.Phase, opts ...func(*store.Entry)) store.Entry {
+	en := store.Entry{TS: at(min), ID: "T-1", Event: event, From: from, To: to}
+	for _, o := range opts {
+		o(&en)
+	}
+	return en
+}
+
+func gateOpened(g string) func(*store.Entry) {
+	return func(en *store.Entry) { en.Data = map[string]any{"gate_opened": g} }
+}
+func gate(g string) func(*store.Entry) { return func(en *store.Entry) { en.Gate = g } }
+func verdict(a, v string) func(*store.Entry) {
+	return func(en *store.Entry) { en.Agent, en.Verdict = a, v }
+}
+func round(n int) func(*store.Entry) { return func(en *store.Entry) { en.Round = n } }
+func tokens(p flow.Phase, in, out, cr, cw int) store.Entry {
+	return store.Entry{TS: at(0), ID: "T-1", Event: "tokens", Data: map[string]any{
+		"phase": string(p), "input": float64(in), "output": float64(out), "cache_read": float64(cr), "cache_write": float64(cw)}}
+}
+
+// Una feature light, en minutos desde t0:
+//
+//	0   start → spec (spec-author trabaja)
+//	30  spec-author READY → abre gate spec
+//	50  reject (humano esperó 20) → spec-author otra vez
+//	70  READY → gate spec
+//	80  approve (esperó 10) → implementing
+//	100 NEEDS_DECISION → gate decision
+//	115 approve decision (esperó 15)
+//	180 DONE → quality
+//	200 reviewer APPROVED
+//	210 security REJECTED → implementing, ronda 1
+//	240 block
+//	300 unblock (60 bloqueada)
+//	330 DONE → quality
+//	350 dos APPROVED → documenting
+//	360 DONE → walkthrough (gate walkthrough)
+//	400 approve (esperó 40) → in_review
+func featureLog() []store.Entry {
+	return []store.Entry{
+		e(0, "start", flow.Backlog, flow.Spec),
+		e(30, "report", flow.Spec, flow.Spec, verdict("spec-author", "READY"), gateOpened("spec")),
+		e(50, "reject", flow.Spec, flow.Spec, gate("spec")),
+		e(70, "report", flow.Spec, flow.Spec, verdict("spec-author", "READY"), gateOpened("spec")),
+		e(80, "approve", flow.Spec, flow.Implementing, gate("spec")),
+		e(100, "report", flow.Implementing, flow.Implementing, verdict("implementer", "NEEDS_DECISION"), gateOpened("decision")),
+		e(115, "approve", flow.Implementing, flow.Implementing, gate("decision")),
+		e(180, "report", flow.Implementing, flow.Quality, verdict("implementer", "DONE")),
+		e(200, "report", flow.Quality, flow.Quality, verdict("reviewer", "APPROVED")),
+		e(210, "report", flow.Quality, flow.Implementing, verdict("security-auditor", "REJECTED"), round(1)),
+		e(240, "block", flow.Implementing, flow.Blocked),
+		e(300, "unblock", flow.Blocked, flow.Implementing),
+		e(330, "report", flow.Implementing, flow.Quality, verdict("implementer", "DONE"), round(1)),
+		e(345, "report", flow.Quality, flow.Quality, verdict("reviewer", "APPROVED"), round(1)),
+		e(350, "report", flow.Quality, flow.Documenting, verdict("security-auditor", "APPROVED"), round(1)),
+		e(360, "report", flow.Documenting, flow.Walkthrough, verdict("documenter", "DONE"), gateOpened("walkthrough")),
+		e(400, "approve", flow.Walkthrough, flow.InReview, gate("walkthrough")),
+		tokens(flow.Spec, 1000, 200, 5000, 300),
+		tokens(flow.Implementing, 3000, 900, 40000, 1200),
+		tokens(flow.Implementing, 500, 100, 2000, 0),
+	}
+}
+
+func TestComputeFeature(t *testing.T) {
+	st := Compute("T-1", featureLog(), at(430))
+	byPhase := map[flow.Phase]PhaseStats{}
+	for _, p := range st.Phases {
+		byPhase[p.Phase] = p
+	}
+	min := func(d time.Duration) int { return int(d / time.Minute) }
+	cases := []struct {
+		phase                 flow.Phase
+		agent, human, blocked int
+	}{
+		{flow.Spec, 50, 30, 0},          // 0-80: gates 30-50 y 70-80
+		{flow.Implementing, 145, 15, 0}, // 80-180 (gate 100-115) + 210-240 + 300-330
+		{flow.Quality, 50, 0, 0},        // 180-210 + 330-350
+		{flow.Documenting, 10, 0, 0},    // 350-360
+		{flow.Walkthrough, 0, 40, 0},    // 360-400, todo gate
+		{flow.InReview, 0, 30, 0},       // 400-430 esperando merge (abierta)
+		{flow.Blocked, 0, 0, 60},
+	}
+	for _, c := range cases {
+		p := byPhase[c.phase]
+		if min(p.Agent) != c.agent || min(p.Human) != c.human || min(p.Blocked) != c.blocked {
+			t.Errorf("%s: agente %d · humano %d · bloqueada %d, want %d · %d · %d", c.phase, min(p.Agent), min(p.Human), min(p.Blocked), c.agent, c.human, c.blocked)
+		}
+	}
+	if min(st.Agent) != 255 || min(st.Human) != 115 || min(st.Blocked) != 60 || min(st.Total) != 430 {
+		t.Errorf("totales: agente %d humano %d bloqueada %d total %d", min(st.Agent), min(st.Human), min(st.Blocked), min(st.Total))
+	}
+	if st.Rejections != 1 || st.Rounds != 1 || st.Decisions != 1 || st.Phase != flow.InReview {
+		t.Errorf("iteraciones: %+v", st)
+	}
+	if !st.TokensAvailable || st.Tokens.Total() != 54200 || byPhase[flow.Implementing].Tokens.Output != 1000 {
+		t.Errorf("tokens: %+v · impl %+v", st.Tokens, byPhase[flow.Implementing].Tokens)
+	}
+}
+
+func TestNoTokens(t *testing.T) {
+	log := featureLog()[:5]
+	st := Compute("T-1", log, at(100))
+	if st.TokensAvailable {
+		t.Error("sin entradas de tokens no deben reportarse disponibles")
+	}
+}
+
+func TestOtherTasksIgnored(t *testing.T) {
+	log := append(featureLog(), store.Entry{TS: at(10), ID: "OTRA-1", Event: "start", From: flow.Backlog, To: flow.Spec})
+	if st := Compute("T-1", log, at(430)); min2(st.Total) != 430 {
+		t.Errorf("total %v", st.Total)
+	}
+}
+
+func min2(d time.Duration) int { return int(d / time.Minute) }
+
+func TestUsageTotal(t *testing.T) {
+	u := Usage{Input: 1, Output: 2, CacheRead: 3, CacheWrite: 4}
+	if u.Total() != 10 {
+		t.Error("total")
+	}
+	if Human(184_300) != "184k" || Human(1_250_000) != "1.2M" || Human(900) != "900" {
+		t.Errorf("formato: %s %s %s", Human(184_300), Human(1_250_000), Human(900))
+	}
+}
