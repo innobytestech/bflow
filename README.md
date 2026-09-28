@@ -18,6 +18,44 @@ Trabajar con agentes de IA en proyectos reales suele terminar en un *harness*: u
 
 Byteflow separa lo que **requiere criterio** (entender el problema, diseñar, programar, revisar), que hace el agente, de lo que es **determinista** (estado, transiciones, git, tracker, pruebas, reglas), que hace el CLI. El agente no tiene que recordar el proceso: pregunta a `bflow` qué sigue y lo hace.
 
+## Para quién es (y para quién no)
+
+bflow es opinado a propósito: tiene un flujo definido y gates humanas fijas. Muestra una forma concreta de trabajar con agentes.
+
+**Te sirve si:**
+
+- Desarrollas features con agentes de IA y quieres que las decisiones importantes (qué se construye, el contrato, qué se mergea) las tome una persona, sin leer todo lo que el agente genera.
+- Trabajas con git y PRs, y con Claude Code como agente.
+- Quieres saber cuánto cuesta cada feature (tiempo, tokens, iteraciones) y dónde se atora.
+
+**No te sirve si:**
+
+- Buscas que el agente trabaje solo de punta a punta, sin aprobaciones.
+- Tu flujo no pasa por ramas y PRs.
+- Usas otra herramienta de agente y necesitas todas las garantías: hoy solo Claude Code tiene adaptador (ver la tabla de abajo).
+
+## Qué garantiza (y qué no)
+
+Lo que vive en el CLI se cumple con cualquier herramienta. Lo que depende de hooks, solo donde hay hooks.
+
+| Garantía | Claude Code con los hooks de bflow | Sin hooks (otra herramienta) |
+|---|---|---|
+| El estado, las fases y las gates los maneja bflow, no el modelo | ✅ | ✅ |
+| `DONE` exige un check verde sobre el commit actual | ✅ | ✅ |
+| Las pruebas del contrato no cambian después de aprobarlo | ✅ se bloquea la edición y se revisa al reportar | ✅ se revisa al reportar |
+| `git reset --hard`, push forzado o a ramas protegidas, `.env`, `.bflow/` | ✅ se bloquea antes de que ocurra | ❌ |
+| Ramas y PR solo los crea bflow mientras hay una tarea en curso | ✅ | ❌ |
+| Un agente que termina sin reportar sigue trabajando (2 avisos, luego decide una persona) | ✅ | ❌ |
+| Tokens por fase y por modelo | ✅ | ❌ (solo tiempos) |
+
+**Lo que bflow no garantiza:**
+
+- **La calidad del código.** La revisan los agentes de calidad y tú en el walkthrough; bflow asegura que esos pasos ocurran, no que acierten.
+- **Que el agente siga su oficio.** Cómo programa o revisa está en prosa; bflow hace cumplir el contrato (qué reporta, qué archivos toca, cuándo puede decir DONE), no el estilo.
+- **Contención ante un agente malintencionado.** `guard` es una barandilla contra errores comunes, no un sandbox: revisa comandos y rutas conocidos, y un comando rebuscado puede pasar.
+
+La guía [Cómo trabajar con bflow](docs/guia.md) explica el día a día: qué haces tú en cada gate, cómo configurar el oficio de los agentes, qué skills conviene tener y qué hacer cuando algo se atora.
+
 ## Qué hace
 
 - **Máquina de estados con gates humanos.** Cada tarea recorre fases; en los puntos de decisión (aprobar la spec, aprobar el contrato, aprobar el PR…) el flujo se detiene hasta que una persona decide.
@@ -120,7 +158,7 @@ Ningún subagente le pregunta nada al humano: devuelve su veredicto y `bflow` de
 
 ## Instalación
 
-Requiere Go 1.25 o superior (los binarios firmados llegarán con las primeras releases).
+Requiere Go 1.25 o superior (los binarios firmados llegarán con las primeras releases) y, como agente, Claude Code 2.1.271 o posterior. `bflow doctor` revisa la versión.
 
 ```bash
 go install innobytes.tech/bflow/cmd/bflow@latest
@@ -268,9 +306,9 @@ La validación junta todos los problemas en un solo mensaje, indica la línea de
 El MVP cubre el módulo 1 (motor de flujo) y adelanta las guardas y las métricas:
 
 1. ✅ Motor de flujo: estado, gates, tracker local y Plane, git y GitHub.
-2. ✅ Guardas (versión inicial): git destructivo, `.env`, pruebas congeladas, tamaño de diff.
+2. ✅ Guardas (versión inicial): git destructivo, `.env`, `.bflow/`, pruebas congeladas (también sin hooks), ramas y PR a mano, tamaño de diff, agentes que terminan sin reportar.
 3. 🟡 Distribuidor: `bflow render` genera los agentes para Claude Code (contrato de bflow + oficio del repo). Pendiente: otras herramientas, `bflow update`, binarios firmados.
-4. ✅ Métricas: tiempo y tokens por fase.
+4. ✅ Métricas: tiempo, tokens por fase y por modelo, calidad (rechazos por gate, hotfixes) y fricción.
 5. ⏳ Contexto: índice del código para el planner y el reviewer.
 6. ⏳ Planeación: ordenar el backlog y repartirlo en ciclos balanceados.
 
