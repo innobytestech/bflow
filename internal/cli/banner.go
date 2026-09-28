@@ -101,7 +101,9 @@ func renderBanner(m bannerMode, version string) string {
 	var b strings.Builder
 	if m == bannerASCII {
 		for _, l := range bannerASCIIWord {
-			b.WriteString("  " + strings.TrimRight(l, " ") + "\n")
+			b.WriteString("  ")
+			b.WriteString(strings.TrimRight(l, " "))
+			b.WriteString("\n")
 		}
 	} else {
 		for i := range bannerWord {
@@ -109,7 +111,8 @@ func renderBanner(m bannerMode, version string) string {
 			if m == bannerColor {
 				line = gradient(line, gradFrom, gradTo)
 			}
-			b.WriteString(strings.TrimRight(line, " ") + "\n")
+			b.WriteString(strings.TrimRight(line, " "))
+			b.WriteString("\n")
 		}
 	}
 	name, sep := "bflow", "·"
@@ -119,7 +122,7 @@ func renderBanner(m bannerMode, version string) string {
 	case bannerASCII:
 		sep = "-"
 	}
-	fmt.Fprintf(&b, "\n  %s by innobytes %s %s\n  motor de flujo Spec-Driven Development\n", name, sep, version)
+	fmt.Fprintf(&b, "\n  %s by innobytes.tech %s %s\n  flow engine Spec-Driven Development\n", name, sep, version)
 	return b.String()
 }
 
@@ -158,7 +161,8 @@ func runHome(c *Ctx) output.Envelope {
 		return registry["help"].Run(c)
 	}
 	var b strings.Builder
-	b.WriteString(renderBanner(m, c.Version) + "\n")
+	b.WriteString(renderBanner(m, c.Version))
+	b.WriteString("\n")
 	e, err := engineFor(c)
 	switch {
 	case err != nil:
