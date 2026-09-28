@@ -216,6 +216,9 @@ func runInit(c *Ctx) output.Envelope {
 		a.BaseBranch = p.ask("Rama base de los PR", setup.PickBase(head, branches))
 	}
 	a.Agent = firstNonEmpty(str(c.Flags, "agent"), prof.Agent)
+	if a.Agent == "" && usesClaude(root) {
+		a.Agent = "claude"
+	}
 
 	if len(a.Steps) > 0 && !p.yes {
 		fmt.Fprintln(c.Stderr, "Pasos de check propuestos:")
@@ -256,6 +259,9 @@ func runInit(c *Ctx) output.Envelope {
 	}
 	if a.Host == "github" {
 		next = append(next, "bflow connect github (para abrir PR solo)")
+	}
+	if a.Agent == "claude" {
+		next = append(next, "bflow render (genera los agentes en .claude/agents; commitéalos)")
 	}
 	next = append(next, "bflow doctor")
 	env := output.OK("initialized", data, nil)
@@ -480,6 +486,14 @@ func runDoctor(c *Ctx) output.Envelope {
 		default:
 			add("agente", "ok", "claude: hooks de bflow instalados")
 		}
+		switch have, min, ok, err := c.Agent.Version(); {
+		case err != nil:
+			add("agente", "warn", "claude: no se pudo leer la versión (%v); bflow necesita %s o posterior", err, min)
+		case !ok:
+			add("agente", "warn", "claude: versión %s; bflow necesita %s o posterior (claude update)", have, min)
+		default:
+			add("agente", "ok", "claude: versión %s", have)
+		}
 		switch p, err := planRender(c, cfg); {
 		case err != nil:
 			add("agentes", "fail", "%v", err)
@@ -582,4 +596,14 @@ func doctorEnvelope(items []docItem) output.Envelope {
 		env = env.WithExit(output.ExitError)
 	}
 	return env
+}
+
+// usesClaude dice si el repo ya trabaja con Claude Code.
+func usesClaude(root string) bool {
+	for _, p := range []string{".claude", "CLAUDE.md"} {
+		if _, err := os.Stat(filepath.Join(root, p)); err == nil {
+			return true
+		}
+	}
+	return false
 }

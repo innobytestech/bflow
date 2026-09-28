@@ -195,6 +195,8 @@ type AgentAdapter interface {
 	SubagentStopped(raw []byte) (subagent, cwd string, ok bool)
 	// KeepWorking es la salida de ese hook que hace seguir al subagente.
 	KeepWorking(reason string) string
+	// Version compara la versión instalada de la herramienta con la mínima.
+	Version() (have, min string, ok bool, err error)
 }
 
 // Commands devuelve los nombres de los comandos registrados.

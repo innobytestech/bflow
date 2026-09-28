@@ -2,9 +2,15 @@ package claude
 
 import (
 	"bytes"
+	"context"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 
@@ -102,4 +108,38 @@ func (Agent) Skills(root string) []agents.Skill {
 func IsGenerated(path string) bool {
 	b, err := os.ReadFile(path)
 	return err == nil && bytes.Contains(b, []byte(generatedMark))
+}
+
+// MinVersion es la versión de Claude Code que bflow necesita: omitClaudeMd
+// en los agentes generados existe desde la v2.1.271.
+const MinVersion = "2.1.271"
+
+var versionRe = regexp.MustCompile(`(\d+)\.(\d+)\.(\d+)`)
+
+// Version compara la versión instalada de Claude Code con MinVersion.
+func (Agent) Version() (have, min string, ok bool, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "claude", "--version").Output()
+	if err != nil {
+		return "", MinVersion, false, err
+	}
+	have = versionRe.FindString(string(out))
+	if have == "" {
+		return "", MinVersion, false, fmt.Errorf("versión no reconocida: %q", strings.TrimSpace(string(out)))
+	}
+	return have, MinVersion, !older(have, MinVersion), nil
+}
+
+// older dice si la versión a es anterior a b (ambas x.y.z).
+func older(a, b string) bool {
+	pa, pb := versionRe.FindStringSubmatch(a), versionRe.FindStringSubmatch(b)
+	for i := 1; i <= 3; i++ {
+		x, _ := strconv.Atoi(pa[i])
+		y, _ := strconv.Atoi(pb[i])
+		if x != y {
+			return x < y
+		}
+	}
+	return false
 }
