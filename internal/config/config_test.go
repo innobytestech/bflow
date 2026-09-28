@@ -214,6 +214,9 @@ flow:
 	if sp := core.Agents[flow.Spec]; !slices.Equal(sp, []string{"ui-designer", "spec-author"}) {
 		t.Errorf("agentes de spec en stack con UI: %v", sp)
 	}
+	if !core.UI {
+		t.Error("el núcleo debe saber que el stack tiene UI (gate de spec con blueprint)")
+	}
 }
 
 func TestStackDefaults(t *testing.T) {

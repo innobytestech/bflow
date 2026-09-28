@@ -100,6 +100,9 @@ func gateNext(cfg Config, s State) output.Next {
 	case GateSpec:
 		n.Skill = "approve"
 		n.Show = []string{cmd("show", id, "brief")}
+		if cfg.UI {
+			n.Show = append(n.Show, cmd("show", id, "spec", "--section", "ui-blueprint"))
+		}
 		n.Question = "¿Apruebas el spec?"
 		n.Options = []output.Option{
 			approveOpt(id, g.Name, "Aprobar"),

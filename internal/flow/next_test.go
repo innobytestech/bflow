@@ -184,3 +184,16 @@ func TestSpawnArgs(t *testing.T) {
 		t.Errorf("report: %s", a.Report)
 	}
 }
+
+func TestSpecGateShowsUIBlueprint(t *testing.T) {
+	s := stateFor(row{lane: Full, from: Spec, gate: GateSpec})
+	cfg := DefaultConfig()
+	if n := NextFor(cfg, s); len(n.Show) != 1 {
+		t.Errorf("sin UI solo el brief: %v", n.Show)
+	}
+	cfg.UI = true
+	n := NextFor(cfg, s)
+	if len(n.Show) != 2 || n.Show[1] != "bflow show T-1 spec --section ui-blueprint" {
+		t.Errorf("con UI el humano ve el blueprint al aprobar: %v", n.Show)
+	}
+}

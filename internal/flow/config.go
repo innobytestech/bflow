@@ -15,6 +15,9 @@ type Config struct {
 	// MaxQualityRounds: al llegar a este número de rechazos de calidad se
 	// pregunta al humano antes de otra ronda.
 	MaxQualityRounds int
+	// UI: el proyecto tiene interfaz; la spec lleva UI blueprint y el humano
+	// lo ve al aprobarla.
+	UI bool
 }
 
 // PhasesOf devuelve, en el orden del flujo, las fases en las que trabaja el agente.

@@ -522,6 +522,7 @@ func (f Flow) Core() flow.Config {
 		core.MaxQualityRounds = f.MaxQualityRounds
 	}
 	if f.UI != nil && *f.UI {
+		core.UI = true
 		core.Agents[flow.Spec] = []string{"ui-designer", "spec-author"}
 		core.Agents[flow.Quality] = append(slices.Clone(core.Agents[flow.Quality]), "ux-auditor")
 	}
