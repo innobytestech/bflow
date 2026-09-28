@@ -261,6 +261,9 @@ func runInit(c *Ctx) output.Envelope {
 	env := output.OK("initialized", data, nil)
 	env.Text = fmt.Sprintf("bflow.yaml creado · stack %s · tracker %s · base %s · %d pasos de check\nsiguiente:\n  %s",
 		orDash(a.Stack), a.Tracker, orDash(a.BaseBranch), len(a.Steps), strings.Join(next, "\n  "))
+	if m := bannerFor(c); m != bannerOff {
+		env.Text = renderBanner(m, c.Version) + "\n" + env.Text
+	}
 	return env
 }
 

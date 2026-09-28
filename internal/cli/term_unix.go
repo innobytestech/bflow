@@ -20,3 +20,6 @@ func disableEcho(f *os.File) func() {
 		_ = on.Run()
 	}
 }
+
+// enableVT: las terminales Unix interpretan las secuencias de color.
+func enableVT(f *os.File) bool { return f != nil }

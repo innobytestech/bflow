@@ -70,6 +70,9 @@ func init() {
 	Register(&Command{Name: "version", Summary: "versión de bflow", Run: func(c *Ctx) output.Envelope {
 		e := output.OK("version", map[string]any{"version": c.Version}, nil)
 		e.Text = "bflow " + c.Version
+		if m := bannerFor(c); m != bannerOff {
+			e.Text = strings.TrimRight(renderBanner(m, c.Version), "\n")
+		}
 		return e
 	}})
 	Register(&Command{Name: "help", Summary: "lista los comandos", Run: func(c *Ctx) output.Envelope {
@@ -104,7 +107,7 @@ func Run(args []string, env *Env) int {
 	if cmd == nil {
 		name := strings.Join(rest, " ")
 		if name == "" {
-			cmd, params = registry["help"], nil
+			cmd, params = homeCommand, nil
 		} else {
 			return emit(env, asJSON, output.Fail("unknown_command", fmt.Errorf("comando desconocido: %q (bflow help)", name)))
 		}

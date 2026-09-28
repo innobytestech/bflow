@@ -241,19 +241,24 @@ func watchFrame(c *Ctx) (string, error) {
 		}
 		st := metrics.Compute(v.ID, log, now)
 		fmt.Fprintf(&b, "%s%s\n", mark, statsLine(st))
-		next := v.Next.Action
-		if v.Gate != "" {
-			next = "decidir " + v.Gate
-		} else if len(v.Next.Agents) > 0 {
-			var as []string
-			for _, a := range v.Next.Agents {
-				as = append(as, a.Agent)
-			}
-			next = "agentes: " + strings.Join(as, ", ")
-		}
-		fmt.Fprintf(&b, "    siguiente: %s\n", next)
+		fmt.Fprintf(&b, "    siguiente: %s\n", nextLabel(v))
 	}
 	return strings.TrimRight(b.String(), "\n"), nil
+}
+
+// nextLabel resume en pocas palabras lo que sigue en una tarea.
+func nextLabel(v engine.View) string {
+	if v.Gate != "" {
+		return "decidir " + v.Gate
+	}
+	if len(v.Next.Agents) > 0 {
+		var as []string
+		for _, a := range v.Next.Agents {
+			as = append(as, a.Agent)
+		}
+		return "agentes: " + strings.Join(as, ", ")
+	}
+	return v.Next.Action
 }
 
 // runHookTokens suma los tokens nuevos del transcript y los atribuye a la
