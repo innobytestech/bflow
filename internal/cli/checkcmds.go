@@ -81,6 +81,9 @@ func runCheck(c *Ctx) output.Envelope {
 		if err != nil {
 			return fail(err)
 		}
+		if changed := e.FrozenChanged(id); ok && id != "" && len(changed) > 0 {
+			ok, detail = false, "pruebas congeladas modificadas: "+strings.Join(changed, ", ")
+		}
 		env := output.OK("verified", map[string]any{"id": id, "ok": ok, "detail": detail}, nil)
 		env.Text = "VERIFY OK: " + detail
 		if !ok {

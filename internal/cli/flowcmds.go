@@ -173,6 +173,26 @@ func init() {
 			return e.Unblock(ctx, id)
 		})})
 
+	Register(&Command{Name: "freeze", Summary: "vuelve a congelar las pruebas del contrato tal como están (solo una persona): freeze [ID]",
+		Run: func(c *Ctx) output.Envelope {
+			ctx := context.Background()
+			e, err := engineFor(c)
+			if err != nil {
+				return output.Fail("config", err)
+			}
+			id, _, err := resolveID(ctx, e, c.Args)
+			if err != nil {
+				return fail(err)
+			}
+			n, err := e.Refreeze(id)
+			if err != nil {
+				return fail(err)
+			}
+			env := output.OK("refrozen", map[string]any{"id": id, "files": n}, nil)
+			env.Text = fmt.Sprintf("%s: %d prueba(s) congelada(s) de nuevo con su contenido actual", id, n)
+			return env
+		}})
+
 	Register(&Command{Name: "status", Summary: "estado y siguiente paso: status [ID] [--brief]",
 		Setup: func(fs *flag.FlagSet) { fs.Bool("brief", false, "resumen de pocas líneas (hooks)") },
 		Run:   runStatus})

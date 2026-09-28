@@ -97,6 +97,9 @@ func (e *Engine) apply(ctx context.Context, id string, ev flow.Event, slug strin
 			if !ok {
 				return &flow.Rejection{Code: "check_required", Reason: "DONE requiere un check verde sobre el código actual: " + detail}
 			}
+			if changed := e.FrozenChanged(id); len(changed) > 0 {
+				return frozenRejection(changed)
+			}
 			ev.CheckOK = true
 		}
 

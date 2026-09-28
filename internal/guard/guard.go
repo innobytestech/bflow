@@ -83,7 +83,26 @@ var (
 	commitRe     = regexp.MustCompile(`^git\s+(-\S+\s+)*commit\b`)
 	coauthorRe   = regexp.MustCompile(`(?i)co-authored-by`)
 	rmRe         = regexp.MustCompile(`^(rm|del|git\s+rm|mv|git\s+mv)\s`)
+
+	// Acciones que le tocan a bflow mientras hay una tarea en curso.
+	ghPRCreate  = regexp.MustCompile(`^gh\s+pr\s+create\b`)
+	checkoutNew = regexp.MustCompile(`^git\s+(-\S+\s+)*checkout\s+(.*\s)?-[bB](\s|$)`)
+	switchNew   = regexp.MustCompile(`^git\s+(-\S+\s+)*switch\s+(.*\s)?(-[cC]|--create|--force-create)(\s|$)`)
+	branchNew   = regexp.MustCompile(`^git\s+(-\S+\s+)*branch\s+[^-\s]`)
+	bflowFreeze = regexp.MustCompile(`^bflow(\.exe)?\s+freeze\b`)
 )
+
+// TaskScoped dice si el comando toca algo que bflow maneja por tarea (rama,
+// PR): el guard necesita saber si hay una tarea en curso.
+func TaskScoped(cmd string) bool {
+	for _, seg := range segSplit.Split(cmd, -1) {
+		s := strings.TrimSpace(seg)
+		if ghPRCreate.MatchString(s) || checkoutNew.MatchString(s) || switchNew.MatchString(s) || branchNew.MatchString(s) {
+			return true
+		}
+	}
+	return false
+}
 
 func bash(cmd string, c Context) Decision {
 	for _, seg := range segSplit.Split(cmd, -1) {
@@ -93,6 +112,12 @@ func bash(cmd string, c Context) Decision {
 			return deny("git_destructive", "`%s` descarta trabajo sin forma de recuperarlo. Si necesitas deshacer algo, haz un commit que lo revierta o pregunta.", s)
 		case restore.MatchString(s) && !strings.Contains(s, "--staged"):
 			return deny("git_destructive", "`%s` descarta cambios del árbol de trabajo. Para quitar algo del stage usa git restore --staged.", s)
+		case bflowFreeze.MatchString(s):
+			return deny("human_only", "bflow freeze acepta cambios a pruebas congeladas: lo corre una persona desde su terminal. Si una prueba está mal, reporta NEEDS_DECISION.")
+		case c.Phase != "" && ghPRCreate.MatchString(s):
+			return deny("bflow_pr", "el PR lo abre bflow al aprobar el walkthrough, con el review-map y el walkthrough; para actualizarlo usa bflow pr.")
+		case c.Phase != "" && (checkoutNew.MatchString(s) || switchNew.MatchString(s) || branchNew.MatchString(s)):
+			return deny("bflow_branch", "la rama de la tarea la crea bflow (al aprobar el spec o al empezar un hotfix); sigue el next de bflow status.")
 		}
 		if m := pushRe.FindStringSubmatch(s); m != nil {
 			args := m[2]
@@ -132,6 +157,9 @@ func edit(a Action, c Context) Decision {
 	base := filepath.Base(p)
 	if (base == ".env" || strings.HasPrefix(base, ".env.")) && base != ".env.example" {
 		return deny("env_file", "%s puede tener secretos: no se edita desde un agente.", p)
+	}
+	if p == ".bflow" || strings.HasPrefix(p, ".bflow/") {
+		return deny("bflow_state", "%s es estado de bflow: cámbialo con sus comandos (report, approve, block…), no a mano.", p)
 	}
 	if isFrozenPhase(c) && slices.Contains(c.Frozen, p) {
 		return deny("frozen_test", "%s quedó congelada al aprobar el contrato. Si la prueba está mal, reporta NEEDS_DECISION en vez de cambiarla.", p)

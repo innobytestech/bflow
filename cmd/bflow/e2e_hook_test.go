@@ -65,9 +65,47 @@ func TestGuardHook(t *testing.T) {
 	if code != 0 {
 		t.Errorf("el código sí se edita: %d", code)
 	}
+	_, errOut, code = r.hook(preToolUse(r.dir, "Bash", map[string]any{"command": "git checkout -b mi-rama"}), "guard")
+	if code != 2 || !strings.Contains(errOut, "la rama de la tarea la crea bflow") {
+		t.Errorf("con tarea en curso la rama la crea bflow: %d %q", code, errOut)
+	}
 
 	out, _, code = r.hook(`{"source":"startup"}`, "hook", "session-start")
 	if code != 0 || !strings.Contains(out, id) || strings.Count(out, "\n") > 10 {
 		t.Errorf("session-start: %d\n%s", code, out)
 	}
+}
+
+// Sin hooks (otra herramienta, o un agente que se los salta), el cambio a una
+// prueba congelada se detecta al reportar DONE.
+func TestFrozenTestsWithoutHooks(t *testing.T) {
+	r, _ := gitRepo(t, "vcs: { base_branch: dev }\nguard: { test_patterns: [\"*_test.go\"] }\n")
+	id := r.ok("task", "add", "Demo").Data["id"].(string)
+	r.ok("start", id, "--lane", "full")
+	os.WriteFile(filepath.Join(r.dir, "d.md"), []byte("d"), 0o644)
+	r.ok("approve", id, "--file", "d.md")
+	r.ok("report", id, "--agent", "spec-author", "--verdict", "READY")
+	git(t, r.dir, "add", ".")
+	git(t, r.dir, "commit", "-m", "spec")
+	r.ok("approve", id)
+	test := filepath.Join(r.dir, "internal", "cas_test.go")
+	os.WriteFile(test, []byte("package a\n"), 0o644)
+	r.ok("report", id, "--agent", "implementer", "--verdict", "CONTRACT_READY")
+	r.ok("approve", id)
+
+	os.WriteFile(test, []byte("package a // debilitada\n"), 0o644)
+	env := r.run("report", id, "--agent", "implementer", "--verdict", "DONE")
+	if env.exit != 2 || env.Code != "frozen_changed" {
+		t.Fatalf("DONE con una prueba congelada cambiada: exit %d code %s", env.exit, env.Code)
+	}
+
+	// Aceptar el cambio lo decide una persona: el agente no puede.
+	if _, _, code := r.hook(preToolUse(r.dir, "Bash", map[string]any{"command": "bflow freeze " + id}), "guard"); code != 2 {
+		t.Errorf("guard debe bloquear bflow freeze desde el agente: %d", code)
+	}
+	if n := r.ok("freeze", id).Data["files"].(float64); n != 1 {
+		t.Errorf("freeze: %v archivos", n)
+	}
+	os.WriteFile(test, []byte("package a // debilitada\r\n"), 0o644) // autocrlf no cuenta como cambio
+	r.ok("report", id, "--agent", "implementer", "--verdict", "DONE")
 }

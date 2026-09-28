@@ -93,6 +93,51 @@ func TestEditRules(t *testing.T) {
 	}
 }
 
+func TestBflowOwnedActions(t *testing.T) {
+	active := ctx()
+	active.Phase = flow.Implementing
+	cases := []struct {
+		a     Action
+		c     Context
+		allow bool
+		rule  string
+	}{
+		// Con una tarea en curso, rama y PR los maneja bflow.
+		{Action{Tool: Bash, Command: "gh pr create --fill"}, active, false, "bflow_pr"},
+		{Action{Tool: Bash, Command: "go vet ./... && gh pr create -t x"}, active, false, "bflow_pr"},
+		{Action{Tool: Bash, Command: "gh pr view 12"}, active, true, ""},
+		{Action{Tool: Bash, Command: "git checkout -b feature/x"}, active, false, "bflow_branch"},
+		{Action{Tool: Bash, Command: "git checkout -B feature/x origin/dev"}, active, false, "bflow_branch"},
+		{Action{Tool: Bash, Command: "git switch -c feature/x"}, active, false, "bflow_branch"},
+		{Action{Tool: Bash, Command: "git branch feature/x"}, active, false, "bflow_branch"},
+		{Action{Tool: Bash, Command: "git branch --show-current"}, active, true, ""},
+		{Action{Tool: Bash, Command: "git checkout feature/x"}, active, true, ""},
+		{Action{Tool: Bash, Command: "git switch dev"}, active, true, ""},
+		// Sin tarea en curso, el agente puede trabajar fuera del flujo.
+		{Action{Tool: Bash, Command: "gh pr create --fill"}, ctx(), true, ""},
+		{Action{Tool: Bash, Command: "git switch -c chore/x"}, ctx(), true, ""},
+		// Siempre: estado de bflow y re-congelar pruebas.
+		{Action{Tool: Bash, Command: "bflow freeze API-1"}, ctx(), false, "human_only"},
+		{Action{Tool: Bash, Command: "bflow status --json"}, ctx(), true, ""},
+		{Action{Tool: Edit, Path: ".bflow/tasks/API-1/state.json"}, ctx(), false, "bflow_state"},
+		{Action{Tool: Write, Path: ".bflowrc"}, ctx(), true, ""},
+	}
+	for _, tc := range cases {
+		d := Evaluate(tc.a, tc.c)
+		if d.Allow != tc.allow || d.Rule != tc.rule {
+			t.Errorf("%+v (fase %q) → allow=%v rule=%q, want allow=%v rule=%q", tc.a, tc.c.Phase, d.Allow, d.Rule, tc.allow, tc.rule)
+		}
+	}
+	for _, cmd := range []string{"gh pr create", "cd x && git switch -c y", "git branch z"} {
+		if !TaskScoped(cmd) {
+			t.Errorf("TaskScoped(%q) = false", cmd)
+		}
+	}
+	if TaskScoped("git branch -a") || TaskScoped("go test ./...") {
+		t.Error("TaskScoped no debe pedir la tarea para comandos ajenos")
+	}
+}
+
 func TestDiffSize(t *testing.T) {
 	c := ctx()
 	c.MaxDiffLines = 400
