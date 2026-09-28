@@ -189,7 +189,7 @@ Copia los archivos de [`adapters/claude/`](adapters/claude/):
 | `skills/bflow/SKILL.md` | `~/.claude/skills/bflow/SKILL.md` (una vez por máquina) |
 | `settings.json` | `<repo>/.claude/settings.json` |
 
-La skill tiene unas 30 líneas: no contiene reglas del flujo, solo cómo interpretar `next`. Los hooks corren `bflow hook session-start` al abrir la sesión, `bflow guard` antes de cada edición o comando, `bflow hook tokens` al terminar cada turno y la barra de estado con `bflow statusline`:
+La skill tiene unas 30 líneas: no contiene reglas del flujo, solo cómo interpretar `next`. Los hooks corren `bflow hook session-start` al abrir la sesión, `bflow guard` antes de cada edición o comando, `bflow hook tokens` al terminar cada turno, `bflow hook subagent-stop` cuando termina un agente de bflow (si no reportó, lo hace seguir hasta 2 veces con lo que le falta y después bloquea la tarea para que decida una persona) y la barra de estado con `bflow statusline`:
 
 ```
 API-12 · implementing · 1h42m · ronda 1 · 184k tok
@@ -215,7 +215,7 @@ agents:
   documenter: { model: haiku, effort: low }
 ```
 
-Con `read`, el agente no carga CLAUDE.md (`omit_claude_md: false` lo cambia): las reglas del repo le llegan por esas rutas. Un agente propio se agrega a una fase en `flow.agents` y define su oficio en `extra`; bflow le antepone el contrato. Los agentes generados llevan el prefijo `bflow-` para no chocar con los tuyos.
+Con `read`, el agente no carga CLAUDE.md (`omit_claude_md: false` lo cambia): las reglas del repo le llegan por esas rutas. Un agente propio se agrega a una fase en `flow.agents` y define su oficio en `extra`; bflow le antepone el contrato. Los agentes generados llevan el prefijo `bflow-` para no chocar con los tuyos; `render` nunca pisa un archivo que no generó. Si el repo tiene `AGENTS.md` (lo leen Codex y OpenCode), `render` mantiene en él un bloque que dice cómo retomar una tarea con bflow. `bflow doctor` avisa si los agentes están desactualizados y si alguna skill instalada parece de proceso (ramas, PR, tracker, specs), porque puede chocar con el flujo; `doctor.ignore_skills` silencia las que no chocan.
 
 ## Configuración
 

@@ -90,7 +90,7 @@ func statsLine(st metrics.TaskStats) string {
 		n    int
 		name string
 	}{{st.Rejections, "rechazo(s)"}, {st.Rounds, "ronda(s)"}, {st.Decisions, "decisión(es)"}, {st.Splits, "división(es)"},
-		{len(st.Hotfixes), "hotfix(es)"}, {st.Refused + st.Guarded, "fricción"}} {
+		{len(st.Hotfixes), "hotfix(es)"}, {st.Refused + st.Guarded + st.Nudged, "fricción"}} {
 		if x.n > 0 {
 			it = append(it, fmt.Sprintf("%d %s", x.n, x.name))
 		}
@@ -125,8 +125,8 @@ func renderStats(st metrics.TaskStats) string {
 	if len(st.Hotfixes) > 0 {
 		b.WriteString("  hotfixes: " + strings.Join(st.Hotfixes, ", ") + "\n")
 	}
-	if st.Refused+st.Guarded > 0 {
-		fmt.Fprintf(&b, "  fricción: %d pedido(s) rechazado(s) por el flujo · %d bloqueo(s) de guard\n", st.Refused, st.Guarded)
+	if st.Refused+st.Guarded+st.Nudged > 0 {
+		fmt.Fprintf(&b, "  fricción: %d pedido(s) rechazado(s) por el flujo · %d bloqueo(s) de guard · %d fin(es) sin reporte\n", st.Refused, st.Guarded, st.Nudged)
 	}
 	if _, unknown := st.Models[""]; len(st.Models) > 1 || (len(st.Models) == 1 && !unknown) {
 		var ms []string

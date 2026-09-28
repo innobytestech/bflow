@@ -60,9 +60,11 @@ type TaskStats struct {
 	// Calidad: rechazos humanos por gate y hotfixes que la corrigen (--fixes).
 	RejectionsByGate map[string]int `json:"rejections_by_gate,omitempty"`
 	Hotfixes         []string       `json:"hotfixes,omitempty"`
-	// Fricción: pedidos que el flujo rechazó (exit 2) y acciones que bloqueó guard.
+	// Fricción: pedidos que el flujo rechazó (exit 2), acciones que bloqueó
+	// guard y veces que un agente terminó sin reportar.
 	Refused int `json:"refused"`
 	Guarded int `json:"guarded"`
+	Nudged  int `json:"nudged"`
 	// Tokens por modelo ("" = registrados antes de guardar el modelo).
 	Models map[string]Usage `json:"models,omitempty"`
 }
@@ -106,6 +108,9 @@ func Compute(id string, entries []store.Entry, now time.Time) TaskStats {
 			continue
 		case "guard":
 			st.Guarded++
+			continue
+		case "nudge":
+			st.Nudged++
 			continue
 		}
 		if e.To != "" {

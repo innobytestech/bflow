@@ -37,6 +37,7 @@ type Config struct {
 	Env     Env                  `yaml:"env,omitempty"`
 	Guard   Guard                `yaml:"guard,omitempty"`
 	Agents  map[string]AgentConf `yaml:"agents,omitempty"` // ajustes por agente para bflow render
+	Doctor  Doctor               `yaml:"doctor,omitempty"`
 
 	Root    string  `yaml:"-"` // raíz del repo
 	Sources Sources `yaml:"-"`
@@ -90,6 +91,11 @@ type AgentConf struct {
 	// OmitClaudeMd evita cargar CLAUDE.md en el agente. Por defecto, sí cuando
 	// hay Read: las reglas del repo le llegan por esas rutas.
 	OmitClaudeMd *bool `yaml:"omit_claude_md,omitempty"`
+}
+
+// Doctor ajusta los avisos de bflow doctor.
+type Doctor struct {
+	IgnoreSkills []string `yaml:"ignore_skills,omitempty"` // skills que no chocan con el flujo aunque lo parezcan
 }
 
 // Efforts son los niveles de esfuerzo que acepta un agente.

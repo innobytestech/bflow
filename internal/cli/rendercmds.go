@@ -25,9 +25,33 @@ func init() {
 
 // renderPlan compara lo que render generaría con lo que hay en el repo.
 type renderPlan struct {
-	Files   map[string][]byte // todo lo que debe existir
-	Changed []string          // nuevo o distinto
-	Stale   []string          // generado antes, ya no pertenece al flujo
+	Files     map[string][]byte // todo lo que debe existir
+	Changed   []string          // nuevo o distinto
+	Stale     []string          // generado antes, ya no pertenece al flujo
+	Conflicts []string          // existe con ese nombre pero no lo generó bflow
+}
+
+// agentsMD es el archivo que leen otras herramientas (Codex, OpenCode). Si el
+// repo lo tiene, render mantiene en él un bloque que les dice cómo retomar
+// una tarea; si no lo tiene, no lo crea.
+const agentsMD = "AGENTS.md"
+
+const (
+	agentsMDStart = "<!-- bflow:inicio (generado por bflow render) -->"
+	agentsMDEnd   = "<!-- bflow:fin -->"
+	agentsMDBody  = "Este repo usa bflow para llevar cada tarea de la idea al PR. Si hay una tarea en curso o te piden avanzar una, corre `bflow status --json` y sigue `next`."
+)
+
+// upsertBlock pone el bloque de bflow en doc: lo reemplaza si ya está o lo
+// agrega al final.
+func upsertBlock(doc string) string {
+	block := agentsMDStart + "\n" + agentsMDBody + "\n" + agentsMDEnd
+	if i := strings.Index(doc, agentsMDStart); i >= 0 {
+		if j := strings.Index(doc[i:], agentsMDEnd); j >= 0 {
+			return doc[:i] + block + doc[i+j+len(agentsMDEnd):]
+		}
+	}
+	return strings.TrimRight(doc, "\n") + "\n\n" + block + "\n"
 }
 
 func planRender(c *Ctx, cfg *config.Config) (*renderPlan, error) {
@@ -43,19 +67,31 @@ func planRender(c *Ctx, cfg *config.Config) (*renderPlan, error) {
 		return nil, err
 	}
 	p := &renderPlan{Files: files}
+	generated := c.Agent.GeneratedAgents(cfg.Root)
 	for rel, want := range files {
 		have, err := os.ReadFile(filepath.Join(cfg.Root, filepath.FromSlash(rel)))
-		if err != nil || !bytes.Equal(bytes.ReplaceAll(have, []byte("\r\n"), []byte("\n")), want) {
+		switch {
+		case err == nil && !slices.Contains(generated, rel):
+			p.Conflicts = append(p.Conflicts, rel)
+		case err != nil || !bytes.Equal(bytes.ReplaceAll(have, []byte("\r\n"), []byte("\n")), want):
 			p.Changed = append(p.Changed, rel)
 		}
 	}
-	for _, rel := range c.Agent.GeneratedAgents(cfg.Root) {
+	for _, rel := range generated {
 		if _, ok := files[rel]; !ok {
 			p.Stale = append(p.Stale, rel)
 		}
 	}
+	if have, err := os.ReadFile(filepath.Join(cfg.Root, agentsMD)); err == nil {
+		doc := strings.ReplaceAll(string(have), "\r\n", "\n")
+		if want := upsertBlock(doc); want != doc {
+			p.Files[agentsMD] = []byte(want)
+			p.Changed = append(p.Changed, agentsMD)
+		}
+	}
 	slices.Sort(p.Changed)
 	slices.Sort(p.Stale)
+	slices.Sort(p.Conflicts)
 	return p, nil
 }
 
@@ -69,10 +105,15 @@ func runRender(c *Ctx) output.Envelope {
 		return output.Fail("render", err)
 	}
 	data := map[string]any{"changed": p.Changed, "stale": p.Stale, "total": len(p.Files)}
+	if len(p.Conflicts) > 0 {
+		env := output.Fail("render_conflict", fmt.Errorf("%s ya existe y no lo generó bflow: renómbralo o bórralo y vuelve a correr bflow render", strings.Join(p.Conflicts, ", ")))
+		env.Data["conflicts"] = p.Conflicts
+		return env
+	}
 	if str(c.Flags, "check") == "true" {
 		if len(p.Changed)+len(p.Stale) == 0 {
 			env := output.OK("render_ok", data, nil)
-			env.Text = fmt.Sprintf("%d agente(s) al día", len(p.Files))
+			env.Text = fmt.Sprintf("%d archivo(s) al día", len(p.Files))
 			return env
 		}
 		env := output.Fail("render_outdated", fmt.Errorf("agentes desactualizados: %s; corre bflow render y commitea", strings.Join(append(p.Changed, p.Stale...), ", ")))
@@ -95,7 +136,7 @@ func runRender(c *Ctx) output.Envelope {
 	}
 	env := output.OK("rendered", data, nil)
 	var b strings.Builder
-	fmt.Fprintf(&b, "%d agente(s): %d escrito(s), %d sin cambios", len(p.Files), len(p.Changed), len(p.Files)-len(p.Changed))
+	fmt.Fprintf(&b, "%d archivo(s): %d escrito(s), %d sin cambios", len(p.Files), len(p.Changed), len(p.Files)-len(p.Changed))
 	for _, rel := range p.Changed {
 		b.WriteString("\n  + " + rel)
 	}

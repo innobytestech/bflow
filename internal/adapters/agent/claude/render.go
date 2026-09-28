@@ -70,6 +70,34 @@ func (Agent) GeneratedAgents(root string) []string {
 	return out
 }
 
+// Skills lista las skills del proyecto (.claude/skills) y del usuario
+// (~/.claude/skills) con su descripción.
+func (Agent) Skills(root string) []agents.Skill {
+	dirs := []string{filepath.Join(root, ".claude", "skills")}
+	if home, err := os.UserHomeDir(); err == nil {
+		dirs = append(dirs, filepath.Join(home, ".claude", "skills"))
+	}
+	var out []agents.Skill
+	for _, d := range dirs {
+		files, _ := filepath.Glob(filepath.Join(d, "*", "SKILL.md"))
+		for _, f := range files {
+			b, err := os.ReadFile(f)
+			if err != nil {
+				continue
+			}
+			s := agents.Skill{Name: filepath.Base(filepath.Dir(f)), Path: f}
+			for _, l := range strings.Split(string(b), "\n") {
+				if v, ok := strings.CutPrefix(strings.TrimSpace(l), "description:"); ok {
+					s.Description = strings.Trim(strings.TrimSpace(v), `"'`)
+					break
+				}
+			}
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
 // IsGenerated dice si el archivo lo escribió bflow render.
 func IsGenerated(path string) bool {
 	b, err := os.ReadFile(path)

@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"innobytes.tech/bflow/internal/agents"
 	"innobytes.tech/bflow/internal/config"
 	"innobytes.tech/bflow/internal/envcheck"
 	"innobytes.tech/bflow/internal/flow"
@@ -462,13 +463,41 @@ func runDoctor(c *Ctx) output.Envelope {
 
 	if cfg.Agent == "claude" {
 		b, err := os.ReadFile(filepath.Join(cfg.Root, ".claude", "settings.json"))
+		var missing []string
+		for _, h := range []string{"bflow guard", "bflow hook session-start", "bflow hook subagent-stop"} {
+			if !strings.Contains(string(b), h) {
+				missing = append(missing, h)
+			}
+		}
 		switch {
 		case err != nil:
 			add("agente", "warn", "claude: falta .claude/settings.json con los hooks de bflow (copia adapters/claude/settings.json)")
-		case !strings.Contains(string(b), "bflow guard") || !strings.Contains(string(b), "bflow hook session-start"):
-			add("agente", "warn", "claude: .claude/settings.json no llama a bflow guard y bflow hook session-start")
+		case len(missing) > 0:
+			add("agente", "warn", "claude: .claude/settings.json no llama a %s (compáralo con adapters/claude/settings.json)", strings.Join(missing, ", "))
 		default:
 			add("agente", "ok", "claude: hooks de bflow instalados")
+		}
+		switch p, err := planRender(c, cfg); {
+		case err != nil:
+			add("agentes", "fail", "%v", err)
+		case len(p.Conflicts) > 0:
+			add("agentes", "fail", "%s existe y no lo generó bflow: renómbralo y corre bflow render", strings.Join(p.Conflicts, ", "))
+		case len(p.Changed)+len(p.Stale) > 0:
+			add("agentes", "warn", "desactualizados: %s (bflow render y commitea)", strings.Join(append(p.Changed, p.Stale...), ", "))
+		default:
+			add("agentes", "ok", "%d archivos generados y al día", len(p.Files))
+		}
+		var procs []string
+		for _, s := range c.Agent.Skills(cfg.Root) {
+			if s.Name == "bflow" || slices.Contains(cfg.Doctor.IgnoreSkills, s.Name) {
+				continue
+			}
+			if t := agents.ProcessTerms(s.Description); t != nil {
+				procs = append(procs, fmt.Sprintf("%s (%s)", s.Name, strings.Join(t, ", ")))
+			}
+		}
+		if len(procs) > 0 {
+			add("skills", "warn", "parecen skills de proceso y pueden chocar con bflow (ramas, PR, tracker, specs): %s. Si no chocan, agrégalas a doctor.ignore_skills", strings.Join(procs, "; "))
 		}
 	}
 

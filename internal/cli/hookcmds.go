@@ -14,6 +14,7 @@ import (
 	"innobytes.tech/bflow/internal/config"
 	"innobytes.tech/bflow/internal/engine"
 	"innobytes.tech/bflow/internal/envcheck"
+	"innobytes.tech/bflow/internal/flow"
 	"innobytes.tech/bflow/internal/guard"
 	"innobytes.tech/bflow/internal/output"
 	"innobytes.tech/bflow/internal/store"
@@ -24,6 +25,41 @@ func init() {
 		Run: runGuard})
 	Register(&Command{Name: "hook session-start", Summary: "hook de inicio de sesión: entorno, compromisos y tarea activa en pocas líneas",
 		Run: runSessionStart})
+	Register(&Command{Name: "hook subagent-stop", Summary: "hook de fin de subagente: si un agente de bflow terminó sin reportar, lo hace seguir (máximo 2 veces) y después bloquea la tarea",
+		Run: runSubagentStop})
+}
+
+// runSubagentStop nunca falla: un hook roto no debe atorar al subagente.
+func runSubagentStop(c *Ctx) output.Envelope {
+	quiet := output.Envelope{OK: true, Code: "stop", Quiet: true}
+	raw, _ := io.ReadAll(c.Stdin)
+	if c.Agent == nil || c.Build == nil {
+		return quiet
+	}
+	sub, cwd, ok := c.Agent.SubagentStopped(raw)
+	name, ours := strings.CutPrefix(sub, flow.SubagentPrefix)
+	if !ok || !ours {
+		return quiet
+	}
+	dir := c.Dir
+	if cwd != "" {
+		dir = cwd
+	}
+	cfg, err := config.Load(dir)
+	if err != nil {
+		return quiet
+	}
+	e, err := c.Build(cfg.Root)
+	if err != nil {
+		return quiet
+	}
+	reason, err := e.Nudge(context.Background(), name)
+	if err != nil || reason == "" {
+		return quiet
+	}
+	env := output.OK("keep_working", map[string]any{"agent": name, "reason": reason}, nil)
+	env.Text = c.Agent.KeepWorking(reason)
+	return env
 }
 
 func runGuard(c *Ctx) output.Envelope {

@@ -110,6 +110,7 @@ func (e *Engine) apply(ctx context.Context, id string, ev flow.Event, slug strin
 			return err
 		}
 		rec.Flow = res.State
+		rec.Nudges = nil // cualquier evento cuenta como avance: el agente vuelve a tener sus intentos
 		if g := rec.Flow.Gate; g == nil {
 			rec.GateSince = time.Time{}
 		} else if before.Gate == nil || before.Gate.Name != g.Name || before.Phase != rec.Flow.Phase {

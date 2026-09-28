@@ -51,6 +51,7 @@ type Record struct {
 	Pending   []flow.Effect     `json:"pending,omitempty"`    // efectos del tracker que fallaron y se reintentan
 	Since     time.Time         `json:"since"`                // entrada a la fase actual
 	GateSince time.Time         `json:"gate_since,omitempty"` // apertura del gate pendiente (SLA)
+	Nudges    map[string]int    `json:"nudges,omitempty"`     // agente → veces que terminó sin reportar desde el último evento
 	Created   time.Time         `json:"created"`
 	Updated   time.Time         `json:"updated"`
 }

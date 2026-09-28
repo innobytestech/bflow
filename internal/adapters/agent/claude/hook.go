@@ -41,3 +41,22 @@ func ParsePreToolUse(raw []byte) (a guard.Action, cwd string, ok bool) {
 	}
 	return a, in.Cwd, true
 }
+
+// SubagentStopped lee la entrada de un hook SubagentStop: qué subagente
+// terminó (agent_type) y en qué carpeta.
+func (Agent) SubagentStopped(raw []byte) (subagent, cwd string, ok bool) {
+	var in hookInput
+	if json.Unmarshal(raw, &in) != nil || in.AgentType == "" {
+		return "", "", false
+	}
+	return in.AgentType, in.Cwd, true
+}
+
+// KeepWorking es la salida de SubagentStop que hace seguir al subagente con
+// reason como su siguiente instrucción. additionalContext, y no
+// decision:block, porque es el flujo esperado y no un error.
+func (Agent) KeepWorking(reason string) string {
+	b, _ := json.Marshal(map[string]any{"hookSpecificOutput": map[string]any{
+		"hookEventName": "SubagentStop", "additionalContext": reason}})
+	return string(b)
+}

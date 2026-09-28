@@ -19,7 +19,11 @@
       { "hooks": [{ "type": "command", "command": "bflow hook tokens", "timeout": 20 }] }
     ],
     "SubagentStop": [
-      { "hooks": [{ "type": "command", "command": "bflow hook tokens", "timeout": 20 }] }
+      { "hooks": [{ "type": "command", "command": "bflow hook tokens", "timeout": 20 }] },
+      {
+        "matcher": "bflow-.*",
+        "hooks": [{ "type": "command", "command": "bflow hook subagent-stop", "timeout": 20 }]
+      }
     ]
   },
   "statusLine": { "type": "command", "command": "bflow statusline" }

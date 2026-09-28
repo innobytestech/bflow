@@ -186,6 +186,12 @@ type AgentAdapter interface {
 	RenderAgents(specs []agents.Spec) (map[string][]byte, error)
 	// GeneratedAgents lista los agentes que ya generó bflow render.
 	GeneratedAgents(root string) []string
+	// Skills lista las skills instaladas (proyecto y usuario).
+	Skills(root string) []agents.Skill
+	// SubagentStopped lee la entrada del hook de fin de subagente.
+	SubagentStopped(raw []byte) (subagent, cwd string, ok bool)
+	// KeepWorking es la salida de ese hook que hace seguir al subagente.
+	KeepWorking(reason string) string
 }
 
 // Commands devuelve los nombres de los comandos registrados.
