@@ -38,7 +38,7 @@ func TestBuildDefaultFlow(t *testing.T) {
 		"en implementing: `bflow report <id> --agent implementer --verdict DONE|NEEDS_DECISION|BLOCKED`",
 		"DONE exige `bflow check <id>`",
 		"quedan congeladas",
-		"`.bflow/tasks/<id>/contract.md`",
+		"`.bflow/tasks/<id>/contract.md` y `.bflow/tasks/<id>/reports/impl.md`",
 		"Tu respuesta final es solo la salida de `bflow report`",
 		"## Oficio\n",
 	} {
