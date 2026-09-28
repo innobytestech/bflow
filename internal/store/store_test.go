@@ -297,3 +297,19 @@ func TestConcurrentGoroutinesAndProcesses(t *testing.T) {
 		seen[e.Note] = true
 	}
 }
+
+// Quien escribe en .bflow/ sin pasar por el Store (cachés) también deja
+// .bflow/ ignorada por git.
+func TestEnsureDirForIgnoresBflow(t *testing.T) {
+	root := testutil.TempDir(t)
+	p := filepath.Join(root, ".bflow", "cache", "plane.json")
+	if err := EnsureDirFor(p); err != nil {
+		t.Fatal(err)
+	}
+	if b, err := os.ReadFile(filepath.Join(root, ".bflow", ".gitignore")); err != nil || string(b) != "*\n" {
+		t.Errorf(".bflow/.gitignore: %q %v", b, err)
+	}
+	if _, err := os.Stat(filepath.Dir(p)); err != nil {
+		t.Error("la carpeta de la caché debe existir")
+	}
+}

@@ -278,7 +278,7 @@ func runHookTokens(c *Ctx) output.Envelope {
 		return quiet
 	}
 	curPath := filepath.Join(e.Store.Dir(), "cache", "tokens-cursor.json")
-	_ = os.MkdirAll(filepath.Dir(curPath), 0o755)
+	_ = store.EnsureDirFor(curPath)
 	unlock, err := store.LockFile(curPath+".lock", 5*time.Second, time.Minute)
 	if err != nil {
 		return quiet

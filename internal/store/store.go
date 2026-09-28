@@ -104,12 +104,35 @@ func (s *Store) ensureDir(dir string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	gi := filepath.Join(s.Dir(), ".gitignore")
+	return ignoreSelf(s.Dir())
+}
+
+// ignoreSelf escribe .bflow/.gitignore: .bflow/ se ignora a sí misma, aunque
+// el repo no la tenga en su .gitignore.
+func ignoreSelf(bflowDir string) error {
+	gi := filepath.Join(bflowDir, ".gitignore")
 	if _, err := os.Stat(gi); errors.Is(err, os.ErrNotExist) {
-		// .bflow/ se ignora a sí misma, aunque el repo no la tenga en su .gitignore.
 		return os.WriteFile(gi, []byte("*\n"), 0o644)
 	}
 	return nil
+}
+
+// EnsureDirFor crea la carpeta de path, que vive dentro de <raíz>/.bflow/, y
+// el .gitignore de .bflow/. Es para quien escribe ahí sin pasar por el Store
+// (cachés de adaptadores, statusline, cursor de tokens).
+func EnsureDirFor(path string) error {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	for d := dir; ; d = filepath.Dir(d) {
+		if filepath.Base(d) == ".bflow" {
+			return ignoreSelf(d)
+		}
+		if filepath.Dir(d) == d {
+			return nil
+		}
+	}
 }
 
 // Load lee el estado de una tarea.

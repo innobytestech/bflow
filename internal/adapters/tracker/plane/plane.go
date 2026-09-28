@@ -12,7 +12,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -239,7 +238,7 @@ func (c *Client) saveCache() {
 	if err != nil {
 		return
 	}
-	_ = os.MkdirAll(filepath.Dir(c.cachePath), 0o755)
+	_ = store.EnsureDirFor(c.cachePath)
 	_ = store.WriteAtomic(c.cachePath, b)
 }
 

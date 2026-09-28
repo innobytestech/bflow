@@ -45,7 +45,7 @@ func writeStatusCache(root string, c StatusCache) {
 		return
 	}
 	p := StatusCachePath(root)
-	_ = os.MkdirAll(filepath.Dir(p), 0o755)
+	_ = store.EnsureDirFor(p)
 	_ = store.WriteAtomic(p, b)
 }
 
