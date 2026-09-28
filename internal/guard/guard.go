@@ -158,8 +158,9 @@ func edit(a Action, c Context) Decision {
 	if (base == ".env" || strings.HasPrefix(base, ".env.")) && base != ".env.example" {
 		return deny("env_file", "%s puede tener secretos: no se edita desde un agente.", p)
 	}
-	if p == ".bflow" || strings.HasPrefix(p, ".bflow/") {
-		return deny("bflow_state", "%s es estado de bflow: cámbialo con sus comandos (report, approve, block…), no a mano.", p)
+	if (p == ".bflow" || strings.HasPrefix(p, ".bflow/")) && !agentArtifact(p) {
+		return deny("bflow_state", "%s es estado de bflow: cámbialo con sus comandos (report, approve, block…), no a mano. Los agentes solo escriben %s en .bflow/tasks/<ID>/.",
+			p, strings.Join(flow.AgentArtifacts, ", "))
 	}
 	if isFrozenPhase(c) && slices.Contains(c.Frozen, p) {
 		return deny("frozen_test", "%s quedó congelada al aprobar el contrato. Si la prueba está mal, reporta NEEDS_DECISION en vez de cambiarla.", p)
@@ -168,6 +169,12 @@ func edit(a Action, c Context) Decision {
 		return deny("leader_code", "la sesión principal no edita %s: eso lo hace el implementer.", p)
 	}
 	return allow
+}
+
+// agentArtifact dice si p (.bflow/tasks/<ID>/<rel>) es un archivo que escribe un agente.
+func agentArtifact(p string) bool {
+	parts := strings.SplitN(p, "/", 4)
+	return len(parts) == 4 && parts[1] == "tasks" && flow.IsAgentArtifact(parts[3])
 }
 
 func isFrozenPhase(c Context) bool {

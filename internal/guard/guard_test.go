@@ -120,6 +120,12 @@ func TestBflowOwnedActions(t *testing.T) {
 		{Action{Tool: Bash, Command: "bflow freeze API-1"}, ctx(), false, "human_only"},
 		{Action{Tool: Bash, Command: "bflow status --json"}, ctx(), true, ""},
 		{Action{Tool: Edit, Path: ".bflow/tasks/API-1/state.json"}, ctx(), false, "bflow_state"},
+		{Action{Tool: Write, Path: ".bflow/tasks/API-1/frozen-tests.json"}, ctx(), false, "bflow_state"},
+		{Action{Tool: Write, Path: ".bflow/log.jsonl"}, ctx(), false, "bflow_state"},
+		{Action{Tool: Write, Path: ".bflow/tasks/API-1/contract.md"}, ctx(), true, ""},
+		{Action{Tool: Write, Path: ".bflow/tasks/API-1/reports/review-map.md"}, ctx(), true, ""},
+		{Action{Tool: Write, Path: ".bflow/tasks/API-1/walkthrough.md"}, ctx(), true, ""},
+		{Action{Tool: Write, Path: ".bflow/tasks/API-1/reports"}, ctx(), false, "bflow_state"},
 		{Action{Tool: Write, Path: ".bflowrc"}, ctx(), true, ""},
 	}
 	for _, tc := range cases {

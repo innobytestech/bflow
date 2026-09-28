@@ -4,7 +4,10 @@
 // efectos que alguien más debe ejecutar y lo que la sesión debe hacer después.
 package flow
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // Phase es una fase del flujo.
 type Phase string
@@ -146,6 +149,21 @@ type Event struct {
 	Verdict Verdict  `json:"verdict,omitempty"`
 	Options []string `json:"options,omitempty"`  // report NEEDS_DECISION
 	CheckOK bool     `json:"check_ok,omitempty"` // report DONE en implementing: check verificado en HEAD
+}
+
+// AgentArtifacts son los archivos de .bflow/tasks/<ID>/ que escriben los
+// agentes (los que terminan en "/" son carpetas). El resto es estado de bflow.
+var AgentArtifacts = []string{"contract.md", "walkthrough.md", "consumer-changelog.md", "reports/"}
+
+// IsAgentArtifact dice si rel (relativa a la carpeta de la tarea) es un
+// artefacto que escribe un agente.
+func IsAgentArtifact(rel string) bool {
+	for _, a := range AgentArtifacts {
+		if rel == a || (strings.HasSuffix(a, "/") && strings.HasPrefix(rel, a) && len(rel) > len(a)) {
+			return true
+		}
+	}
+	return false
 }
 
 // EffectKind es un efecto que el núcleo pide y el engine ejecuta.
