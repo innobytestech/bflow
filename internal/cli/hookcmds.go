@@ -9,12 +9,14 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"innobytes.tech/bflow/internal/config"
 	"innobytes.tech/bflow/internal/engine"
 	"innobytes.tech/bflow/internal/envcheck"
 	"innobytes.tech/bflow/internal/guard"
 	"innobytes.tech/bflow/internal/output"
+	"innobytes.tech/bflow/internal/store"
 )
 
 func init() {
@@ -61,9 +63,25 @@ func runGuard(c *Ctx) output.Envelope {
 		return output.Envelope{OK: true, Code: "allowed", Quiet: true}
 	}
 	fmt.Fprintln(c.Stderr, "bflow guard: "+d.Reason)
+	logGuard(c, cfg.Root, d.Rule)
 	env := output.Rejected(d.Rule, d.Reason)
 	env.Quiet = !c.JSON
 	return env
+}
+
+// logGuard registra el bloqueo en la tarea activa para medir la fricción. Solo
+// corre al bloquear; sin tarea activa no hay a quién atribuirlo.
+func logGuard(c *Ctx, root, rule string) {
+	if c.Build == nil {
+		return
+	}
+	e, err := c.Build(root)
+	if err != nil {
+		return
+	}
+	if id, err := e.Active(context.Background()); err == nil {
+		_ = e.Store.Append(store.Entry{TS: time.Now(), ID: id, Event: "guard", By: e.User, Data: map[string]any{"rule": rule}})
+	}
 }
 
 // needsTask dice si la regla necesita la fase y las pruebas congeladas (cuesta

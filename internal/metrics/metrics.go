@@ -56,6 +56,15 @@ type TaskStats struct {
 	Splits          int           `json:"splits"`
 	Tokens          Usage         `json:"tokens"`
 	TokensAvailable bool          `json:"tokens_available"`
+
+	// Calidad: rechazos humanos por gate y hotfixes que la corrigen (--fixes).
+	RejectionsByGate map[string]int `json:"rejections_by_gate,omitempty"`
+	Hotfixes         []string       `json:"hotfixes,omitempty"`
+	// Fricción: pedidos que el flujo rechazó (exit 2) y acciones que bloqueó guard.
+	Refused int `json:"refused"`
+	Guarded int `json:"guarded"`
+	// Tokens por modelo ("" = registrados antes de guardar el modelo).
+	Models map[string]Usage `json:"models,omitempty"`
 }
 
 // Compute calcula las métricas de una tarea. now cierra el último intervalo
@@ -71,15 +80,32 @@ func Compute(id string, entries []store.Entry, now time.Time) TaskStats {
 		return per[p]
 	}
 	for _, e := range entries {
+		if e.Event == "start" && e.ID != id && e.Data["fixes"] == id {
+			st.Hotfixes = append(st.Hotfixes, e.ID)
+		}
 		if e.ID != id {
 			continue
 		}
-		if e.Event == "tokens" {
+		switch e.Event {
+		case "tokens":
 			u := usageOf(e.Data)
 			p := flow.Phase(fmt.Sprint(e.Data["phase"]))
 			get(p).Tokens.Add(u)
 			st.Tokens.Add(u)
 			st.TokensAvailable = true
+			model, _ := e.Data["model"].(string)
+			if st.Models == nil {
+				st.Models = map[string]Usage{}
+			}
+			m := st.Models[model]
+			m.Add(u)
+			st.Models[model] = m
+			continue
+		case "refused":
+			st.Refused++
+			continue
+		case "guard":
+			st.Guarded++
 			continue
 		}
 		if e.To != "" {
@@ -119,6 +145,12 @@ func Compute(id string, entries []store.Entry, now time.Time) TaskStats {
 		switch e.Event {
 		case "reject":
 			st.Rejections++
+			if e.Gate != "" {
+				if st.RejectionsByGate == nil {
+					st.RejectionsByGate = map[string]int{}
+				}
+				st.RejectionsByGate[e.Gate]++
+			}
 			// Rechazar el discovery lo deja abierto.
 			gateOpen = opened || (e.From == flow.Discovery && e.To == flow.Discovery)
 		case "approve":

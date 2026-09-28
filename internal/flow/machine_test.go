@@ -150,6 +150,7 @@ func table() []row {
 
 		// ---------- hotfix ----------
 		{lane: Hotfix, from: Backlog, ev: start(Hotfix), want: Implementing, fx: []EffectKind{cs, ts, ss}},
+		{lane: Hotfix, from: Backlog, ev: Event{Kind: EvStart, Lane: Hotfix, Fixes: "T-0"}, want: Implementing, fx: []EffectKind{cs, ts, ss}},
 		{lane: Hotfix, from: Implementing, ev: rep(imp, DoneV), want: Quality, fx: []EffectKind{ts}},
 
 		// ---------- errores ----------
@@ -169,6 +170,8 @@ func table() []row {
 		{lane: Full, from: Implementing, ev: merged(), err: "not_in_review"},
 		{lane: Full, from: Spec, ev: start(Light), err: "already_started"},
 		{lane: Full, from: Backlog, ev: start("turbo"), err: "unknown_lane"},
+		{lane: Light, from: Backlog, ev: Event{Kind: EvStart, Lane: Light, Fixes: "T-0"}, err: "fixes_needs_hotfix"},
+		{lane: Hotfix, from: Backlog, ev: Event{Kind: EvStart, Lane: Hotfix, Fixes: "T-1"}, err: "fixes_self"},
 		{lane: Full, from: Done, ev: Event{Kind: EvBlock, Note: "x"}, err: "task_done"},
 		{lane: Full, from: Spec, ev: Event{Kind: EvUnblock}, err: "not_blocked"},
 		{lane: Full, from: Spec, gate: GateSpec, ev: Event{Kind: EvReject}, err: "note_required"},

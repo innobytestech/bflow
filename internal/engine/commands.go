@@ -17,11 +17,19 @@ import (
 )
 
 // Start toma la tarea del tracker y la pone en la primera fase del carril.
-func (e *Engine) Start(ctx context.Context, id string, lane flow.Lane, slug string) (Outcome, error) {
+// fixes (solo hotfix) liga la tarea a la feature que corrige, para sus métricas.
+func (e *Engine) Start(ctx context.Context, id string, lane flow.Lane, slug, fixes string) (Outcome, error) {
 	if slug != "" {
 		slug = Slug(slug)
 	}
-	return e.apply(ctx, id, flow.Event{Kind: flow.EvStart, Lane: lane}, slug)
+	fixes = strings.ToUpper(strings.TrimSpace(fixes))
+	out, err := e.apply(ctx, id, flow.Event{Kind: flow.EvStart, Lane: lane, Fixes: fixes}, slug)
+	if err == nil && fixes != "" {
+		if _, lerr := e.Store.Load(fixes); lerr != nil {
+			out.Warnings = append(out.Warnings, fixes+" no tiene historial en bflow: el hotfix no sumará a sus métricas")
+		}
+	}
+	return out, err
 }
 
 // ApproveOpts son las opciones de approve.

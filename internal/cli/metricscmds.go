@@ -6,8 +6,10 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -87,7 +89,8 @@ func statsLine(st metrics.TaskStats) string {
 	for _, x := range []struct {
 		n    int
 		name string
-	}{{st.Rejections, "rechazo(s)"}, {st.Rounds, "ronda(s)"}, {st.Decisions, "decisión(es)"}, {st.Splits, "división(es)"}} {
+	}{{st.Rejections, "rechazo(s)"}, {st.Rounds, "ronda(s)"}, {st.Decisions, "decisión(es)"}, {st.Splits, "división(es)"},
+		{len(st.Hotfixes), "hotfix(es)"}, {st.Refused + st.Guarded, "fricción"}} {
 		if x.n > 0 {
 			it = append(it, fmt.Sprintf("%d %s", x.n, x.name))
 		}
@@ -111,6 +114,30 @@ func renderStats(st metrics.TaskStats) string {
 			tok = metrics.Human(p.Tokens.Total())
 		}
 		fmt.Fprintf(&b, "  %-13s %8s %8s %8s %8s\n", p.Phase, dur(p.Agent), dur(p.Human), dur(p.Blocked), tok)
+	}
+	if len(st.RejectionsByGate) > 0 {
+		var gs []string
+		for _, g := range slices.Sorted(maps.Keys(st.RejectionsByGate)) {
+			gs = append(gs, fmt.Sprintf("%s %d", g, st.RejectionsByGate[g]))
+		}
+		b.WriteString("  rechazos por gate: " + strings.Join(gs, " · ") + "\n")
+	}
+	if len(st.Hotfixes) > 0 {
+		b.WriteString("  hotfixes: " + strings.Join(st.Hotfixes, ", ") + "\n")
+	}
+	if st.Refused+st.Guarded > 0 {
+		fmt.Fprintf(&b, "  fricción: %d pedido(s) rechazado(s) por el flujo · %d bloqueo(s) de guard\n", st.Refused, st.Guarded)
+	}
+	if _, unknown := st.Models[""]; len(st.Models) > 1 || (len(st.Models) == 1 && !unknown) {
+		var ms []string
+		for _, m := range slices.Sorted(maps.Keys(st.Models)) {
+			name := m
+			if name == "" {
+				name = "sin modelo"
+			}
+			ms = append(ms, name+" "+metrics.Human(st.Models[m].Total()))
+		}
+		b.WriteString("  por modelo: " + strings.Join(ms, " · ") + "\n")
 	}
 	if st.TokensAvailable {
 		t := st.Tokens
@@ -256,9 +283,13 @@ func runHookTokens(c *Ctx) output.Envelope {
 	if b, err := os.ReadFile(curPath); err == nil {
 		_ = json.Unmarshal(b, &cur)
 	}
-	u, err := c.Agent.ReadUsage(path, &cur)
+	byModel, err := c.Agent.ReadUsage(path, &cur)
 	if err != nil {
 		return quiet
+	}
+	var u metrics.Usage
+	for _, m := range byModel {
+		u.Add(m)
 	}
 	if len(cur.Seen) > 5000 { // los offsets evitan releer; los ids viejos ya no hacen falta
 		cur.Seen = nil
@@ -277,8 +308,18 @@ func runHookTokens(c *Ctx) output.Envelope {
 	if err != nil {
 		return quiet
 	}
-	_ = e.Store.Append(store.Entry{TS: time.Now(), ID: id, Event: "tokens", By: e.User, Data: map[string]any{
-		"phase": string(rec.Flow.Phase), "input": u.Input, "output": u.Output, "cache_read": u.CacheRead, "cache_write": u.CacheWrite}})
+	now := time.Now()
+	var entries []store.Entry
+	for _, model := range slices.Sorted(maps.Keys(byModel)) {
+		m := byModel[model]
+		d := map[string]any{"phase": string(rec.Flow.Phase), "tool": c.Agent.Name(),
+			"input": m.Input, "output": m.Output, "cache_read": m.CacheRead, "cache_write": m.CacheWrite}
+		if model != "" {
+			d["model"] = model
+		}
+		entries = append(entries, store.Entry{TS: now, ID: id, Event: "tokens", By: e.User, Data: d})
+	}
+	_ = e.Store.Append(entries...)
 	e.AddTokens(id, u.Total())
 	quiet.Data = map[string]any{"id": id, "tokens": u}
 	return quiet

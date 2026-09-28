@@ -26,7 +26,7 @@ Byteflow separa lo que **requiere criterio** (entender el problema, diseñar, pr
 - **Tracker y git sin el modelo.** Mueve la tarea en el tracker, sella la fecha de inicio, comenta los rechazos, crea la rama al aprobar la spec, abre el PR con el review-map y el walkthrough, y cierra la tarea cuando el PR se mergea.
 - **Compuerta de calidad determinista (`bflow check`).** Corre los pasos del proyecto (lint, pruebas, build, vulnerabilidades, secretos), resume los fallos en pocas líneas y liga el resultado a un commit. El agente no puede reportar "terminé" sin un check verde del código actual.
 - **Reglas que se cumplen con código (`bflow guard`).** Un hook bloquea antes de que ocurra: `git reset --hard`, push forzado o a ramas protegidas, editar `.env`, y modificar las pruebas que se aprobaron en el contrato.
-- **Métricas.** Tiempo por fase separado en trabajo del agente, espera del humano y bloqueo; iteraciones (rechazos, rondas, decisiones), y tokens por fase leídos de los transcripts del agente.
+- **Métricas.** Tiempo por fase separado en trabajo del agente, espera del humano y bloqueo; iteraciones (rechazos por gate, rondas, decisiones); hotfixes ligados a la feature que corrigen (`start --fixes`); fricción (pedidos que el flujo rechazó y bloqueos de `guard`), y tokens por fase y por modelo leídos de los transcripts del agente.
 - **Salida pensada para gastar pocos tokens.** JSON compacto y sin campos redundantes. Una respuesta típica pesa ~480 bytes, y un check fallido le entrega al agente solo las líneas de fallo, sin repetir; el detalle completo queda en un archivo.
 
 ## Cómo funciona
@@ -231,7 +231,7 @@ La validación junta todos los problemas en un solo mensaje, indica la línea de
 
 | Grupo | Comandos |
 |---|---|
-| Flujo | `status [ID] [--brief]` · `start <ID> --lane` · `approve` · `reject --note` · `report --agent --verdict` · `block` / `unblock` · `show` · `task add` · `sync` · `import --from harness` |
+| Flujo | `status [ID] [--brief]` · `start <ID> --lane [--fixes ID]` · `approve` · `reject --note` · `report --agent --verdict` · `block` / `unblock` · `show` · `task add` · `sync` · `import --from harness` |
 | Git y PR | `pr` · `panel [--sla]` (cierra lo mergeado, recuerda gates vencidos) |
 | Calidad | `check [--quick pkg] [--verify]` · `env check` · `guard` |
 | Métricas | `stats [ID]` · `statusline` · `watch` |

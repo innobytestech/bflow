@@ -129,6 +129,11 @@ func (e *Engine) apply(ctx context.Context, id string, ev flow.Event, slug strin
 		return nil
 	})
 	if err != nil {
+		var rej *flow.Rejection
+		if errors.As(err, &rej) { // fricción: el agente o el humano pidió algo que el flujo no permite
+			_ = e.Store.Append(store.Entry{TS: e.now(), ID: id, Event: "refused", By: e.User,
+				Data: map[string]any{"code": rej.Code, "event": string(ev.Kind)}})
+		}
 		return out, err
 	}
 	if err := e.Store.Append(entries...); err != nil {
@@ -163,6 +168,9 @@ func (e *Engine) entry(id string, ev flow.Event, before, after flow.State) store
 	}
 	if ev.Kind == flow.EvStart {
 		en.Data = map[string]any{"lane": string(ev.Lane)}
+		if ev.Fixes != "" {
+			en.Data["fixes"] = ev.Fixes
+		}
 	}
 	if after.Gate != nil && (before.Gate == nil || before.Gate.Name != after.Gate.Name || before.Phase != after.Phase) {
 		if en.Data == nil {

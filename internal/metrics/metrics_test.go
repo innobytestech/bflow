@@ -112,6 +112,35 @@ func TestComputeFeature(t *testing.T) {
 	}
 }
 
+func TestQualityFrictionAndModels(t *testing.T) {
+	log := featureLog()
+	log[len(log)-1].Data["model"] = "claude-haiku-4-5" // las otras dos entradas son previas: sin modelo
+	log = append(log,
+		e(410, "reject", flow.Walkthrough, flow.Implementing, gate("walkthrough")),
+		store.Entry{TS: at(20), ID: "T-1", Event: "refused", Data: map[string]any{"code": "gate_pending"}},
+		store.Entry{TS: at(21), ID: "T-1", Event: "guard", Data: map[string]any{"rule": "frozen_test"}},
+		store.Entry{TS: at(22), ID: "T-1", Event: "guard", Data: map[string]any{"rule": "force_push"}},
+		store.Entry{TS: at(500), ID: "T-9", Event: "start", From: flow.Backlog, To: flow.Implementing, Data: map[string]any{"lane": "hotfix", "fixes": "T-1"}},
+		store.Entry{TS: at(501), ID: "T-8", Event: "start", From: flow.Backlog, To: flow.Implementing, Data: map[string]any{"lane": "hotfix", "fixes": "OTRA-1"}},
+	)
+	st := Compute("T-1", log, at(430))
+	if st.Rejections != 2 || st.RejectionsByGate["spec"] != 1 || st.RejectionsByGate["walkthrough"] != 1 {
+		t.Errorf("rechazos por gate: %d %v", st.Rejections, st.RejectionsByGate)
+	}
+	if st.Refused != 1 || st.Guarded != 2 {
+		t.Errorf("fricción: refused %d guarded %d", st.Refused, st.Guarded)
+	}
+	if len(st.Hotfixes) != 1 || st.Hotfixes[0] != "T-9" {
+		t.Errorf("hotfixes: %v", st.Hotfixes)
+	}
+	if st.Models["claude-haiku-4-5"].Total() != 2600 || st.Models[""].Total() != 51600 || st.Tokens.Total() != 54200 {
+		t.Errorf("tokens por modelo: %+v", st.Models)
+	}
+	if st.Phase != flow.Implementing {
+		t.Errorf("refused y guard no mueven la fase: %s", st.Phase)
+	}
+}
+
 func TestNoTokens(t *testing.T) {
 	log := featureLog()[:5]
 	st := Compute("T-1", log, at(100))

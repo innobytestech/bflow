@@ -129,6 +129,12 @@ func (t *tx) start(ev Event) error {
 	if !ok {
 		return reject("unknown_lane", "carril desconocido %q (disponibles: %s)", ev.Lane, laneNames(t.cfg))
 	}
+	if ev.Fixes != "" && ev.Lane != Hotfix {
+		return reject("fixes_needs_hotfix", "--fixes solo aplica al carril hotfix (se pidió %s)", ev.Lane)
+	}
+	if ev.Fixes == s.ID {
+		return reject("fixes_self", "%s no puede corregirse a sí misma", s.ID)
+	}
 	s.Lane = ev.Lane
 	t.enter(phases[0])
 	return nil

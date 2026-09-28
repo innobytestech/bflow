@@ -133,7 +133,8 @@ const (
 type Event struct {
 	Kind EventKind `json:"kind"`
 
-	Lane Lane `json:"lane,omitempty"` // start
+	Lane  Lane   `json:"lane,omitempty"`  // start
+	Fixes string `json:"fixes,omitempty"` // start hotfix: tarea que corrige
 
 	Gate       Gate   `json:"gate,omitempty"`       // approve/reject (vacío = el pendiente)
 	To         Phase  `json:"to,omitempty"`         // reject: destino alternativo

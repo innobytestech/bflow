@@ -87,7 +87,7 @@ func TestFullLaneEndToEnd(t *testing.T) {
 	ctx := context.Background()
 	id := v.task(t, "Crédito: reabrir por rechazo fiscal")
 
-	o := mustT(t)(v.e.Start(ctx, id, flow.Full, ""))
+	o := mustT(t)(v.e.Start(ctx, id, flow.Full, "", ""))
 	if o.To != flow.Discovery || o.Next.Gate != "discovery" {
 		t.Fatalf("start: %+v", o)
 	}
@@ -194,7 +194,7 @@ func TestHotfixLane(t *testing.T) {
 	v := newEnv(t, "")
 	ctx := context.Background()
 	id := v.task(t, "Migración mal numerada")
-	o := mustT(t)(v.e.Start(ctx, id, flow.Hotfix, "migracion-124"))
+	o := mustT(t)(v.e.Start(ctx, id, flow.Hotfix, "migracion-124", ""))
 	rec, _ := v.e.Store.Load(id)
 	if o.To != flow.Implementing || rec.Branch != "hotfix/"+id+"-migracion-124" {
 		t.Errorf("hotfix: to=%s rama=%s", o.To, rec.Branch)
@@ -211,7 +211,7 @@ func TestTrackerFailureQueuesAndSyncs(t *testing.T) {
 	v.tr.FailTransitions = true
 	v.tr.FailComments = true
 
-	o := mustT(t)(v.e.Start(ctx, id, flow.Full, ""))
+	o := mustT(t)(v.e.Start(ctx, id, flow.Full, "", ""))
 	if o.To != flow.Discovery || !hasWarning(o, "pendiente") {
 		t.Fatalf("con el tracker caído el estado local avanza y avisa: %+v", o)
 	}
@@ -245,7 +245,7 @@ func TestPendingKeepsOrderAcrossCommands(t *testing.T) {
 	ctx := context.Background()
 	id := v.task(t, "Demo")
 	v.tr.FailTransitions = true
-	mustT(t)(v.e.Start(ctx, id, flow.Light, "")) // transition spec queda pendiente
+	mustT(t)(v.e.Start(ctx, id, flow.Light, "", "")) // transition spec queda pendiente
 	v.tr.FailTransitions = false
 	mustT(t)(v.e.Report(ctx, id, ReportOpts{Agent: "spec-author", Verdict: flow.Ready}))
 	mustT(t)(v.e.Approve(ctx, id, ApproveOpts{})) // debe sincronizar spec antes de implementing
@@ -259,7 +259,7 @@ func TestDoneRequiresVerifiedCheck(t *testing.T) {
 	v := newEnv(t, "")
 	ctx := context.Background()
 	id := v.task(t, "Demo")
-	mustT(t)(v.e.Start(ctx, id, flow.Hotfix, ""))
+	mustT(t)(v.e.Start(ctx, id, flow.Hotfix, "", ""))
 	v.ver.ok, v.ver.detail = false, "cambios de código posteriores al check: internal/x.go"
 	_, err := v.e.Report(ctx, id, ReportOpts{Agent: "implementer", Verdict: flow.DoneV})
 	var rj *flow.Rejection
@@ -285,7 +285,7 @@ func TestNotStartedAndUnknown(t *testing.T) {
 	if !errors.As(err, &rj) || rj.Code != "not_started" {
 		t.Errorf("aprobar sin empezar: %v", err)
 	}
-	if _, err := v.e.Start(ctx, "MEM-99", flow.Full, ""); err == nil || !strings.Contains(err.Error(), "no existe") {
+	if _, err := v.e.Start(ctx, "MEM-99", flow.Full, "", ""); err == nil || !strings.Contains(err.Error(), "no existe") {
 		t.Errorf("tarea inexistente: %v", err)
 	}
 	view, err := v.e.Status(ctx, id)
@@ -304,12 +304,12 @@ func TestActiveTask(t *testing.T) {
 		t.Error("sin tareas debe fallar")
 	}
 	a := v.task(t, "A")
-	mustT(t)(v.e.Start(ctx, a, flow.Full, ""))
+	mustT(t)(v.e.Start(ctx, a, flow.Full, "", ""))
 	if id, err := v.e.Active(ctx); err != nil || id != a {
 		t.Errorf("una sola tarea activa: %q %v", id, err)
 	}
 	b := v.task(t, "B")
-	mustT(t)(v.e.Start(ctx, b, flow.Full, ""))
+	mustT(t)(v.e.Start(ctx, b, flow.Full, "", ""))
 	_, err := v.e.Active(ctx)
 	var rj *flow.Rejection
 	if !errors.As(err, &rj) || rj.Code != "ambiguous_task" || !strings.Contains(rj.Reason, a) || !strings.Contains(rj.Reason, b) {
@@ -321,7 +321,7 @@ func TestDecisionRecorded(t *testing.T) {
 	v := newEnv(t, "")
 	ctx := context.Background()
 	id := v.task(t, "Demo")
-	mustT(t)(v.e.Start(ctx, id, flow.Hotfix, ""))
+	mustT(t)(v.e.Start(ctx, id, flow.Hotfix, "", ""))
 	o := mustT(t)(v.e.Report(ctx, id, ReportOpts{Agent: "implementer", Verdict: flow.NeedsDecision,
 		Note: "¿Reintento o fallo rápido?", Options: []string{"Reintentar 3 veces", "Fallar rápido"}}))
 	if o.Next.Gate != "decision" || len(o.Next.Options) != 3 {
@@ -338,7 +338,7 @@ func TestShowSections(t *testing.T) {
 	v := newEnv(t, "stack: angular\n")
 	ctx := context.Background()
 	id := v.task(t, "Pantalla de cotizaciones")
-	mustT(t)(v.e.Start(ctx, id, flow.Light, ""))
+	mustT(t)(v.e.Start(ctx, id, flow.Light, "", ""))
 	rec, _ := v.e.Store.Load(id)
 	path := filepath.Join(v.e.Cfg.Root, flow.SpecPath(id, rec.Flow.Slug))
 	b, _ := os.ReadFile(path)

@@ -93,7 +93,7 @@ func toWalkthrough(t *testing.T, v *env, id string) {
 	t.Helper()
 	ctx := context.Background()
 	m := mustT(t)
-	m(v.e.Start(ctx, id, flow.Hotfix, ""))
+	m(v.e.Start(ctx, id, flow.Hotfix, "", ""))
 	m(v.e.Report(ctx, id, ReportOpts{Agent: "implementer", Verdict: flow.DoneV}))
 	m(v.e.Report(ctx, id, ReportOpts{Agent: "reviewer", Verdict: flow.Approved}))
 	m(v.e.Report(ctx, id, ReportOpts{Agent: "security-auditor", Verdict: flow.Approved}))
@@ -106,7 +106,7 @@ func TestBranchCreatedOnSpecApproval(t *testing.T) {
 	v.e.Git = g
 	ctx := context.Background()
 	id := v.task(t, "Demo")
-	mustT(t)(v.e.Start(ctx, id, flow.Light, ""))
+	mustT(t)(v.e.Start(ctx, id, flow.Light, "", ""))
 	if len(g.calls) != 0 {
 		t.Fatalf("no se crea rama antes de aprobar el spec: %v", g.calls)
 	}
@@ -127,7 +127,7 @@ func TestBranchCreatedOnSpecApproval(t *testing.T) {
 	}
 	// La tarea activa sale de la rama actual aunque haya otras en curso.
 	other := v.task(t, "Otra")
-	mustT(t)(v.e.Start(ctx, other, flow.Full, ""))
+	mustT(t)(v.e.Start(ctx, other, flow.Full, "", ""))
 	if a, err := v.e.Active(ctx); err != nil || a != id {
 		t.Errorf("activa por rama: %q %v", a, err)
 	}
@@ -197,7 +197,7 @@ func TestPanelClosesMergedAndRemindsSLA(t *testing.T) {
 	h.merge("hotfix/" + merged + "-ya-mergeada")
 
 	waiting := v.task(t, "Esperando spec")
-	mustT(t)(v.e.Start(ctx, waiting, flow.Light, ""))
+	mustT(t)(v.e.Start(ctx, waiting, flow.Light, "", ""))
 	mustT(t)(v.e.Report(ctx, waiting, ReportOpts{Agent: "spec-author", Verdict: flow.Ready}))
 
 	v.tick(30 * time.Hour)
@@ -249,7 +249,7 @@ func TestContractApprovalFreezesTouchedTests(t *testing.T) {
 	ctx := context.Background()
 	id := v.task(t, "Demo")
 	m := mustT(t)
-	m(v.e.Start(ctx, id, flow.Full, ""))
+	m(v.e.Start(ctx, id, flow.Full, "", ""))
 	m(v.e.Approve(ctx, id, ApproveOpts{Attachment: "d"}))
 	m(v.e.Report(ctx, id, ReportOpts{Agent: "spec-author", Verdict: flow.Ready}))
 	m(v.e.Approve(ctx, id, ApproveOpts{}))

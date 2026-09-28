@@ -176,9 +176,11 @@ func emit(env *Env, asJSON bool, e output.Envelope) int {
 
 // AgentAdapter es lo que la CLI necesita de la herramienta de agente.
 type AgentAdapter interface {
+	Name() string
 	ParsePreToolUse(raw []byte) (a guard.Action, cwd string, ok bool)
 	TranscriptPath(raw []byte) string
-	ReadUsage(path string, cur *metrics.Cursor) (metrics.Usage, error)
+	// ReadUsage devuelve los tokens nuevos por modelo.
+	ReadUsage(path string, cur *metrics.Cursor) (map[string]metrics.Usage, error)
 }
 
 // Commands devuelve los nombres de los comandos registrados.

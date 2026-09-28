@@ -82,3 +82,62 @@ func TestStatsTokensAndStatusline(t *testing.T) {
 		t.Error("watch --once")
 	}
 }
+
+func TestQualityFrictionAndModelMetrics(t *testing.T) {
+	r := newRepo(t)
+	feat := r.ok("task", "add", "Alta de clientes").Data["id"].(string)
+	r.ok("start", feat, "--lane", "light")
+
+	// Fricción: un pedido que el flujo rechaza y una acción que bloquea guard.
+	if env := r.run("approve", feat); env.exit != 2 {
+		t.Fatalf("aprobar sin gate pendiente debe rechazarse: exit %d", env.exit)
+	}
+	if _, _, code := r.hook(preToolUse(r.dir, "Bash", map[string]any{"command": "git push --force origin main"}), "guard"); code != 2 {
+		t.Fatalf("guard debe bloquear el push forzado: exit %d", code)
+	}
+
+	// Tokens de dos modelos: la sesión principal y un subagente.
+	tr := filepath.Join(r.dir, "sess.jsonl")
+	line := func(id, model string, out int) string {
+		b, _ := json.Marshal(map[string]any{"type": "assistant", "message": map[string]any{"id": id, "model": model,
+			"usage": map[string]any{"input_tokens": 1, "output_tokens": out}}})
+		return string(b) + "\n"
+	}
+	os.WriteFile(tr, []byte(line("m1", "claude-opus-5-5", 300)), 0o644)
+	os.MkdirAll(filepath.Join(r.dir, "sess", "subagents"), 0o755)
+	os.WriteFile(filepath.Join(r.dir, "sess", "subagents", "agent-x.jsonl"), []byte(line("s1", "claude-haiku-4-5", 99)), 0o644)
+	r.hook(fmt.Sprintf(`{"hook_event_name":"Stop","transcript_path":%q}`, tr), "hook", "tokens")
+
+	r.ok("report", feat, "--agent", "spec-author", "--verdict", "READY")
+	r.ok("reject", feat, "--note", "falta el RFC genérico")
+
+	// Hotfix ligado a la feature.
+	fix := r.ok("task", "add", "Corrige alta").Data["id"].(string)
+	if env := r.run("start", fix, "--lane", "light", "--fixes", feat); env.exit != 2 || env.Code != "fixes_needs_hotfix" {
+		t.Errorf("--fixes fuera de hotfix: exit %d code %s", env.exit, env.Code)
+	}
+	r.ok("start", fix, "--lane", "hotfix", "--fixes", strings.ToLower(feat))
+
+	st := r.ok("stats", feat).Data["stats"].(map[string]any)
+	if st["refused"].(float64) != 1 || st["guarded"].(float64) != 1 {
+		t.Errorf("fricción: refused %v guarded %v", st["refused"], st["guarded"])
+	}
+	if g := st["rejections_by_gate"].(map[string]any); g["spec"].(float64) != 1 {
+		t.Errorf("rechazos por gate: %v", g)
+	}
+	if h := st["hotfixes"].([]any); len(h) != 1 || h[0] != fix {
+		t.Errorf("hotfixes: %v", h)
+	}
+	models := st["models"].(map[string]any)
+	opus := models["claude-opus-5-5"].(map[string]any)
+	haiku := models["claude-haiku-4-5"].(map[string]any)
+	if opus["output"].(float64) != 300 || haiku["output"].(float64) != 99 || len(models) != 2 {
+		t.Errorf("tokens por modelo: %v", models)
+	}
+	text, _, _ := r.hook("", "stats", feat)
+	for _, want := range []string{"rechazos por gate: spec 1", "hotfixes: " + fix, "fricción: 1", "por modelo: claude-haiku-4-5"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("stats texto sin %q:\n%s", want, text)
+		}
+	}
+}

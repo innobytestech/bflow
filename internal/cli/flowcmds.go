@@ -99,10 +99,11 @@ func flowCommand(run func(ctx context.Context, e *engine.Engine, id string, c *C
 func str(fs *flag.FlagSet, name string) string { return fs.Lookup(name).Value.String() }
 
 func init() {
-	Register(&Command{Name: "start", Summary: "empieza una tarea en un carril: start <ID> --lane full|light|hotfix [--slug s]",
+	Register(&Command{Name: "start", Summary: "empieza una tarea en un carril: start <ID> --lane full|light|hotfix [--slug s] [--fixes ID]",
 		Setup: func(fs *flag.FlagSet) {
 			fs.String("lane", "", "carril")
 			fs.String("slug", "", "slug para rama y carpeta del spec")
+			fs.String("fixes", "", "hotfix: ID de la feature que corrige")
 		},
 		Run: func(c *Ctx) output.Envelope {
 			if len(c.Args) == 0 {
@@ -113,7 +114,7 @@ func init() {
 				return output.Fail("usage", errors.New("falta --lane (full, light o hotfix); bflow status <ID> muestra las opciones"))
 			}
 			return flowCommand(func(ctx context.Context, e *engine.Engine, id string, c *Ctx, _ []string) (engine.Outcome, error) {
-				return e.Start(ctx, id, flow.Lane(lane), str(c.Flags, "slug"))
+				return e.Start(ctx, id, flow.Lane(lane), str(c.Flags, "slug"), str(c.Flags, "fixes"))
 			})(c)
 		}})
 
