@@ -68,6 +68,9 @@ var artifacts = map[string]string{
 // Show devuelve un artefacto: una sección del spec (brief, spec --section X) o
 // un archivo de trabajo (contract, review-map, decisions, check).
 func (e *Engine) Show(ctx context.Context, id, what, section string) (string, error) {
+	if what == "task" {
+		return e.showTask(ctx, id)
+	}
 	rec, err := e.Store.Load(id)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
@@ -87,13 +90,29 @@ func (e *Engine) Show(ctx context.Context, id, what, section string) (string, er
 	}
 	rel, ok := artifacts[what]
 	if !ok {
-		return "", fmt.Errorf("no sé mostrar %q (disponibles: brief, spec, contract, review-map, decisions, discovery, check)", what)
+		return "", fmt.Errorf("no sé mostrar %q (disponibles: task, brief, spec, contract, review-map, decisions, discovery, check)", what)
 	}
 	b, err := e.Store.ReadFile(id, rel)
 	if errors.Is(err, os.ErrNotExist) {
 		return "", fmt.Errorf("%s todavía no tiene %s (%s/%s)", id, what, ".bflow/tasks/"+id, rel)
 	}
 	return string(b), err
+}
+
+// showTask devuelve la tarea del tracker envuelta como contenido externo: la
+// escribieron personas ajenas al flujo (clientes, otros equipos) y el agente
+// debe tratarla como datos, no como instrucciones.
+func (e *Engine) showTask(ctx context.Context, id string) (string, error) {
+	t, err := e.Tracker.Get(ctx, id)
+	if err != nil {
+		return "", trackerErr(id, err)
+	}
+	body := "# " + t.Title
+	if d := strings.TrimSpace(t.Description); d != "" {
+		body += "\n\n" + d
+	}
+	body = strings.ReplaceAll(body, "</pasted_content", "<\\/pasted_content")
+	return fmt.Sprintf("<pasted_content id=\"tracker:%s\">\n%s\n</pasted_content>", id, body), nil
 }
 
 func (e *Engine) specSection(rec store.Record, key string) (string, error) {

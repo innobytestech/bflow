@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	"innobytes.tech/bflow/internal/agents"
 	"innobytes.tech/bflow/internal/engine"
 	"innobytes.tech/bflow/internal/guard"
 	"innobytes.tech/bflow/internal/metrics"
@@ -181,6 +182,10 @@ type AgentAdapter interface {
 	TranscriptPath(raw []byte) string
 	// ReadUsage devuelve los tokens nuevos por modelo.
 	ReadUsage(path string, cur *metrics.Cursor) (map[string]metrics.Usage, error)
+	// RenderAgents da formato a los agentes: ruta relativa → contenido.
+	RenderAgents(specs []agents.Spec) (map[string][]byte, error)
+	// GeneratedAgents lista los agentes que ya generó bflow render.
+	GeneratedAgents(root string) []string
 }
 
 // Commands devuelve los nombres de los comandos registrados.

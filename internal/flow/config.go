@@ -17,6 +17,33 @@ type Config struct {
 	MaxQualityRounds int
 }
 
+// PhasesOf devuelve, en el orden del flujo, las fases en las que trabaja el agente.
+func (c Config) PhasesOf(agent string) []Phase {
+	var ps []Phase
+	for _, p := range Order {
+		if slices.Contains(c.Agents[p], agent) {
+			ps = append(ps, p)
+		}
+	}
+	return ps
+}
+
+// AgentNames devuelve todos los agentes del flujo, en orden de aparición.
+func (c Config) AgentNames() []string {
+	var names []string
+	for _, p := range Order {
+		for _, a := range c.Agents[p] {
+			if !slices.Contains(names, a) {
+				names = append(names, a)
+			}
+		}
+	}
+	return names
+}
+
+// SubagentPrefix distingue los agentes que genera bflow de los del usuario.
+const SubagentPrefix = "bflow-"
+
 // DefaultLanes son los carriles por defecto. `paused` solo en full.
 func DefaultLanes() map[Lane][]Phase {
 	return map[Lane][]Phase{

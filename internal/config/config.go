@@ -26,16 +26,17 @@ const RepoFile = "bflow.yaml"
 
 // Config es la configuración efectiva de un repo.
 type Config struct {
-	Profile string  `yaml:"profile,omitempty"`
-	Project Project `yaml:"project,omitempty"`
-	Stack   string  `yaml:"stack,omitempty"`
-	Agent   string  `yaml:"agent,omitempty"`
-	Tracker Tracker `yaml:"tracker,omitempty"`
-	VCS     VCS     `yaml:"vcs,omitempty"`
-	Flow    Flow    `yaml:"flow,omitempty"`
-	Check   Check   `yaml:"check,omitempty"`
-	Env     Env     `yaml:"env,omitempty"`
-	Guard   Guard   `yaml:"guard,omitempty"`
+	Profile string               `yaml:"profile,omitempty"`
+	Project Project              `yaml:"project,omitempty"`
+	Stack   string               `yaml:"stack,omitempty"`
+	Agent   string               `yaml:"agent,omitempty"`
+	Tracker Tracker              `yaml:"tracker,omitempty"`
+	VCS     VCS                  `yaml:"vcs,omitempty"`
+	Flow    Flow                 `yaml:"flow,omitempty"`
+	Check   Check                `yaml:"check,omitempty"`
+	Env     Env                  `yaml:"env,omitempty"`
+	Guard   Guard                `yaml:"guard,omitempty"`
+	Agents  map[string]AgentConf `yaml:"agents,omitempty"` // ajustes por agente para bflow render
 
 	Root    string  `yaml:"-"` // raíz del repo
 	Sources Sources `yaml:"-"`
@@ -78,6 +79,21 @@ type VCS struct {
 	CommitStyle       string       `yaml:"commit_style,omitempty"`
 	ProtectedBranches []string     `yaml:"protected_branches,omitempty"`
 }
+
+// AgentConf ajusta un agente del flujo. El contrato con bflow no se configura:
+// sale del flujo. Esto es el oficio del repo y cómo se ejecuta el agente.
+type AgentConf struct {
+	Model  string   `yaml:"model,omitempty"`
+	Effort string   `yaml:"effort,omitempty"`
+	Read   []string `yaml:"read,omitempty"`  // documentos del repo que el agente lee antes de empezar
+	Extra  string   `yaml:"extra,omitempty"` // archivo con instrucciones propias; se copia al agente
+	// OmitClaudeMd evita cargar CLAUDE.md en el agente. Por defecto, sí cuando
+	// hay Read: las reglas del repo le llegan por esas rutas.
+	OmitClaudeMd *bool `yaml:"omit_claude_md,omitempty"`
+}
+
+// Efforts son los niveles de esfuerzo que acepta un agente.
+var Efforts = []string{"low", "medium", "high", "xhigh", "max"}
 
 type Flow struct {
 	Lanes            map[string][]string `yaml:"lanes,omitempty"`
@@ -461,8 +477,23 @@ func (c *Config) Validate() error {
 	}
 	unknownPhase := slices.ContainsFunc(p, func(s string) bool { return strings.Contains(s, "fase desconocida") })
 	if !unknownPhase {
-		if err := c.Flow.Core().Validate(); err != nil {
+		core := c.Flow.Core()
+		if err := core.Validate(); err != nil {
 			add("flow: %v", err)
+		}
+		for _, name := range sortedKeys(c.Agents) {
+			a := c.Agents[name]
+			if len(core.PhasesOf(name)) == 0 {
+				add("agents.%s no trabaja en ninguna fase (revisa flow.agents)", name)
+			}
+			if a.Effort != "" && !slices.Contains(Efforts, a.Effort) {
+				add("agents.%s.effort %q no existe (disponibles: %s)", name, a.Effort, strings.Join(Efforts, ", "))
+			}
+			for _, r := range append(slices.Clone(a.Read), a.Extra) {
+				if filepath.IsAbs(r) || strings.HasPrefix(filepath.ToSlash(filepath.Clean(r)), "../") {
+					add("agents.%s: %q debe ser una ruta dentro del repo", name, r)
+				}
+			}
 		}
 	}
 	if len(p) > 0 {

@@ -42,9 +42,10 @@ type Option struct {
 // AgentCall es un agente a lanzar. Report es la plantilla del comando con el
 // que el agente devuelve su veredicto.
 type AgentCall struct {
-	Agent  string            `json:"agent"`
-	Args   map[string]string `json:"args"`
-	Report string            `json:"report"`
+	Agent    string            `json:"agent"`
+	Subagent string            `json:"subagent"` // definición que genera bflow render
+	Args     map[string]string `json:"args"`
+	Report   string            `json:"report"`
 }
 
 // Next dice a la sesión principal qué hacer a continuación.

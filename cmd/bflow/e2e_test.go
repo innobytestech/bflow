@@ -48,9 +48,10 @@ type envelope struct {
 			Command string `json:"command"`
 		} `json:"options"`
 		Agents []struct {
-			Agent  string            `json:"agent"`
-			Args   map[string]string `json:"args"`
-			Report string            `json:"report"`
+			Agent    string            `json:"agent"`
+			Subagent string            `json:"subagent"`
+			Args     map[string]string `json:"args"`
+			Report   string            `json:"report"`
 		} `json:"agents"`
 	} `json:"next"`
 	exit int
@@ -147,6 +148,9 @@ func spawned(t *testing.T, env envelope, agents ...string) {
 	var got []string
 	for _, a := range env.Next.Agents {
 		got = append(got, a.Agent)
+		if a.Subagent != "bflow-"+a.Agent {
+			t.Errorf("spawn de %s debe nombrar su subagente generado: %q", a.Agent, a.Subagent)
+		}
 	}
 	if env.Next.Action != "spawn" || strings.Join(got, ",") != strings.Join(agents, ",") {
 		t.Fatalf("spawn %v, want %v (next %+v)", got, agents, env.Next)

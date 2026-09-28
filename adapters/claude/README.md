@@ -1,6 +1,6 @@
 # Adaptador de Claude Code
 
-Escrito a mano para el MVP; más adelante lo generará `bflow render --tool claude`.
+La skill y los hooks se copian a mano. Los agentes no: `bflow render` los escribe en `<repo>/.claude/agents/bflow-<agente>.md` y se commitean.
 
 | Archivo | Dónde va | Para qué |
 |---|---|---|

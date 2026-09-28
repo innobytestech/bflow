@@ -196,7 +196,7 @@ func spawnNext(cfg Config, s State) output.Next {
 		if s.Resume && !parallel {
 			args["resume"] = "true"
 		}
-		n.Agents = append(n.Agents, output.AgentCall{Agent: a, Args: args,
+		n.Agents = append(n.Agents, output.AgentCall{Agent: a, Subagent: SubagentPrefix + a, Args: args,
 			Report: cmd("report", s.ID, "--agent", a, "--verdict", joinVerdicts(Verdicts(s.Phase)))})
 	}
 	return n

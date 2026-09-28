@@ -17,7 +17,7 @@ Todo comando `bflow … --json` responde con `next`. Haz lo que diga y luego sig
   2. Si trae `skill`, aplica esa sección de abajo.
   3. Pregunta con AskUserQuestion usando `question` y los `label` de `options`.
   4. Corre el `command` de la opción elegida. Si `needs_note`, cambia `<motivo>` o `<decisión>` por las palabras del humano, entre comillas.
-- `spawn`: lanza cada agente de `agents` como subagente (todos en el mismo mensaje si `parallel`). Pásale solo sus `args` y su comando `report`; no pegues specs ni código, el agente lee las rutas. Al terminar, el último `report` trae el siguiente `next`.
+- `spawn`: lanza cada agente de `agents` con el subagente `subagent` (todos en el mismo mensaje si `parallel`; si no existe, corre `bflow render`). Pásale solo sus `args` y su comando `report`; no pegues specs ni código, el agente lee las rutas. Al terminar, el último `report` trae el siguiente `next`.
 - `wait`: dile al humano qué se espera (`reason`).
 - `done`: no hay nada pendiente.
 

@@ -195,6 +195,28 @@ La skill tiene unas 30 líneas: no contiene reglas del flujo, solo cómo interpr
 API-12 · implementing · 1h42m · ronda 1 · 184k tok
 ```
 
+Los agentes los genera bflow en el repo:
+
+```bash
+bflow render           # escribe .claude/agents/bflow-<agente>.md; commitéalos
+bflow render --check   # en CI: falla si no coinciden con la configuración
+```
+
+Cada agente tiene dos capas. El **contrato** con bflow (qué recibe, qué archivos escribe, qué veredictos puede reportar y cómo) sale del flujo y no se configura. El **oficio** (cómo hace su trabajo) trae un default y cada repo lo complementa:
+
+```yaml
+# bflow.yaml
+agents:
+  implementer:
+    model: sonnet
+    effort: medium
+    read: [docs/architecture/]           # el agente los lee antes de empezar
+    extra: docs/bflow/implementer.md     # instrucciones propias, se copian al agente
+  documenter: { model: haiku, effort: low }
+```
+
+Con `read`, el agente no carga CLAUDE.md (`omit_claude_md: false` lo cambia): las reglas del repo le llegan por esas rutas. Un agente propio se agrega a una fase en `flow.agents` y define su oficio en `extra`; bflow le antepone el contrato. Los agentes generados llevan el prefijo `bflow-` para no chocar con los tuyos.
+
 ## Configuración
 
 Hay tres capas; la última gana:
@@ -232,6 +254,7 @@ La validación junta todos los problemas en un solo mensaje, indica la línea de
 | Grupo | Comandos |
 |---|---|
 | Flujo | `status [ID] [--brief]` · `start <ID> --lane [--fixes ID]` · `approve` · `reject --note` · `report --agent --verdict` · `block` / `unblock` · `freeze` · `show` · `task add` · `sync` · `import --from harness` |
+| Agentes | `render [--check]` |
 | Git y PR | `pr` · `panel [--sla]` (cierra lo mergeado, recuerda gates vencidos) |
 | Calidad | `check [--quick pkg] [--verify]` · `env check` · `guard` |
 | Métricas | `stats [ID]` · `statusline` · `watch` |
@@ -246,7 +269,7 @@ El MVP cubre el módulo 1 (motor de flujo) y adelanta las guardas y las métrica
 
 1. ✅ Motor de flujo: estado, gates, tracker local y Plane, git y GitHub.
 2. ✅ Guardas (versión inicial): git destructivo, `.env`, pruebas congeladas, tamaño de diff.
-3. ⏳ Distribuidor: una sola definición de agentes (`agents.yaml`) y `bflow render --tool claude|codex|opencode`, `bflow update`, binarios firmados.
+3. 🟡 Distribuidor: `bflow render` genera los agentes para Claude Code (contrato de bflow + oficio del repo). Pendiente: otras herramientas, `bflow update`, binarios firmados.
 4. ✅ Métricas: tiempo y tokens por fase.
 5. ⏳ Contexto: índice del código para el planner y el reviewer.
 6. ⏳ Planeación: ordenar el backlog y repartirlo en ciclos balanceados.
