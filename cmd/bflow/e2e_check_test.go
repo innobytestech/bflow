@@ -57,3 +57,23 @@ func TestDoneRequiresVigentCheck(t *testing.T) {
 		t.Fatalf("con check vigente avanza: %v", env.Data)
 	}
 }
+
+// env_first exige lo que usan las pruebas (puertos y variables), no el API.
+func TestCheckEnvFirstIgnoresAPIHealth(t *testing.T) {
+	r, _ := gitRepo(t, `check:
+  env_first: true
+  steps: [{ name: ok, run: "go version" }]
+env:
+  api_url: http://127.0.0.1:1
+  health_paths: [/api/health]
+  require_env: { BFLOW_TEST_DSN: ":5433" }
+`)
+	t.Setenv("BFLOW_TEST_DSN", "postgres://localhost:5432/dev")
+	if env := r.run("check"); env.Code != "env_not_ready" {
+		t.Errorf("con la variable apuntando a otro lado el check no corre: %s", env.Code)
+	}
+	t.Setenv("BFLOW_TEST_DSN", "postgres://localhost:5433/test")
+	if env := r.run("check"); env.Code == "env_not_ready" {
+		t.Errorf("el API caído no debe impedir el check: %v", env.Data)
+	}
+}

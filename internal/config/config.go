@@ -123,7 +123,7 @@ type Check struct {
 	Steps         []Step   `yaml:"steps,omitempty"`
 	Quick         []string `yaml:"quick,omitempty"`
 	CodePaths     []string `yaml:"code_paths,omitempty"`
-	EnvFirst      bool     `yaml:"env_first,omitempty"`
+	EnvFirst      bool     `yaml:"env_first,omitempty"` // no correr si fallan env.tcp o env.require_env (la salud del API no cuenta)
 	DBTestPattern string   `yaml:"db_test_pattern,omitempty"`
 	DBTestImports []string `yaml:"db_test_imports,omitempty"` // sufijos de import que marcan un paquete de tests con BD
 	FailPattern   string   `yaml:"fail_pattern,omitempty"`    // líneas que resumen un fallo (por defecto, las del stack)

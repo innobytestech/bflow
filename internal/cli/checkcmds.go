@@ -94,7 +94,11 @@ func runCheck(c *Ctx) output.Envelope {
 	}
 
 	if e.Cfg.Check.EnvFirst {
-		if res := envcheck.Run(ctx, e.Cfg.Env, os.Getenv); envcheck.Failed(res) > 0 {
+		// Solo lo que usan las pruebas (puertos y variables). La salud del API
+		// avisa al iniciar sesión, pero el check no necesita el servidor corriendo.
+		need := e.Cfg.Env
+		need.APIURL, need.HealthPaths = "", nil
+		if res := envcheck.Run(ctx, need, os.Getenv); envcheck.Failed(res) > 0 {
 			env := output.Fail("env_not_ready", errors.New("entorno no listo; no se corrió el check"))
 			env.Data["checks"] = res
 			env.Text = envcheck.Text(res, true) + "\nCHECK ABORTADO: entorno no listo"
