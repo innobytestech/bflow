@@ -261,6 +261,7 @@ go test ./...        # incluye E2E que compilan el binario y usan git real
 - Dependencias: biblioteca estándar, `gopkg.in/yaml.v3` y `github.com/zalando/go-keyring`.
 - El núcleo (`internal/...`) nunca importa `internal/adapters/...`; lo verifica `internal/archtest`. El único lugar que conecta ambos es `cmd/bflow`.
 - Los adaptadores externos se prueban con `httptest` y respuestas grabadas, nunca contra servicios reales.
+- Guía para contribuir: [`CONTRIBUTING.md`](CONTRIBUTING.md). Vulnerabilidades: [`SECURITY.md`](SECURITY.md).
 
 ## Licencia
 
