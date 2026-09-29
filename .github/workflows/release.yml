@@ -1,0 +1,60 @@
+name: release
+# Publica binarios al empujar un tag vX.Y.Z. Antes de crear el tag, CHANGELOG.md
+# debe tener la sección «## vX.Y.Z»: son las notas de la versión.
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write     # crear la release
+  id-token: write     # atestación de procedencia (Sigstore)
+  attestations: write
+jobs:
+  release:
+    # Windows para poder firmar los .exe con signtool; Go compila las demás
+    # plataformas desde aquí.
+    runs-on: windows-latest
+    env:
+      TAG: ${{ github.ref_name }}
+      CERT: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+      CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test -count=1 ./...
+      - name: notas (falla si CHANGELOG.md no tiene la sección del tag)
+        run: go run ./scripts/dist notes "$TAG"
+      - run: go run ./scripts/dist build "$TAG"
+      - name: firmar los .exe (solo si hay certificado)
+        if: env.CERT != ''
+        shell: pwsh
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP 'cert.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT))
+          $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe' | Sort-Object FullName | Select-Object -Last 1
+          Get-ChildItem dist\bin\windows_*\bflow.exe | ForEach-Object {
+            & $signtool.FullName sign /f $pfx /p $env:CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $_.FullName
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+            & $signtool.FullName verify /pa $_.FullName
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+          }
+          Remove-Item $pfx
+      - run: go run ./scripts/dist package "$TAG"
+      - uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            dist/*.zip
+            dist/*.tar.gz
+      - name: publicar
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pre=""
+          case "$TAG" in *-*) pre="--prerelease" ;; esac
+          gh release create "$TAG" dist/*.zip dist/*.tar.gz dist/checksums.txt \
+            --title "$TAG" --notes-file dist/notes.md --verify-tag $pre

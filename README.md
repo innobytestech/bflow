@@ -158,7 +158,29 @@ Ningún subagente le pregunta nada al humano: devuelve su veredicto y `bflow` de
 
 ## Instalación
 
-Requiere Go 1.25 o superior (los binarios firmados llegarán con las primeras releases) y, como agente, Claude Code 2.1.271 o posterior. `bflow doctor` revisa la versión.
+Como agente, bflow requiere Claude Code 2.1.271 o posterior; `bflow doctor` revisa la versión. Para instalarlo no hace falta Go.
+
+Linux y macOS (en `~/.local/bin`; `BFLOW_INSTALL_DIR` lo cambia):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/innobytestech/bflow/main/install.sh | sh
+```
+
+Windows (en `%LOCALAPPDATA%\Programs\bflow`, que agrega a tu `PATH`):
+
+```powershell
+irm https://raw.githubusercontent.com/innobytestech/bflow/main/install.ps1 | iex
+```
+
+Los dos scripts verifican el SHA-256 del archivo contra `checksums.txt` antes de instalar. También puedes bajar el archivo de tu plataforma de [Releases](https://github.com/innobytestech/bflow/releases). Cada release trae una atestación de procedencia: `gh attestation verify <archivo> --repo innobytestech/bflow` comprueba que lo compiló el workflow del repo.
+
+Para actualizar:
+
+```bash
+bflow update           # --check solo dice si hay una versión nueva
+```
+
+Con Go 1.25 o superior:
 
 ```bash
 go install innobytes.tech/bflow/cmd/bflow@latest
@@ -309,7 +331,7 @@ El MVP cubre el módulo 1 (motor de flujo) y adelanta las guardas y las métrica
 
 1. ✅ Motor de flujo: estado, gates, tracker local y Plane, git y GitHub.
 2. ✅ Guardas (versión inicial): git destructivo, `.env`, `.bflow/`, pruebas congeladas (también sin hooks), ramas y PR a mano, tamaño de diff, agentes que terminan sin reportar.
-3. 🟡 Distribuidor: `bflow render` genera los agentes para Claude Code (contrato de bflow + oficio del repo). Pendiente: otras herramientas, `bflow update`, binarios firmados.
+3. 🟡 Distribuidor: `bflow render` genera los agentes para Claude Code (contrato de bflow + oficio del repo). Binarios por plataforma con checksums y atestación, instaladores y `bflow update`. Pendiente: otras herramientas y la firma de código en Windows y macOS (falta el certificado).
 4. ✅ Métricas: tiempo, tokens por fase, agente y modelo, calidad (rechazos por gate, hotfixes) y fricción.
 5. ⏳ Contexto: índice del código para el planner y el reviewer.
 6. ⏳ Planeación: ordenar el backlog y repartirlo en ciclos balanceados.

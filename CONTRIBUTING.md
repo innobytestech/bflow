@@ -28,6 +28,14 @@ go test ./...        # incluye E2E que compilan el binario y usan git real
 - Un PR por tema, con descripción de qué cambia y cómo se probó.
 - No incluyas datos internos de tu organización (URLs, IDs de proyectos, correos) en código, pruebas ni fixtures.
 
+## Publicar una versión
+
+1. En `CHANGELOG.md`, renombra «Sin publicar» a `## vX.Y.Z (AAAA-MM-DD)` y abre una sección «Sin publicar» vacía encima. Esa sección son las notas de la release: sin ella el workflow falla.
+2. Commit, push y tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+3. El workflow `release` corre las pruebas, compila para Windows, Linux y macOS (amd64 y arm64), firma los `.exe` si el repo tiene los secretos `WINDOWS_CERT_PFX_BASE64` y `WINDOWS_CERT_PASSWORD`, empaqueta, publica `checksums.txt` y una atestación de procedencia, y crea la release. Un tag con guion (`v0.2.0-rc.1`) sale como pre-release.
+
+Para probar el empaquetado en local: `go run ./scripts/dist build v0.0.0 && go run ./scripts/dist package v0.0.0` (queda en `dist/`, que git ignora).
+
 ## Licencia
 
 Al contribuir aceptas que tu aporte se publique bajo la [licencia Apache 2.0](LICENSE).
