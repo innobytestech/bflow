@@ -38,6 +38,7 @@ type Config struct {
 	Guard   Guard                `yaml:"guard,omitempty"`
 	Agents  map[string]AgentConf `yaml:"agents,omitempty"` // ajustes por agente para bflow render
 	Doctor  Doctor               `yaml:"doctor,omitempty"`
+	UI      UI                   `yaml:"ui,omitempty"` // preferencias de la persona; también en la config global
 
 	Root    string  `yaml:"-"` // raíz del repo
 	Sources Sources `yaml:"-"`
@@ -94,6 +95,11 @@ type AgentConf struct {
 }
 
 // Doctor ajusta los avisos de bflow doctor.
+// UI son preferencias de cómo bflow se muestra a la persona.
+type UI struct {
+	Watch bool `yaml:"watch,omitempty"` // start abre el panel (bflow watch) en otra ventana
+}
+
 type Doctor struct {
 	IgnoreSkills []string `yaml:"ignore_skills,omitempty"` // skills que no chocan con el flujo aunque lo parezcan
 }
@@ -147,6 +153,7 @@ type Guard struct {
 
 type globalFile struct {
 	Profiles map[string]Config `yaml:"profiles"`
+	UI       UI                `yaml:"ui"`
 }
 
 // Known son los adaptadores que este binario sabe construir.
@@ -227,6 +234,9 @@ func Load(dir string) (*Config, error) {
 		profile = env
 	}
 	merged := map[string]any{}
+	if ui, ok := globalMap["ui"].(map[string]any); ok { // preferencias personales: el repo o el perfil las pisan
+		merged["ui"] = ui
+	}
 	if profile != "" {
 		pm, ok := globalProfiles[profile]
 		if !ok {

@@ -103,6 +103,8 @@ Tus reglas de arquitectura en CLAUDE.md o en los documentos de `read` son bienve
 
 ## Medir
 
+Mientras trabajas, `bflow watch --open` abre en otra ventana un panel en vivo: el paso actual (quién trabaja o qué gate te espera), lo que sigue, tiempos, tokens por agente y los últimos eventos. Para que `bflow start` lo abra solo, pon `ui: { watch: true }` en tu config global (`%AppData%\bflow\config.yaml` en Windows, `~/.config/bflow/config.yaml` en Linux y macOS) o en `bflow.yaml`.
+
 `bflow stats <ID>` separa el tiempo de cada fase en trabajo del agente, espera tuya y bloqueo, y cuenta:
 
 - **Calidad:** rechazos por gate, rondas de calidad y hotfixes ligados (`bflow start <ID> --lane hotfix --fixes <feature>`).

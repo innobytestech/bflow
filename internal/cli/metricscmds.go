@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"maps"
@@ -24,12 +23,6 @@ import (
 func init() {
 	Register(&Command{Name: "stats", Summary: "tiempo por fase (agente, humano, bloqueada), iteraciones y tokens: stats [ID]", Run: runStats})
 	Register(&Command{Name: "statusline", Summary: "una línea para la barra de estado (lee una caché: milisegundos)", Run: runStatusline})
-	Register(&Command{Name: "watch", Summary: "panel en la terminal que se refresca solo: watch [--interval 5s] [--once]",
-		Setup: func(fs *flag.FlagSet) {
-			fs.Duration("interval", 5*time.Second, "cada cuánto refrescar")
-			fs.Bool("once", false, "dibujar una vez y salir")
-		},
-		Run: runWatch})
 	Register(&Command{Name: "hook tokens", Summary: "hook Stop/SubagentStop: suma los tokens nuevos del transcript a la fase activa", Run: runHookTokens})
 }
 
@@ -150,15 +143,9 @@ func usageTable(b *strings.Builder, title string, m map[string]metrics.Usage, na
 	if _, legacy := m[""]; len(m) == 0 || (len(m) == 1 && legacy) {
 		return
 	}
-	keys := slices.SortedFunc(maps.Keys(m), func(x, y string) int {
-		if d := m[y].New() - m[x].New(); d != 0 {
-			return int(max(-1, min(1, d)))
-		}
-		return strings.Compare(x, y)
-	})
 	row := "  %-22s %8s %8s\n"
 	fmt.Fprintf(b, row, title, "nuevos", "caché")
-	for _, k := range keys {
+	for _, k := range byNew(m) {
 		name := k
 		if n, ok := names[k]; ok {
 			name = n
@@ -215,53 +202,6 @@ func StatuslineText(sc engine.StatusCache, now time.Time) string {
 		parts = append(parts, metrics.Tokens(sc.New, sc.Cached))
 	}
 	return strings.Join(parts, " · ")
-}
-
-func runWatch(c *Ctx) output.Envelope {
-	interval := c.Flags.Lookup("interval").Value.(flag.Getter).Get().(time.Duration)
-	once := str(c.Flags, "once") == "true"
-	for {
-		frame, err := watchFrame(c)
-		if err != nil {
-			return fail(err)
-		}
-		if once {
-			env := output.OK("watch", map[string]any{}, nil)
-			env.Text = frame
-			return env
-		}
-		fmt.Fprint(c.Stdout, "\x1b[H\x1b[2J"+frame+"\n")
-		time.Sleep(interval)
-	}
-}
-
-func watchFrame(c *Ctx) (string, error) {
-	e, err := engineFor(c)
-	if err != nil {
-		return "", err
-	}
-	views, err := e.Views(context.Background())
-	if err != nil {
-		return "", err
-	}
-	log, _ := e.Store.Log("")
-	now := time.Now()
-	var b strings.Builder
-	fmt.Fprintf(&b, "bflow · %s · %s\n\n", filepath.Base(e.Cfg.Root), now.Format("15:04:05"))
-	if len(views) == 0 {
-		b.WriteString("sin tareas en curso\n")
-	}
-	active, _ := e.Active(context.Background())
-	for _, v := range views {
-		mark := "  "
-		if v.ID == active {
-			mark = "▶ "
-		}
-		st := metrics.Compute(v.ID, log, now)
-		fmt.Fprintf(&b, "%s%s\n", mark, statsLine(st))
-		fmt.Fprintf(&b, "    siguiente: %s\n", nextLabel(v))
-	}
-	return strings.TrimRight(b.String(), "\n"), nil
 }
 
 // nextLabel resume en pocas palabras lo que sigue en una tarea.

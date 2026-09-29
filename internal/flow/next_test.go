@@ -197,3 +197,36 @@ func TestSpecGateShowsUIBlueprint(t *testing.T) {
 		t.Errorf("con UI el humano ve el blueprint al aprobar: %v", n.Show)
 	}
 }
+
+func TestUpcoming(t *testing.T) {
+	cfg := DefaultConfig()
+	st := func(lane Lane, p Phase, g Gate) State {
+		s := State{ID: "T-1", Lane: lane, Phase: p}
+		if g != "" {
+			s.Gate = &PendingGate{Name: g}
+		}
+		return s
+	}
+	for _, c := range []struct {
+		s    State
+		want string
+	}{
+		{st(Light, Spec, ""), "gate spec"},
+		{st(Light, Spec, GateSpec), "implementing"},
+		{st(Full, Spec, GateSpec), "contract"},
+		{st(Full, Contract, GateContract), "implementing"},
+		{st(Full, Implementing, ""), "paused"},
+		{st(Light, Implementing, ""), "quality"},
+		{st(Light, Implementing, GateDecision), "sigue implementing"},
+		{st(Light, Quality, ""), "documenting"},
+		{st(Light, Walkthrough, GateQuestions), "gate walkthrough"},
+		{st(Light, Walkthrough, GateWalkthrough), "PR y in_review"},
+		{st(Light, InReview, ""), "merge del PR → done"},
+		{st(Light, Blocked, ""), "desbloquear (bflow unblock T-1)"},
+		{st(Light, Done, ""), ""},
+	} {
+		if got := Upcoming(cfg, c.s); got != c.want {
+			t.Errorf("%s/%s gate %v: %q, want %q", c.s.Lane, c.s.Phase, c.s.Gate, got, c.want)
+		}
+	}
+}

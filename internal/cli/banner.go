@@ -187,3 +187,12 @@ func runHome(c *Ctx) output.Envelope {
 	env.Text = strings.TrimRight(b.String(), "\n")
 	return env
 }
+
+// compactBanner es el banner en una línea, para cuando no cabe completo.
+func compactBanner(m bannerMode, version string) string {
+	name := "bflow"
+	if m == bannerColor {
+		name = fmt.Sprintf("\x1b[1;38;2;%d;%d;%dmbflow\x1b[0m", gradTo[0], gradTo[1], gradTo[2])
+	}
+	return "  " + name + " by innobytes.tech · " + version
+}

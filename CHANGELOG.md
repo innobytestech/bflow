@@ -20,6 +20,7 @@ Los cambios de bflow que ve quien lo usa. Las versiones siguen [semver](https://
 - **Gate `questions`** antes del walkthrough: el humano contesta las preguntas de producto sin ver el código (`bflow show <ID> questions` las saca del review-map sin las respuestas) y el walkthrough compara sus respuestas con lo implementado.
 - **La spec entra al PR.** Al aprobarla, bflow hace commit de ella en la rama nueva, y antes de abrir el PR hace commit de sus cambios (tareas marcadas). El mensaje sigue `vcs.commit_style` (`{type}: {id} {summary}` por defecto).
 - **`report DONE` exige las tareas de la spec marcadas `[x]`** (`tasks_open`).
+- **Panel en vivo (`bflow watch`).** Banner, paso actual (quién trabaja y desde cuándo, o qué gate espera a la persona), lo que sigue, tiempos por fase, tokens por agente, fricción y últimos eventos. Se ajusta al alto de la terminal y se repinta sin parpadeo. `watch --open` lo abre en otra pestaña o ventana y no duplica uno abierto; con `ui.watch: true`, `start` lo abre solo, nunca en CI ni sin escritorio.
 - **Tokens por agente.** `stats` desglosa los tokens por agente, con la sesión principal aparte. Cada agente cuenta en la fase donde trabajó: antes caían en la fase siguiente, porque se leían cuando el agente ya había reportado.
 
 ### Cambiado

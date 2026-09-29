@@ -272,3 +272,18 @@ func TestFindRepoRootWalksUp(t *testing.T) {
 		t.Errorf("root=%s stack=%s", c.Root, c.Stack)
 	}
 }
+
+func TestUIWatchIsPersonal(t *testing.T) {
+	// Preferencia personal en la config global; el repo puede apagarla.
+	c, err := Load(fixture(t, "ui: { watch: true }\n", "stack: go\n"))
+	if err != nil || !c.UI.Watch {
+		t.Fatalf("global: %v %+v", err, c.UI)
+	}
+	c, err = Load(fixture(t, "ui: { watch: true }\n", "ui: { watch: false }\n"))
+	if err != nil || c.UI.Watch {
+		t.Errorf("el repo la pisa: %v %+v", err, c.UI)
+	}
+	if c, err := Load(fixture(t, "", "ui: { watch: true }\n")); err != nil || !c.UI.Watch {
+		t.Errorf("en bflow.yaml: %v", err)
+	}
+}

@@ -3,6 +3,7 @@ package cli
 import (
 	"os"
 	"syscall"
+	"unsafe"
 )
 
 var (
@@ -41,4 +42,24 @@ func enableVT(f *os.File) bool {
 	}
 	r, _, _ := setConsoleMode.Call(uintptr(h), uintptr(mode|enableVirtualTerminalProcessing))
 	return r != 0
+}
+
+var getConsoleScreenBufferInfo = kernel32.NewProc("GetConsoleScreenBufferInfo")
+
+// termRows es el alto visible de la consola (0 si no se sabe).
+func termRows(f *os.File) int {
+	if f == nil {
+		return 0
+	}
+	var info struct {
+		Size, Cursor             [2]int16
+		Attr                     uint16
+		Left, Top, Right, Bottom int16
+		MaxX, MaxY               int16
+	}
+	r, _, _ := getConsoleScreenBufferInfo.Call(f.Fd(), uintptr(unsafe.Pointer(&info)))
+	if r == 0 {
+		return 0
+	}
+	return int(info.Bottom-info.Top) + 1
 }

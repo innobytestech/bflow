@@ -114,7 +114,14 @@ func init() {
 				return output.Fail("usage", errors.New("falta --lane (full, light o hotfix); bflow status <ID> muestra las opciones"))
 			}
 			return flowCommand(func(ctx context.Context, e *engine.Engine, id string, c *Ctx, _ []string) (engine.Outcome, error) {
-				return e.Start(ctx, id, flow.Lane(lane), str(c.Flags, "slug"), str(c.Flags, "fixes"))
+				o, err := e.Start(ctx, id, flow.Lane(lane), str(c.Flags, "slug"), str(c.Flags, "fixes"))
+				if err == nil && e.Cfg.UI.Watch {
+					// Sin escritorio (CI, SSH) no se abre y no se avisa: es lo esperado.
+					if _, werr := openWatch(e.Cfg.Root, e.Store.Dir()); werr != nil && !errors.Is(werr, errNoDesktop) {
+						o.Warnings = append(o.Warnings, "no se pudo abrir el panel (bflow watch): "+werr.Error())
+					}
+				}
+				return o, err
 			})(c)
 		}})
 

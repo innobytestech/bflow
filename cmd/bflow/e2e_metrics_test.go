@@ -174,3 +174,28 @@ func TestQualityFrictionAndModelMetrics(t *testing.T) {
 		}
 	}
 }
+
+func TestWatchOpen(t *testing.T) {
+	r := newRepo(t)
+	t.Setenv("CI", "true")
+	os.WriteFile(filepath.Join(r.dir, "bflow.yaml"), []byte("ui: { watch: true }\n"), 0o644)
+	id := r.ok("task", "add", "Panel").Data["id"].(string)
+	// En CI start no abre ventanas ni avisa.
+	if env := r.ok("start", id, "--lane", "light"); env.Data["warnings"] != nil {
+		t.Errorf("start en CI: %v", env.Data)
+	}
+	if env := r.run("watch", "--open"); env.exit != 1 || env.Code != "no_terminal" {
+		t.Errorf("watch --open en CI: exit %d %s", env.exit, env.Code)
+	}
+	// Con un panel vivo, --open no abre otro (y no llega a buscar terminal).
+	alive := filepath.Join(r.dir, ".bflow", "cache", "watch.alive")
+	os.MkdirAll(filepath.Dir(alive), 0o755)
+	os.WriteFile(alive, []byte("2000"), 0o644)
+	if env := r.ok("watch", "--open"); env.Data["watch"] != "already" {
+		t.Errorf("con panel abierto: %v", env.Data)
+	}
+	text, _, _ := r.hook("", "watch", "--once")
+	if !strings.Contains(text, "spec · trabajando: spec-author") || !strings.Contains(text, "sigue     gate spec") {
+		t.Errorf("watch --once:\n%s", text)
+	}
+}
