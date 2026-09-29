@@ -51,10 +51,23 @@ func releaseServer(t *testing.T, badSum bool) *httptest.Server {
 	return srv
 }
 
-// runCopy corre una copia del binario (update la reemplaza).
-func runCopy(t *testing.T, api string, args ...string) (exe string, out string, code int) {
-	exe = filepath.Join(testutil.TempDir(t), filepath.Base(binary))
-	b, _ := os.ReadFile(binary)
+// buildAs compila bflow con la versión fijada. El binario de las demás
+// pruebas toma la versión de git (en un checkout con tag es ese tag), así que
+// no sirve para probar la comparación de versiones.
+func buildAs(t *testing.T, args ...string) string {
+	t.Helper()
+	exe := filepath.Join(testutil.TempDir(t), filepath.Base(binary))
+	cmd := exec.Command("go", append(append([]string{"build"}, args...), "-o", exe, ".")...)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("go build: %v\n%s", err, out)
+	}
+	return exe
+}
+
+// runCopy corre una copia de src (update la reemplaza).
+func runCopy(t *testing.T, src, api string, args ...string) (exe string, out string, code int) {
+	exe = filepath.Join(testutil.TempDir(t), filepath.Base(src))
+	b, _ := os.ReadFile(src)
 	os.WriteFile(exe, b, 0o755)
 	cmd := exec.Command(exe, args...)
 	cmd.Env = append(os.Environ(), "BFLOW_RELEASES_URL="+api)
@@ -67,21 +80,32 @@ func runCopy(t *testing.T, api string, args ...string) (exe string, out string, 
 
 func TestUpdate(t *testing.T) {
 	srv := releaseServer(t, false)
-	// Un binario compilado desde el código no se compara: pide --force.
-	if _, out, code := runCopy(t, srv.URL, "update", "--check"); code != 0 || !strings.Contains(out, "no viene de una versión publicada") {
-		t.Errorf("dev --check: %d %s", code, out)
+	old := buildAs(t, "-ldflags", "-X main.version=v0.0.1")
+	if _, out, code := runCopy(t, old, srv.URL, "update", "--check"); code != 0 || !strings.Contains(out, "hay una versión nueva: v9.9.9 (tienes v0.0.1)") {
+		t.Errorf("--check: %d %s", code, out)
 	}
-	exe, out, code := runCopy(t, srv.URL, "update", "--force")
-	if code != 0 || !strings.Contains(out, "→ v9.9.9") {
-		t.Fatalf("update --force: %d %s", code, out)
+	exe, out, code := runCopy(t, old, srv.URL, "update")
+	if code != 0 || !strings.Contains(out, "v0.0.1 → v9.9.9") {
+		t.Fatalf("update: %d %s", code, out)
 	}
 	if b, _ := os.ReadFile(exe); string(b) != "bflow nuevo" {
 		t.Errorf("el binario no se reemplazó: %q", b)
 	}
 
+	// Sin versión publicada (compilado sin datos de git) no se compara: pide --force.
+	dev := buildAs(t, "-buildvcs=false")
+	if _, out, code := runCopy(t, dev, srv.URL, "update"); code != 0 || !strings.Contains(out, "no viene de una versión publicada") {
+		t.Errorf("dev: %d %s", code, out)
+	}
+	if exe, out, code := runCopy(t, dev, srv.URL, "update", "--force"); code != 0 || !strings.Contains(out, "→ v9.9.9") {
+		t.Errorf("dev --force: %d %s", code, out)
+	} else if b, _ := os.ReadFile(exe); string(b) != "bflow nuevo" {
+		t.Errorf("--force no reemplazó: %q", b)
+	}
+
 	// Si la descarga no coincide con checksums.txt, no se toca nada.
 	bad := releaseServer(t, true)
-	exe, out, code = runCopy(t, bad.URL, "update", "--force")
+	exe, out, code = runCopy(t, old, bad.URL, "update")
 	if code == 0 || !strings.Contains(out, "no coincide con checksums.txt") {
 		t.Errorf("checksum malo: %d %s", code, out)
 	}
