@@ -32,7 +32,7 @@ func TestUIHandler(t *testing.T) {
 	if w := get("evil.example:7719", "/api/state"); w.Code != http.StatusForbidden {
 		t.Errorf("Host ajeno (DNS rebinding): %d", w.Code)
 	}
-	if w := get("127.0.0.1:7719", "/"); w.Code != 200 || !strings.Contains(w.Body.String(), "Avisarme en este navegador") || w.Header().Get("Content-Security-Policy") == "" {
+	if w := get("127.0.0.1:7719", "/"); w.Code != 200 || !strings.Contains(w.Body.String(), "Avisarme cuando me toque") || w.Header().Get("Content-Security-Policy") == "" {
 		t.Errorf("página: %d %v", w.Code, w.Header())
 	}
 	w := get("127.0.0.1:7719", "/api/state")
