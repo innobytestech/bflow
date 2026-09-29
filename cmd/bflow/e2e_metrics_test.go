@@ -7,10 +7,15 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func transcriptLine(id string, in, out, cr, cw int) string {
-	b, _ := json.Marshal(map[string]any{"type": "assistant", "message": map[string]any{"id": id,
+	return transcriptLineAt(time.Now(), id, in, out, cr, cw)
+}
+
+func transcriptLineAt(ts time.Time, id string, in, out, cr, cw int) string {
+	b, _ := json.Marshal(map[string]any{"type": "assistant", "timestamp": ts.UTC().Format(time.RFC3339Nano), "message": map[string]any{"id": id,
 		"usage": map[string]any{"input_tokens": in, "output_tokens": out, "cache_read_input_tokens": cr, "cache_creation_input_tokens": cw}}})
 	return string(b) + "\n"
 }
@@ -23,26 +28,47 @@ func TestStatsTokensAndStatusline(t *testing.T) {
 	r.ok("approve", id, "--file", "d.md")
 	r.ok("report", id, "--agent", "spec-author", "--verdict", "READY")
 
-	// Tokens del spec-author: transcript principal y de un subagente.
+	// La sesión principal (Stop) y el spec-author (SubagentStop) llegan cada
+	// uno por su hook y solo con su transcript.
 	tr := filepath.Join(r.dir, "sess.jsonl")
+	subs := filepath.Join(r.dir, "sess", "subagents")
+	os.MkdirAll(subs, 0o755)
 	os.WriteFile(tr, []byte(transcriptLine("m1", 10, 500, 20000, 3000)+transcriptLine("m1", 10, 900, 20000, 3000)), 0o644)
-	os.MkdirAll(filepath.Join(r.dir, "sess", "subagents"), 0o755)
-	os.WriteFile(filepath.Join(r.dir, "sess", "subagents", "agent-x.jsonl"), []byte(transcriptLine("s1", 5, 100, 10000, 0)), 0o644)
-	hookIn := fmt.Sprintf(`{"hook_event_name":"SubagentStop","transcript_path":%q}`, tr)
-	out, _, code := r.hook(hookIn, "hook", "tokens")
+	stop := fmt.Sprintf(`{"hook_event_name":"Stop","transcript_path":%q}`, tr)
+	subStop := func(agent, file string) string {
+		return fmt.Sprintf(`{"hook_event_name":"SubagentStop","transcript_path":%q,"agent_id":"x","agent_type":"bflow-%s","agent_transcript_path":%q}`,
+			tr, agent, filepath.Join(subs, file))
+	}
+	os.WriteFile(filepath.Join(subs, "agent-s.jsonl"), []byte(transcriptLine("s1", 5, 100, 10000, 0)), 0o644)
+	out, _, code := r.hook(subStop("spec-author", "agent-s.jsonl"), "hook", "tokens")
 	if code != 0 || out != "" {
 		t.Fatalf("hook tokens debe ser silencioso: %d %q", code, out)
 	}
-	r.hook(hookIn, "hook", "tokens") // sin nada nuevo no suma otra vez
+	r.hook(stop, "hook", "tokens")
+	r.hook(stop, "hook", "tokens") // sin nada nuevo no suma otra vez
 
 	r.ok("reject", id, "--note", "falta concurrencia")
 	r.ok("report", id, "--agent", "spec-author", "--verdict", "READY")
 	r.ok("approve", id)
 	r.ok("report", id, "--agent", "implementer", "--verdict", "CONTRACT_READY")
 	r.ok("approve", id)
+	time.Sleep(20 * time.Millisecond)
+	inImpl := time.Now() // la sesión principal responde ya en implementing
+	time.Sleep(20 * time.Millisecond)
 	r.ok("report", id, "--agent", "implementer", "--verdict", "NEEDS_DECISION", "--note", "¿409?", "--option", "a", "--option", "b")
 	r.ok("approve", id, "--choice", "1")
 	r.ok("report", id, "--agent", "implementer", "--verdict", "DONE")
+
+	// El hook del implementer corre cuando la tarea ya pasó a quality: sus
+	// tokens son de implementing. La respuesta de la sesión principal se
+	// registra al terminar el turno, pero ocurrió en implementing.
+	os.WriteFile(filepath.Join(subs, "agent-i.jsonl"), []byte(transcriptLine("i1", 3, 2000, 50000, 5000)), 0o644)
+	r.hook(subStop("implementer", "agent-i.jsonl"), "hook", "tokens")
+	f, _ := os.OpenFile(tr, os.O_APPEND|os.O_WRONLY, 0o644)
+	f.WriteString(transcriptLineAt(inImpl, "m2", 1, 40, 8000, 0))
+	f.Close()
+	r.hook(stop, "hook", "tokens")
+
 	r.ok("approve", id)
 	r.ok("report", id, "--agent", "reviewer", "--verdict", "APPROVED")
 	r.ok("report", id, "--agent", "security-auditor", "--verdict", "REJECTED")
@@ -56,27 +82,32 @@ func TestStatsTokensAndStatusline(t *testing.T) {
 		t.Errorf("los tiempos deben cuadrar: %v", st)
 	}
 	tok := st["tokens"].(map[string]any)
-	if st["tokens_available"] != true || tok["output"].(float64) != 1000 || tok["cache_read"].(float64) != 30000 {
-		t.Errorf("tokens (m1 contado una vez con su uso final + subagente): %v", tok)
+	if st["tokens_available"] != true || tok["output"].(float64) != 3040 || tok["cache_read"].(float64) != 88000 {
+		t.Errorf("tokens (m1 contado una vez con su uso final): %v", tok)
 	}
-	phases := st["phases"].([]any)
-	specTok := 0.0
-	for _, p := range phases {
+	byPhase := map[string]float64{}
+	for _, p := range st["phases"].([]any) {
 		pm := p.(map[string]any)
-		if pm["phase"] == "spec" {
-			specTok = pm["tokens"].(map[string]any)["output"].(float64)
-		}
+		byPhase[pm["phase"].(string)] = pm["tokens"].(map[string]any)["output"].(float64)
 	}
-	if specTok != 1000 {
-		t.Errorf("los tokens se atribuyen a la fase activa (spec): %v", phases)
+	if byPhase["spec"] != 1000 || byPhase["implementing"] != 2040 || byPhase["quality"] != 0 || byPhase["contract"] != 0 {
+		t.Errorf("cada agente en la fase donde trabajó: %v", byPhase)
+	}
+	agents := st["agents"].(map[string]any)
+	outOf := func(a string) float64 { return agents[a].(map[string]any)["output"].(float64) }
+	if len(agents) != 3 || outOf("main") != 940 || outOf("spec-author") != 100 || outOf("implementer") != 2000 {
+		t.Errorf("por agente: %v", agents)
 	}
 
 	line, _, _ := r.hook(fmt.Sprintf(`{"workspace":{"current_dir":%q}}`, r.dir), "statusline")
-	if !strings.HasPrefix(line, id+" · implementing") || !strings.Contains(line, "ronda 1") {
+	if !strings.HasPrefix(line, id+" · implementing") || !strings.Contains(line, "ronda 1") || !strings.HasSuffix(strings.TrimSpace(line), "11k nuevos · 88k caché") {
 		t.Errorf("statusline: %q", line)
 	}
-	if text, _, _ := r.hook("", "stats", id); !strings.Contains(text, "caché leída") {
-		t.Errorf("stats texto:\n%s", text)
+	text, _, _ := r.hook("", "stats", id)
+	for _, want := range []string{"11k nuevos · 88k caché", "sesión principal", "implementer", "caché escrita 8k"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("stats texto sin %q:\n%s", want, text)
+		}
 	}
 	if w := r.ok("watch", "--once").Data; w == nil {
 		t.Error("watch --once")
@@ -107,6 +138,8 @@ func TestQualityFrictionAndModelMetrics(t *testing.T) {
 	os.MkdirAll(filepath.Join(r.dir, "sess", "subagents"), 0o755)
 	os.WriteFile(filepath.Join(r.dir, "sess", "subagents", "agent-x.jsonl"), []byte(line("s1", "claude-haiku-4-5", 99)), 0o644)
 	r.hook(fmt.Sprintf(`{"hook_event_name":"Stop","transcript_path":%q}`, tr), "hook", "tokens")
+	r.hook(fmt.Sprintf(`{"hook_event_name":"SubagentStop","transcript_path":%q,"agent_id":"x","agent_type":"Explore","agent_transcript_path":%q}`,
+		tr, filepath.Join(r.dir, "sess", "subagents", "agent-x.jsonl")), "hook", "tokens")
 
 	r.ok("report", feat, "--agent", "spec-author", "--verdict", "READY")
 	r.ok("reject", feat, "--note", "falta el RFC genérico")
@@ -135,7 +168,7 @@ func TestQualityFrictionAndModelMetrics(t *testing.T) {
 		t.Errorf("tokens por modelo: %v", models)
 	}
 	text, _, _ := r.hook("", "stats", feat)
-	for _, want := range []string{"rechazos por gate: spec 1", "hotfixes: " + fix, "fricción: 1", "por modelo: claude-haiku-4-5"} {
+	for _, want := range []string{"rechazos por gate: spec 1", "hotfixes: " + fix, "fricción: 1", "claude-haiku-4-5            100"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("stats texto sin %q:\n%s", want, text)
 		}

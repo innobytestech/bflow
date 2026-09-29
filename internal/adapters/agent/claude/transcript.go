@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"innobytes.tech/bflow/internal/guard"
 	"innobytes.tech/bflow/internal/metrics"
@@ -23,41 +24,53 @@ func (Agent) Name() string { return "claude" }
 // ParsePreToolUse ver hook.go.
 func (Agent) ParsePreToolUse(raw []byte) (guard.Action, string, bool) { return ParsePreToolUse(raw) }
 
-// TranscriptPath saca la ruta del transcript de la entrada de un hook.
-func (Agent) TranscriptPath(raw []byte) string {
+// TokenSource dice qué transcript leer al terminar un turno o un subagente. En
+// Stop es el de la sesión principal (agent vacío); en SubagentStop, solo el
+// del subagente, para no mezclar sus tokens con los de la sesión.
+func (Agent) TokenSource(raw []byte) (path, agent string) {
 	var in struct {
-		TranscriptPath string `json:"transcript_path"`
+		TranscriptPath      string `json:"transcript_path"`
+		AgentTranscriptPath string `json:"agent_transcript_path"`
+		AgentType           string `json:"agent_type"`
+		AgentID             string `json:"agent_id"`
 	}
 	_ = json.Unmarshal(raw, &in)
-	return in.TranscriptPath
+	if in.AgentType == "" && in.AgentID == "" {
+		return in.TranscriptPath, ""
+	}
+	path = in.AgentTranscriptPath
+	if path == "" && in.AgentID != "" && in.TranscriptPath != "" { // versiones que no mandan la ruta
+		path = filepath.Join(strings.TrimSuffix(in.TranscriptPath, filepath.Ext(in.TranscriptPath)), "subagents", "agent-"+in.AgentID+".jsonl")
+	}
+	agent = in.AgentType
+	if agent == "" {
+		agent = "?"
+	}
+	return path, agent
 }
 
-// ReadUsage suma por modelo los tokens nuevos del transcript de la sesión y de
-// los de sus subagentes (<sesión>/subagents/*.jsonl). Claude Code escribe cada
-// respuesta en varias líneas con el mismo id de mensaje: se cuenta una vez,
-// con el uso más alto visto. Solo se leen líneas completas.
-func (Agent) ReadUsage(path string, cur *metrics.Cursor) (map[string]metrics.Usage, error) {
+// ReadUsage devuelve las respuestas nuevas del transcript, con su hora y
+// modelo. Claude Code escribe cada respuesta en varias líneas con el mismo id
+// de mensaje: se cuenta una vez, con el uso más alto visto. Solo se leen
+// líneas completas.
+func (Agent) ReadUsage(path string, cur *metrics.Cursor) ([]metrics.Sample, error) {
 	if cur.Offsets == nil {
 		cur.Offsets = map[string]int64{}
 	}
 	if cur.Seen == nil {
 		cur.Seen = map[string]metrics.Usage{}
 	}
-	files := []string{path}
-	subs, _ := filepath.Glob(filepath.Join(strings.TrimSuffix(path, filepath.Ext(path)), "subagents", "*.jsonl"))
-	files = append(files, subs...)
-	total := map[string]metrics.Usage{}
-	for _, f := range files {
-		if err := readFile(f, cur, total); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return total, err
-		}
+	out, err := readFile(path, cur)
+	if errors.Is(err, os.ErrNotExist) {
+		err = nil
 	}
-	return total, nil
+	return out, err
 }
 
 type entry struct {
-	Type    string `json:"type"`
-	Message struct {
+	Type      string    `json:"type"`
+	Timestamp time.Time `json:"timestamp"`
+	Message   struct {
 		ID    string `json:"id"`
 		Model string `json:"model"`
 		Usage struct {
@@ -69,10 +82,10 @@ type entry struct {
 	} `json:"message"`
 }
 
-func readFile(path string, cur *metrics.Cursor, total map[string]metrics.Usage) error {
+func readFile(path string, cur *metrics.Cursor) ([]metrics.Sample, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer f.Close()
 	off := cur.Offsets[path]
@@ -80,8 +93,9 @@ func readFile(path string, cur *metrics.Cursor, total map[string]metrics.Usage) 
 		off = 0 // el archivo se truncó o se reemplazó
 	}
 	if _, err := f.Seek(off, io.SeekStart); err != nil {
-		return err
+		return nil, err
 	}
+	var out []metrics.Sample
 	r := bufio.NewReaderSize(f, 1<<20)
 	for {
 		line, err := r.ReadBytes('\n')
@@ -102,13 +116,15 @@ func readFile(path string, cur *metrics.Cursor, total map[string]metrics.Usage) 
 		delta := metrics.Usage{Input: max(0, u.Input-prev.Input), Output: max(0, u.Output-prev.Output),
 			CacheRead: max(0, u.CacheRead-prev.CacheRead), CacheWrite: max(0, u.CacheWrite-prev.CacheWrite)}
 		if delta.Total() > 0 {
-			t := total[e.Message.Model]
-			t.Add(delta)
-			total[e.Message.Model] = t
+			ts := e.Timestamp
+			if ts.IsZero() {
+				ts = time.Now()
+			}
+			out = append(out, metrics.Sample{TS: ts, Model: e.Message.Model, Usage: delta})
 		}
 		cur.Seen[e.Message.ID] = metrics.Usage{Input: max(u.Input, prev.Input), Output: max(u.Output, prev.Output),
 			CacheRead: max(u.CacheRead, prev.CacheRead), CacheWrite: max(u.CacheWrite, prev.CacheWrite)}
 	}
 	cur.Offsets[path] = off
-	return nil
+	return out, nil
 }

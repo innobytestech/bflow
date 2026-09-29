@@ -24,6 +24,21 @@ type Usage struct {
 // Total suma todo lo que se procesó.
 func (u Usage) Total() int64 { return u.Input + u.Output + u.CacheRead + u.CacheWrite }
 
+// New es lo que el modelo procesó por primera vez: entrada sin caché, salida y
+// caché escrita. La caché leída cuesta ~10% de la entrada y va aparte.
+func (u Usage) New() int64 { return u.Input + u.Output + u.CacheWrite }
+
+// Sample es el uso de una respuesta del modelo y cuándo ocurrió.
+type Sample struct {
+	TS    time.Time
+	Model string
+	Usage
+}
+
+// MainSession es el nombre con el que se registran los tokens de la sesión
+// principal, para separarlos de los de los agentes.
+const MainSession = "main"
+
 // Add acumula.
 func (u *Usage) Add(o Usage) {
 	u.Input += o.Input
@@ -39,6 +54,9 @@ type PhaseStats struct {
 	Human   time.Duration `json:"human_ns"`
 	Blocked time.Duration `json:"blocked_ns"`
 	Tokens  Usage         `json:"tokens"`
+	// Tokens por agente (MainSession = sesión principal; "" = registrados
+	// antes de separarlos).
+	Agents map[string]Usage `json:"agents,omitempty"`
 }
 
 // TaskStats son las métricas de una tarea.
@@ -67,6 +85,17 @@ type TaskStats struct {
 	Nudged  int `json:"nudged"`
 	// Tokens por modelo ("" = registrados antes de guardar el modelo).
 	Models map[string]Usage `json:"models,omitempty"`
+	// Tokens por agente, como en PhaseStats.
+	Agents map[string]Usage `json:"agents,omitempty"`
+}
+
+func addTo(m *map[string]Usage, k string, u Usage) {
+	if *m == nil {
+		*m = map[string]Usage{}
+	}
+	x := (*m)[k]
+	x.Add(u)
+	(*m)[k] = x
 }
 
 // Compute calcula las métricas de una tarea. now cierra el último intervalo
@@ -91,17 +120,14 @@ func Compute(id string, entries []store.Entry, now time.Time) TaskStats {
 		switch e.Event {
 		case "tokens":
 			u := usageOf(e.Data)
-			p := flow.Phase(fmt.Sprint(e.Data["phase"]))
-			get(p).Tokens.Add(u)
+			ps := get(flow.Phase(fmt.Sprint(e.Data["phase"])))
+			ps.Tokens.Add(u)
+			addTo(&ps.Agents, e.Agent, u)
 			st.Tokens.Add(u)
 			st.TokensAvailable = true
 			model, _ := e.Data["model"].(string)
-			if st.Models == nil {
-				st.Models = map[string]Usage{}
-			}
-			m := st.Models[model]
-			m.Add(u)
-			st.Models[model] = m
+			addTo(&st.Models, model, u)
+			addTo(&st.Agents, e.Agent, u)
 			continue
 		case "refused":
 			st.Refused++
@@ -200,6 +226,87 @@ func Compute(id string, entries []store.Entry, now time.Time) TaskStats {
 	return st
 }
 
+// PhaseAt dice en qué fase estaba la tarea en el instante ts, según las
+// transiciones del log. Antes de la primera transición devuelve la primera
+// fase (lo que se habló justo antes de empezar ya es parte de la tarea); sin
+// historial, "".
+func PhaseAt(entries []store.Entry, id string, ts time.Time) flow.Phase {
+	var (
+		cur, first flow.Phase
+		at         time.Time
+	)
+	for _, e := range entries {
+		if e.ID != id || e.To == "" {
+			continue
+		}
+		if first == "" {
+			first = e.To
+		}
+		if !e.TS.After(ts) && !e.TS.Before(at) {
+			cur, at = e.To, e.TS
+		}
+	}
+	if cur == "" {
+		return first
+	}
+	return cur
+}
+
+// Share es la parte de un transcript que va a una fase y un modelo.
+type Share struct {
+	Phase flow.Phase
+	Model string
+	Usage
+}
+
+// Allot reparte las respuestas de un transcript entre las fases de la tarea.
+// Las de un agente van completas a la fase de su último reporte: el hook corre
+// cuando el agente termina, y para entonces su reporte ya movió la tarea. Sin
+// reporte, a la fase en que empezó. Las de la sesión principal (agent vacío),
+// cada una a la fase en que ocurrió.
+func Allot(entries []store.Entry, id, agent string, samples []Sample) []Share {
+	if len(samples) == 0 {
+		return nil
+	}
+	var fixed flow.Phase
+	if agent != "" {
+		for _, e := range entries {
+			if e.ID == id && e.Event == string(flow.EvReport) && e.Agent == agent {
+				fixed = e.From
+			}
+		}
+		if fixed == "" {
+			fixed = PhaseAt(entries, id, samples[0].TS)
+		}
+	}
+	type key struct {
+		p flow.Phase
+		m string
+	}
+	sum := map[key]Usage{}
+	for _, s := range samples {
+		p := fixed
+		if p == "" {
+			p = PhaseAt(entries, id, s.TS)
+		}
+		k := key{p, s.Model}
+		u := sum[k]
+		u.Add(s.Usage)
+		sum[k] = u
+	}
+	out := make([]Share, 0, len(sum))
+	for k, u := range sum {
+		out = append(out, Share{Phase: k.p, Model: k.m, Usage: u})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Phase != out[j].Phase {
+			return out[i].Phase < out[j].Phase
+		}
+		return out[i].Model < out[j].Model
+	})
+	return out
+}
+
 func usageOf(d map[string]any) Usage {
 	return Usage{Input: num(d["input"]), Output: num(d["output"]), CacheRead: num(d["cache_read"]), CacheWrite: num(d["cache_write"])}
 }
@@ -214,6 +321,16 @@ func num(v any) int64 {
 		return int64(x)
 	}
 	return 0
+}
+
+// Tokens separa lo nuevo de lo leído de caché: "145k nuevos · 2.9M caché".
+// Un total que mezcla ambos exagera el costo.
+func Tokens(fresh, cached int64) string {
+	s := Human(fresh) + " nuevos"
+	if cached > 0 {
+		s += " · " + Human(cached) + " caché"
+	}
+	return s
 }
 
 // Human formatea tokens: 900, 184k, 1.2M.

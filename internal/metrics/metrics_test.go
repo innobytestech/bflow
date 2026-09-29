@@ -167,3 +167,89 @@ func TestUsageTotal(t *testing.T) {
 		t.Errorf("formato: %s %s %s", Human(184_300), Human(1_250_000), Human(900))
 	}
 }
+
+func TestTokensNewVersusCache(t *testing.T) {
+	// Cifras de la piloto: casi todo es caché leída.
+	u := Usage{Input: 100, Output: 27_000, CacheRead: 2_900_000, CacheWrite: 118_000}
+	if u.New() != 145_100 {
+		t.Errorf("nuevos: %d", u.New())
+	}
+	if s := Tokens(u.New(), u.CacheRead); s != "145k nuevos · 2.9M caché" {
+		t.Errorf("formato: %q", s)
+	}
+	if s := Tokens(900, 0); s != "900 nuevos" {
+		t.Errorf("sin caché: %q", s)
+	}
+}
+
+// Una tarea light como la piloto: el implementer reporta DONE y la tarea pasa
+// a quality antes de que termine su hook.
+func pilotLog() []store.Entry {
+	return []store.Entry{
+		e(0, "start", flow.Backlog, flow.Spec),
+		e(1, "report", flow.Spec, flow.Spec, verdict("spec-author", "READY"), gateOpened("spec")),
+		e(2, "approve", flow.Spec, flow.Implementing, gate("spec")),
+		e(9, "report", flow.Implementing, flow.Quality, verdict("implementer", "DONE")),
+		e(10, "report", flow.Quality, flow.Quality, verdict("reviewer", "APPROVED")),
+		e(11, "report", flow.Quality, flow.Documenting, verdict("security-auditor", "APPROVED")),
+	}
+}
+
+func sample(min int, model string, out int) Sample {
+	return Sample{TS: at(min), Model: model, Usage: Usage{Output: int64(out)}}
+}
+
+func TestAllot(t *testing.T) {
+	log := pilotLog()
+	// El implementer trabajó de 2 a 9 y su última respuesta llega después del
+	// reporte: todo va a implementing, no a quality.
+	got := Allot(log, "T-1", "implementer", []Sample{sample(3, "opus", 100), sample(8, "opus", 50), sample(9, "opus", 5)})
+	if len(got) != 1 || got[0].Phase != flow.Implementing || got[0].Output != 155 {
+		t.Errorf("implementer: %+v", got)
+	}
+	// Un agente que no reportó (p. ej. Explore) va a la fase en que empezó.
+	got = Allot(log, "T-1", "Explore", []Sample{sample(4, "haiku", 10), sample(12, "haiku", 10)})
+	if len(got) != 1 || got[0].Phase != flow.Implementing || got[0].Output != 20 {
+		t.Errorf("agente sin reporte: %+v", got)
+	}
+	// La sesión principal se reparte por la hora de cada respuesta; lo previo
+	// al start es de la primera fase.
+	got = Allot(log, "T-1", "", []Sample{sample(-1, "opus", 1), sample(1, "opus", 2), sample(2, "opus", 4),
+		sample(5, "sonnet", 8), sample(10, "opus", 16), sample(30, "opus", 32)})
+	want := []Share{
+		{flow.Documenting, "opus", Usage{Output: 32}},
+		{flow.Implementing, "opus", Usage{Output: 4}},
+		{flow.Implementing, "sonnet", Usage{Output: 8}},
+		{flow.Quality, "opus", Usage{Output: 16}},
+		{flow.Spec, "opus", Usage{Output: 3}},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("sesión principal: %+v", got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("sesión principal [%d]: %+v, want %+v", i, got[i], want[i])
+		}
+	}
+	if Allot(log, "T-1", "", nil) != nil || PhaseAt(log, "OTRA-1", at(5)) != "" {
+		t.Error("sin muestras o sin historial no hay reparto")
+	}
+}
+
+func TestComputeByAgent(t *testing.T) {
+	tok := func(agent string, p flow.Phase, out, cr int) store.Entry {
+		return store.Entry{TS: at(20), ID: "T-1", Event: "tokens", Agent: agent, Data: map[string]any{
+			"phase": string(p), "output": float64(out), "cache_read": float64(cr)}}
+	}
+	log := append(pilotLog(), tok("implementer", flow.Implementing, 100, 1000), tok(MainSession, flow.Implementing, 10, 500),
+		tok(MainSession, flow.Quality, 5, 200), tok("reviewer", flow.Quality, 40, 0), tok("", flow.Spec, 7, 0))
+	st := Compute("T-1", log, at(20))
+	if st.Agents["implementer"].Output != 100 || st.Agents[MainSession].Output != 15 || st.Agents[""].Output != 7 || len(st.Agents) != 4 {
+		t.Errorf("por agente: %+v", st.Agents)
+	}
+	for _, p := range st.Phases {
+		if p.Phase == flow.Implementing && (len(p.Agents) != 2 || p.Agents[MainSession].CacheRead != 500) {
+			t.Errorf("implementing por agente: %+v", p.Agents)
+		}
+	}
+}

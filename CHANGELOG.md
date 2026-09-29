@@ -20,9 +20,12 @@ Los cambios de bflow que ve quien lo usa. Las versiones siguen [semver](https://
 - **Gate `questions`** antes del walkthrough: el humano contesta las preguntas de producto sin ver el código (`bflow show <ID> questions` las saca del review-map sin las respuestas) y el walkthrough compara sus respuestas con lo implementado.
 - **La spec entra al PR.** Al aprobarla, bflow hace commit de ella en la rama nueva, y antes de abrir el PR hace commit de sus cambios (tareas marcadas). El mensaje sigue `vcs.commit_style` (`{type}: {id} {summary}` por defecto).
 - **`report DONE` exige las tareas de la spec marcadas `[x]`** (`tasks_open`).
+- **Tokens por agente.** `stats` desglosa los tokens por agente, con la sesión principal aparte. Cada agente cuenta en la fase donde trabajó: antes caían en la fase siguiente, porque se leían cuando el agente ya había reportado.
 
 ### Cambiado
 
+- `stats` y la barra de estado separan los tokens nuevos de la caché leída ("145k nuevos · 2.9M caché"). El total anterior mezclaba ambos: en la piloto, 2.9M de 3.1M eran caché, que cuesta cerca del 10% de la entrada.
+- `hook tokens` en `Stop` lee solo el transcript de la sesión principal y reparte cada respuesta en la fase en que ocurrió; en `SubagentStop`, solo el del subagente (`agent_transcript_path`).
 - Con UI, la gate de spec muestra también el UI blueprint.
 - `ui-designer` y `ux-auditor` terminan de inmediato si la tarea no toca la interfaz.
 - `init` usa `agent: claude` si el repo ya tiene `.claude/` o `CLAUDE.md`, y propone `bflow render`.

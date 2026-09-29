@@ -13,12 +13,14 @@ import (
 // StatusCache es lo que bflow statusline lee sin tocar el tracker ni git: la
 // última tarea tocada y su estado. Lo escribe cada comando que cambia estado.
 type StatusCache struct {
-	ID     string     `json:"id"`
-	Phase  flow.Phase `json:"phase"`
-	Gate   string     `json:"gate,omitempty"`
-	Since  time.Time  `json:"since"`
-	Round  int        `json:"round,omitempty"`
-	Tokens int64      `json:"tokens,omitempty"`
+	ID    string     `json:"id"`
+	Phase flow.Phase `json:"phase"`
+	Gate  string     `json:"gate,omitempty"`
+	Since time.Time  `json:"since"`
+	Round int        `json:"round,omitempty"`
+	// Tokens nuevos y leídos de caché, por separado: sumados exageran el costo.
+	New    int64 `json:"new_tokens,omitempty"`
+	Cached int64 `json:"cached_tokens,omitempty"`
 }
 
 // StatusCachePath es la ruta de la caché de statusline.
@@ -55,13 +57,13 @@ func (e *Engine) updateStatusCache(rec store.Record) {
 		c.Gate = string(rec.Flow.Gate.Name)
 	}
 	if old := ReadStatusCache(e.Cfg.Root); old != nil && old.ID == c.ID {
-		c.Tokens = old.Tokens
+		c.New, c.Cached = old.New, old.Cached
 	}
 	writeStatusCache(e.Cfg.Root, c)
 }
 
-// AddTokens suma tokens a la tarea en la caché de statusline.
-func (e *Engine) AddTokens(id string, n int64) {
+// AddTokens suma tokens nuevos y de caché a la tarea en la caché de statusline.
+func (e *Engine) AddTokens(id string, fresh, cached int64) {
 	c := ReadStatusCache(e.Cfg.Root)
 	if c == nil || c.ID != id {
 		rec, err := e.Store.Load(id)
@@ -72,8 +74,9 @@ func (e *Engine) AddTokens(id string, n int64) {
 		if c = ReadStatusCache(e.Cfg.Root); c == nil {
 			return
 		}
-		c.Tokens = 0
+		c.New, c.Cached = 0, 0
 	}
-	c.Tokens += n
+	c.New += fresh
+	c.Cached += cached
 	writeStatusCache(e.Cfg.Root, *c)
 }

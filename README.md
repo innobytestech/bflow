@@ -46,7 +46,7 @@ Lo que vive en el CLI se cumple con cualquier herramienta. Lo que depende de hoo
 | `git reset --hard`, push forzado o a ramas protegidas, `.env`, `.bflow/` | ✅ se bloquea antes de que ocurra | ❌ |
 | Ramas y PR solo los crea bflow mientras hay una tarea en curso | ✅ | ❌ |
 | Un agente que termina sin reportar sigue trabajando (2 avisos, luego decide una persona) | ✅ | ❌ |
-| Tokens por fase y por modelo | ✅ | ❌ (solo tiempos) |
+| Tokens por fase, agente y modelo | ✅ | ❌ (solo tiempos) |
 
 **Lo que bflow no garantiza:**
 
@@ -64,7 +64,7 @@ La guía [Cómo trabajar con bflow](docs/guia.md) explica el día a día: qué h
 - **Tracker y git sin el modelo.** Mueve la tarea en el tracker, sella la fecha de inicio, comenta los rechazos, crea la rama al aprobar la spec, abre el PR con el review-map y el walkthrough, y cierra la tarea cuando el PR se mergea.
 - **Compuerta de calidad determinista (`bflow check`).** Corre los pasos del proyecto (lint, pruebas, build, vulnerabilidades, secretos), resume los fallos en pocas líneas y liga el resultado a un commit. El agente no puede reportar "terminé" sin un check verde del código actual.
 - **Reglas que se cumplen con código (`bflow guard`).** Un hook bloquea antes de que ocurra: `git reset --hard`, push forzado o a ramas protegidas, editar `.env` o `.bflow/`, modificar las pruebas que se aprobaron en el contrato y, con una tarea en curso, crear ramas o PRs a mano (eso lo hace bflow). Las pruebas congeladas también se verifican sin hook: `report DONE` y `check --verify` comparan su contenido con el del contrato, y solo una persona acepta un cambio con `bflow freeze`.
-- **Métricas.** Tiempo por fase separado en trabajo del agente, espera del humano y bloqueo; iteraciones (rechazos por gate, rondas, decisiones); hotfixes ligados a la feature que corrigen (`start --fixes`); fricción (pedidos que el flujo rechazó y bloqueos de `guard`), y tokens por fase y por modelo leídos de los transcripts del agente.
+- **Métricas.** Tiempo por fase separado en trabajo del agente, espera del humano y bloqueo; iteraciones (rechazos por gate, rondas, decisiones); hotfixes ligados a la feature que corrigen (`start --fixes`); fricción (pedidos que el flujo rechazó y bloqueos de `guard`), y tokens por fase, por agente y por modelo leídos de los transcripts, con lo nuevo separado de la caché leída.
 - **Salida pensada para gastar pocos tokens.** JSON compacto y sin campos redundantes. Una respuesta típica pesa ~480 bytes, y un check fallido le entrega al agente solo las líneas de fallo, sin repetir; el detalle completo queda en un archivo.
 
 ## Cómo funciona
@@ -227,10 +227,10 @@ Copia los archivos de [`adapters/claude/`](adapters/claude/):
 | `skills/bflow/SKILL.md` | `~/.claude/skills/bflow/SKILL.md` (una vez por máquina) |
 | `settings.json` | `<repo>/.claude/settings.json` |
 
-La skill tiene unas 30 líneas: no contiene reglas del flujo, solo cómo interpretar `next`. Los hooks corren `bflow hook session-start` al abrir la sesión, `bflow guard` antes de cada edición o comando, `bflow hook tokens` al terminar cada turno, `bflow hook subagent-stop` cuando termina un agente de bflow (si no reportó, lo hace seguir hasta 2 veces con lo que le falta y después bloquea la tarea para que decida una persona) y la barra de estado con `bflow statusline`:
+La skill tiene unas 30 líneas: no contiene reglas del flujo, solo cómo interpretar `next`. Los hooks corren `bflow hook session-start` al abrir la sesión, `bflow guard` antes de cada edición o comando, `bflow hook tokens` al terminar cada turno y cada subagente (cada uno cuenta solo su transcript), `bflow hook subagent-stop` cuando termina un agente de bflow (si no reportó, lo hace seguir hasta 2 veces con lo que le falta y después bloquea la tarea para que decida una persona) y la barra de estado con `bflow statusline`:
 
 ```
-API-12 · implementing · 1h42m · ronda 1 · 184k tok
+API-12 · implementing · 1h42m · ronda 1 · 145k nuevos · 2.9M caché
 ```
 
 Los agentes los genera bflow en el repo:
@@ -308,7 +308,7 @@ El MVP cubre el módulo 1 (motor de flujo) y adelanta las guardas y las métrica
 1. ✅ Motor de flujo: estado, gates, tracker local y Plane, git y GitHub.
 2. ✅ Guardas (versión inicial): git destructivo, `.env`, `.bflow/`, pruebas congeladas (también sin hooks), ramas y PR a mano, tamaño de diff, agentes que terminan sin reportar.
 3. 🟡 Distribuidor: `bflow render` genera los agentes para Claude Code (contrato de bflow + oficio del repo). Pendiente: otras herramientas, `bflow update`, binarios firmados.
-4. ✅ Métricas: tiempo, tokens por fase y por modelo, calidad (rechazos por gate, hotfixes) y fricción.
+4. ✅ Métricas: tiempo, tokens por fase, agente y modelo, calidad (rechazos por gate, hotfixes) y fricción.
 5. ⏳ Contexto: índice del código para el planner y el reviewer.
 6. ⏳ Planeación: ordenar el backlog y repartirlo en ciclos balanceados.
 

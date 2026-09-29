@@ -99,7 +99,7 @@ func statsLine(st metrics.TaskStats) string {
 		l += " · " + strings.Join(it, ", ")
 	}
 	if st.TokensAvailable {
-		l += " · " + metrics.Human(st.Tokens.Total()) + " tok"
+		l += " · " + metrics.Tokens(st.Tokens.New(), st.Tokens.CacheRead)
 	}
 	return l
 }
@@ -107,13 +107,10 @@ func statsLine(st metrics.TaskStats) string {
 func renderStats(st metrics.TaskStats) string {
 	var b strings.Builder
 	b.WriteString(statsLine(st) + "\n")
-	fmt.Fprintf(&b, "  %-13s %8s %8s %8s %8s\n", "fase", "agente", "humano", "bloq.", "tokens")
+	row := "  %-13s %8s %8s %8s %8s %8s\n"
+	fmt.Fprintf(&b, row, "fase", "agente", "humano", "bloq.", "nuevos", "caché")
 	for _, p := range st.Phases {
-		tok := "-"
-		if p.Tokens.Total() > 0 {
-			tok = metrics.Human(p.Tokens.Total())
-		}
-		fmt.Fprintf(&b, "  %-13s %8s %8s %8s %8s\n", p.Phase, dur(p.Agent), dur(p.Human), dur(p.Blocked), tok)
+		fmt.Fprintf(&b, row, p.Phase, dur(p.Agent), dur(p.Human), dur(p.Blocked), tok(p.Tokens.New()), tok(p.Tokens.CacheRead))
 	}
 	if len(st.RejectionsByGate) > 0 {
 		var gs []string
@@ -128,25 +125,46 @@ func renderStats(st metrics.TaskStats) string {
 	if st.Refused+st.Guarded+st.Nudged > 0 {
 		fmt.Fprintf(&b, "  fricción: %d pedido(s) rechazado(s) por el flujo · %d bloqueo(s) de guard · %d fin(es) sin reporte\n", st.Refused, st.Guarded, st.Nudged)
 	}
-	if _, unknown := st.Models[""]; len(st.Models) > 1 || (len(st.Models) == 1 && !unknown) {
-		var ms []string
-		for _, m := range slices.Sorted(maps.Keys(st.Models)) {
-			name := m
-			if name == "" {
-				name = "sin modelo"
-			}
-			ms = append(ms, name+" "+metrics.Human(st.Models[m].Total()))
-		}
-		b.WriteString("  por modelo: " + strings.Join(ms, " · ") + "\n")
-	}
+	usageTable(&b, "por agente", st.Agents, map[string]string{metrics.MainSession: "sesión principal", "": "sin desglose"})
+	usageTable(&b, "por modelo", st.Models, map[string]string{"": "sin modelo"})
 	if st.TokensAvailable {
 		t := st.Tokens
-		fmt.Fprintf(&b, "  tokens: %s (entrada %s · salida %s · caché leída %s · caché escrita %s)", metrics.Human(t.Total()),
-			metrics.Human(t.Input), metrics.Human(t.Output), metrics.Human(t.CacheRead), metrics.Human(t.CacheWrite))
+		fmt.Fprintf(&b, "  tokens: %s (entrada %s · salida %s · caché escrita %s)", metrics.Tokens(t.New(), t.CacheRead),
+			metrics.Human(t.Input), metrics.Human(t.Output), metrics.Human(t.CacheWrite))
 	} else {
 		b.WriteString("  tokens: no disponibles (se registran con el hook de tokens del agente)")
 	}
 	return b.String()
+}
+
+func tok(n int64) string {
+	if n <= 0 {
+		return "-"
+	}
+	return metrics.Human(n)
+}
+
+// usageTable desglosa tokens por clave, de mayor a menor gasto nuevo. Se omite
+// si solo hay registros viejos sin esa clave.
+func usageTable(b *strings.Builder, title string, m map[string]metrics.Usage, names map[string]string) {
+	if _, legacy := m[""]; len(m) == 0 || (len(m) == 1 && legacy) {
+		return
+	}
+	keys := slices.SortedFunc(maps.Keys(m), func(x, y string) int {
+		if d := m[y].New() - m[x].New(); d != 0 {
+			return int(max(-1, min(1, d)))
+		}
+		return strings.Compare(x, y)
+	})
+	row := "  %-22s %8s %8s\n"
+	fmt.Fprintf(b, row, title, "nuevos", "caché")
+	for _, k := range keys {
+		name := k
+		if n, ok := names[k]; ok {
+			name = n
+		}
+		fmt.Fprintf(b, row, name, tok(m[k].New()), tok(m[k].CacheRead))
+	}
 }
 
 // runStatusline no carga config ni toca git ni el tracker: solo lee la caché.
@@ -181,7 +199,7 @@ func runStatusline(c *Ctx) output.Envelope {
 	return env
 }
 
-// StatuslineText arma la línea: API-171 · implementing · 1h42m · ronda 1 · 184k tok
+// StatuslineText arma la línea: API-171 · implementing · 1h42m · ronda 1 · 145k nuevos · 2.9M caché
 func StatuslineText(sc engine.StatusCache, now time.Time) string {
 	parts := []string{sc.ID, string(sc.Phase)}
 	if sc.Gate != "" {
@@ -193,8 +211,8 @@ func StatuslineText(sc engine.StatusCache, now time.Time) string {
 	if sc.Round > 0 {
 		parts = append(parts, fmt.Sprintf("ronda %d", sc.Round))
 	}
-	if sc.Tokens > 0 {
-		parts = append(parts, metrics.Human(sc.Tokens)+" tok")
+	if sc.New+sc.Cached > 0 {
+		parts = append(parts, metrics.Tokens(sc.New, sc.Cached))
 	}
 	return strings.Join(parts, " · ")
 }
@@ -261,15 +279,17 @@ func nextLabel(v engine.View) string {
 	return v.Next.Action
 }
 
-// runHookTokens suma los tokens nuevos del transcript y los atribuye a la
-// fase de la tarea activa. Nunca falla ni imprime: es un hook.
+// runHookTokens suma los tokens nuevos de un transcript a la tarea activa. En
+// Stop lee solo la sesión principal y reparte cada respuesta en la fase en que
+// ocurrió; en SubagentStop lee solo el transcript de ese agente y lo asigna a
+// la fase donde trabajó. Nunca falla ni imprime: es un hook.
 func runHookTokens(c *Ctx) output.Envelope {
 	quiet := output.Envelope{OK: true, Code: "tokens", Quiet: true}
 	raw, _ := io.ReadAll(c.Stdin)
 	if c.Agent == nil {
 		return quiet
 	}
-	path := c.Agent.TranscriptPath(raw)
+	path, agent := c.Agent.TokenSource(raw)
 	if path == "" {
 		return quiet
 	}
@@ -288,13 +308,9 @@ func runHookTokens(c *Ctx) output.Envelope {
 	if b, err := os.ReadFile(curPath); err == nil {
 		_ = json.Unmarshal(b, &cur)
 	}
-	byModel, err := c.Agent.ReadUsage(path, &cur)
+	samples, err := c.Agent.ReadUsage(path, &cur)
 	if err != nil {
 		return quiet
-	}
-	var u metrics.Usage
-	for _, m := range byModel {
-		u.Add(m)
 	}
 	if len(cur.Seen) > 5000 { // los offsets evitan releer; los ids viejos ya no hacen falta
 		cur.Seen = nil
@@ -302,30 +318,36 @@ func runHookTokens(c *Ctx) output.Envelope {
 	if b, err := json.Marshal(cur); err == nil {
 		_ = store.WriteAtomic(curPath, b)
 	}
-	if u.Total() == 0 {
+	if len(samples) == 0 {
 		return quiet
 	}
 	id, err := e.Active(context.Background())
 	if err != nil {
 		return quiet
 	}
-	rec, err := e.Store.Load(id)
+	log, err := e.Store.Log(id)
 	if err != nil {
 		return quiet
 	}
+	name := metrics.MainSession
+	if agent != "" {
+		name = strings.TrimPrefix(agent, flow.SubagentPrefix)
+	}
+	shares := metrics.Allot(log, id, strings.TrimPrefix(agent, flow.SubagentPrefix), samples)
 	now := time.Now()
 	var entries []store.Entry
-	for _, model := range slices.Sorted(maps.Keys(byModel)) {
-		m := byModel[model]
-		d := map[string]any{"phase": string(rec.Flow.Phase), "tool": c.Agent.Name(),
-			"input": m.Input, "output": m.Output, "cache_read": m.CacheRead, "cache_write": m.CacheWrite}
-		if model != "" {
-			d["model"] = model
+	var u metrics.Usage
+	for _, s := range shares {
+		d := map[string]any{"phase": string(s.Phase), "tool": c.Agent.Name(),
+			"input": s.Input, "output": s.Output, "cache_read": s.CacheRead, "cache_write": s.CacheWrite}
+		if s.Model != "" {
+			d["model"] = s.Model
 		}
-		entries = append(entries, store.Entry{TS: now, ID: id, Event: "tokens", By: e.User, Data: d})
+		entries = append(entries, store.Entry{TS: now, ID: id, Event: "tokens", Agent: name, By: e.User, Data: d})
+		u.Add(s.Usage)
 	}
 	_ = e.Store.Append(entries...)
-	e.AddTokens(id, u.Total())
-	quiet.Data = map[string]any{"id": id, "tokens": u}
+	e.AddTokens(id, u.New(), u.CacheRead)
+	quiet.Data = map[string]any{"id": id, "agent": name, "tokens": u}
 	return quiet
 }

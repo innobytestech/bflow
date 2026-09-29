@@ -182,9 +182,11 @@ func emit(env *Env, asJSON bool, e output.Envelope) int {
 type AgentAdapter interface {
 	Name() string
 	ParsePreToolUse(raw []byte) (a guard.Action, cwd string, ok bool)
-	TranscriptPath(raw []byte) string
-	// ReadUsage devuelve los tokens nuevos por modelo.
-	ReadUsage(path string, cur *metrics.Cursor) (map[string]metrics.Usage, error)
+	// TokenSource dice qué transcript leer en un hook de fin de turno o de
+	// subagente y de quién es (agent vacío = sesión principal).
+	TokenSource(raw []byte) (path, agent string)
+	// ReadUsage devuelve las respuestas nuevas del transcript con su hora.
+	ReadUsage(path string, cur *metrics.Cursor) ([]metrics.Sample, error)
 	// RenderAgents da formato a los agentes: ruta relativa → contenido.
 	RenderAgents(specs []agents.Spec) (map[string][]byte, error)
 	// GeneratedAgents lista los agentes que ya generó bflow render.

@@ -87,7 +87,7 @@ Tus reglas de arquitectura en CLAUDE.md o en los documentos de `read` son bienve
 - **La conversación se puede descartar; el hilo vive en bflow.** El estado, las decisiones y los reportes están en `.bflow/`, la spec y el tracker. Después de aprobar una gate puedes hacer `/clear`: al reiniciar, bflow le vuelve a dar a la sesión la tarea y el siguiente paso.
 - **No pegues specs ni código en el chat.** Los agentes leen por ruta y por sección (`bflow show <ID> spec --section design`).
 - **Agentes con modelo y esfuerzo a su medida:** los mecánicos (documenter) con un modelo menor y esfuerzo bajo.
-- `bflow stats <ID>` muestra los tokens por fase y por modelo. Úsalo para ver si un cambio de configuración ahorró de verdad.
+- `bflow stats <ID>` muestra los tokens por fase, por agente (la sesión principal aparte) y por modelo, con lo nuevo separado de la caché leída, que cuesta cerca del 10% de la entrada. Úsalo para ver si un cambio de configuración ahorró de verdad.
 
 ## Cuando algo se atora
 
@@ -107,6 +107,6 @@ Tus reglas de arquitectura en CLAUDE.md o en los documentos de `read` son bienve
 
 - **Calidad:** rechazos por gate, rondas de calidad y hotfixes ligados (`bflow start <ID> --lane hotfix --fixes <feature>`).
 - **Fricción:** pedidos que el flujo rechazó, bloqueos de `guard` y agentes que terminaron sin reportar. Si sube en un repo, algo del entorno está confundiendo a los agentes: revisa sus skills y reglas.
-- **Costo:** tokens por fase y por modelo.
+- **Costo:** tokens nuevos y de caché por fase, por agente y por modelo.
 
 Antes de quitar un paso del flujo para ahorrar tokens, compara varias features: si las métricas de calidad no empeoran, ese paso sobraba.
