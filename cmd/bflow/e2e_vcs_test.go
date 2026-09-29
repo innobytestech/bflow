@@ -219,3 +219,39 @@ func (g *ghFake) count() int {
 	defer g.mu.Unlock()
 	return len(g.prs)
 }
+
+// Un contrato de pruebas que se saltan se rechaza antes de congelarse; si el
+// problema aparece ya implementando, la decisión permite volver a contract.
+func TestContractHollowAndBackToContract(t *testing.T) {
+	r, _ := gitRepo(t, "stack: go\nvcs: { base_branch: dev }\n")
+	id := r.ok("task", "add", "Suma").Data["id"].(string)
+	r.ok("start", id, "--lane", "full")
+	os.WriteFile(filepath.Join(r.dir, "d.md"), []byte("d"), 0o644)
+	r.ok("approve", id, "--file", "d.md")
+	os.Remove(filepath.Join(r.dir, "d.md"))
+	r.ok("report", id, "--agent", "spec-author", "--verdict", "READY")
+	r.ok("approve", id) // contract, en la rama nueva
+
+	test := filepath.Join(r.dir, "internal", "a_test.go")
+	os.WriteFile(test, []byte("package a\n\nimport \"testing\"\n\nfunc TestSuma(t *testing.T) {\n\tt.Skip(\"contrato\")\n}\n"), 0o644)
+	env := r.run("report", id, "--agent", "implementer", "--verdict", "CONTRACT_READY")
+	if env.exit != 2 || env.Code != "contract_hollow" || !strings.Contains(fmt.Sprint(env.Data), "internal/a_test.go:5 TestSuma se salta siempre") {
+		t.Fatalf("contrato hueco: exit %d %s %v", env.exit, env.Code, env.Data)
+	}
+	os.WriteFile(test, []byte("package a\n\nimport \"testing\"\n\nfunc TestSuma(t *testing.T) {\n\tif Suma(1, 2) != 3 {\n\t\tt.Fatal(\"suma\")\n\t}\n}\n"), 0o644)
+	r.ok("report", id, "--agent", "implementer", "--verdict", "CONTRACT_READY")
+	r.ok("approve", id) // implementing, pruebas congeladas
+
+	env = r.ok("report", id, "--agent", "implementer", "--verdict", "NEEDS_DECISION", "--note", "falta un caso en el contrato", "--option", "seguir")
+	if !strings.Contains(fmt.Sprint(env.Next.Options), "contract") {
+		t.Fatalf("la decisión ofrece rehacer el contrato: %+v", env.Next.Options)
+	}
+	env = r.ok(option(t, env, "contract", map[string]string{"<motivo>": "agrega el caso negativo"})...)
+	if env.Data["phase"] != "contract" {
+		t.Errorf("de vuelta en contract: %v", env.Data)
+	}
+	// En contract las pruebas congeladas se pueden editar otra vez.
+	if _, _, code := r.hook(preToolUse(r.dir, "Edit", map[string]any{"file_path": test}), "guard"); code != 0 {
+		t.Errorf("guard bloquea editar la prueba en contract: exit %d", code)
+	}
+}

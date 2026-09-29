@@ -228,6 +228,22 @@ func RejectTargets(cfg Config, lane Lane, g Gate) []Phase {
 	return out
 }
 
+// decisionTargets son las fases a las que se puede volver desde una decisión:
+// spec y contract, si el carril las tiene y van antes de la fase actual (la
+// más cercana primero). Sirve cuando el agente descubre que el contrato o la
+// spec están mal: en la piloto, un contrato de pruebas vacías congeladas.
+func decisionTargets(cfg Config, lane Lane, phase Phase) []Phase {
+	phases := cfg.Lanes[lane]
+	cur := slices.Index(phases, phase)
+	var out []Phase
+	for _, p := range []Phase{Contract, Spec} {
+		if i := slices.Index(phases, p); i >= 0 && i < cur {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 func (t *tx) reject(ev Event) error {
 	s := &t.s
 	g, err := t.pendingGate(ev)
@@ -235,6 +251,10 @@ func (t *tx) reject(ev Event) error {
 		return err
 	}
 	allowed, ok := rejectTargets[g.Name]
+	if g.Name == GateDecision {
+		allowed = decisionTargets(t.cfg, s.Lane, s.Phase)
+		ok = len(allowed) > 0
+	}
 	if !ok {
 		return reject("not_rejectable", "el gate %q no se rechaza: aprueba una opción o escribe la decisión", g.Name)
 	}
@@ -248,6 +268,9 @@ func (t *tx) reject(ev Event) error {
 	}
 	if !slices.Contains(allowed, to) || !t.cfg.has(s.Lane, to) {
 		valid := RejectTargets(t.cfg, s.Lane, g.Name)
+		if g.Name == GateDecision {
+			valid = allowed
+		}
 		if len(valid) == 0 {
 			return reject("invalid_target", "el gate %q no tiene destino de rechazo en el carril %s", g.Name, s.Lane)
 		}

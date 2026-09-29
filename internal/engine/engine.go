@@ -90,6 +90,12 @@ func (e *Engine) apply(ctx context.Context, id string, ev flow.Event, slug strin
 			rec.Title, rec.URL = task.Title, task.URL
 		}
 
+		if ev.Kind == flow.EvReport && ev.Verdict == flow.ContractReady && rec.Flow.Phase == flow.Contract {
+			if hollow := hollowTests(e.Cfg.Root, e.taskTests(ctx)); len(hollow) > 0 {
+				return &flow.Rejection{Code: "contract_hollow", Reason: "el contrato tiene pruebas que se saltan siempre o no tienen cuerpo; al aprobarlo se congelan y ya no se pueden completar:\n" +
+					strings.Join(hollow, "\n") + "\nEscribe su cuerpo real (preparar, actuar, verificar contra las firmas) para que fallen contra los stubs, y reporta otra vez."}
+			}
+		}
 		if ev.Kind == flow.EvReport && ev.Verdict == flow.DoneV && rec.Flow.Phase == flow.Implementing {
 			ok, detail, err := e.verify(ctx, id)
 			if err != nil {

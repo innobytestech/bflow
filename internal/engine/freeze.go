@@ -31,6 +31,16 @@ func (e *Engine) freezeTests(ctx context.Context, id string) (int, error) {
 	if e.Git == nil {
 		return 0, nil
 	}
+	frozen := e.taskTests(ctx)
+	return len(frozen), e.writeFrozen(id, frozen)
+}
+
+// taskTests son las pruebas que la rama agregó o cambió, más las que están
+// sin commitear.
+func (e *Engine) taskTests(ctx context.Context) []string {
+	if e.Git == nil {
+		return nil
+	}
 	base := e.Cfg.VCS.BaseBranch
 	if base != "" && e.Cfg.VCS.Remote != "" {
 		base = e.Cfg.VCS.Remote + "/" + base
@@ -51,7 +61,7 @@ func (e *Engine) freezeTests(ctx context.Context, id string) (int, error) {
 			frozen = append(frozen, f)
 		}
 	}
-	return len(frozen), e.writeFrozen(id, frozen)
+	return frozen
 }
 
 // Refreeze vuelve a tomar el hash de las pruebas congeladas tal como están
