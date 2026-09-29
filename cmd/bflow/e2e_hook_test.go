@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -107,5 +108,11 @@ func TestFrozenTestsWithoutHooks(t *testing.T) {
 		t.Errorf("freeze: %v archivos", n)
 	}
 	os.WriteFile(test, []byte("package a // debilitada\r\n"), 0o644) // autocrlf no cuenta como cambio
+	// Aceptado el cambio, lo que falta es commitearlo: sin commit no entraría al PR.
+	if env := r.run("report", id, "--agent", "implementer", "--verdict", "DONE"); env.Code != "uncommitted" || !strings.Contains(fmt.Sprint(env.Data), "internal/cas_test.go") {
+		t.Fatalf("DONE sin commit: %s %v", env.Code, env.Data)
+	}
+	git(t, r.dir, "add", "internal")
+	git(t, r.dir, "commit", "-m", "prueba")
 	r.ok("report", id, "--agent", "implementer", "--verdict", "DONE")
 }

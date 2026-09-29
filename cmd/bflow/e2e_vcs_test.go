@@ -255,3 +255,41 @@ func TestContractHollowAndBackToContract(t *testing.T) {
 		t.Errorf("guard bloquea editar la prueba en contract: exit %d", code)
 	}
 }
+
+// Lo que un agente deja sin commitear no entraría al PR (MSSYSBE-170: el
+// documenter dejó comentarios sin commit). Se rechaza en su DONE y al abrir
+// el PR.
+func TestUncommittedChangesNeverMissThePR(t *testing.T) {
+	r, _ := gitRepo(t, "stack: go\nvcs: { base_branch: dev }\n")
+	id := r.ok("task", "add", "Doc").Data["id"].(string)
+	r.ok("start", id, "--lane", "light")
+	r.ok("report", id, "--agent", "spec-author", "--verdict", "READY")
+	r.ok("approve", id)
+	code := filepath.Join(r.dir, "internal", "a.go")
+	os.WriteFile(code, []byte("package a\n\nfunc A() {}\n"), 0o644)
+	git(t, r.dir, "add", "internal")
+	git(t, r.dir, "commit", "-m", "a")
+	r.ok("report", id, "--agent", "implementer", "--verdict", "DONE")
+	r.ok("report", id, "--agent", "reviewer", "--verdict", "APPROVED")
+
+	os.WriteFile(code, []byte("package a\n\n// A hace algo.\nfunc A() {}\n"), 0o644)
+	env := r.run("report", id, "--agent", "documenter", "--verdict", "DONE")
+	if env.exit != 2 || env.Code != "uncommitted" || !strings.Contains(fmt.Sprint(env.Data), "internal/a.go") {
+		t.Fatalf("documenter sin commit: exit %d %s %v", env.exit, env.Code, env.Data)
+	}
+	git(t, r.dir, "commit", "-am", "doc")
+	r.ok("report", id, "--agent", "documenter", "--verdict", "DONE")
+	r.ok("approve", id, "--gate", "questions")
+
+	os.WriteFile(code, []byte("package a\n\n// A hace algo más.\nfunc A() {}\n"), 0o644)
+	if env := r.run("approve", id); env.exit != 2 || env.Code != "uncommitted" {
+		t.Fatalf("PR con cambios sin commit: exit %d %s %v", env.exit, env.Code, env.Data)
+	}
+	if st := r.ok("status", id).Data["task"].(map[string]any); st["phase"] != "walkthrough" {
+		t.Errorf("la gate sigue abierta: %v", st["phase"])
+	}
+	git(t, r.dir, "checkout", "--", "internal/a.go")
+	if env := r.ok("approve", id); env.Data["phase"] != "in_review" {
+		t.Errorf("sin cambios pendientes se abre el PR: %v", env.Data)
+	}
+}

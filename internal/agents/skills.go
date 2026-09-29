@@ -54,7 +54,8 @@ type ContextSource struct {
 	Note  string // un problema concreto (p. ej. "se corta")
 }
 
-// EstimateTokens aproxima tokens a partir de bytes. Estos archivos llevan
-// rutas, identificadores y acentos, que rinden menos que la prosa: ~3 bytes
-// por token. Es una estimación; el conteo exacto lo da el API del modelo.
-func EstimateTokens(bytes int) int { return (bytes + 2) / 3 }
+// EstimateTokens aproxima tokens a partir de bytes: ~2.2 bytes por token.
+// Calibrado con /context de Claude Code (Opus 5.5) en ms-sys: un MEMORY.md de
+// 19 048 bytes pesaba 8.5k tokens y un CLAUDE.md de 1 573, 715. Rutas,
+// identificadores y acentos rinden menos que la prosa.
+func EstimateTokens(bytes int) int { return (bytes*10 + 21) / 22 }

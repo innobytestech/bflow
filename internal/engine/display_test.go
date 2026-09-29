@@ -14,6 +14,8 @@ func TestProductQuestionsHideAnswers(t *testing.T) {
 
 ## Preguntas de producto
 1. ¿Qué pasa si el RFC es genérico?
+   - Lo acepta como cualquier otro
+   - Lo rechaza con 422
    el código responde: lo rechaza (internal/x.go:12)
 2. ¿Y si viene vacío?
    El código responde: error 400 (internal/x.go:20)
@@ -25,7 +27,7 @@ func TestProductQuestionsHideAnswers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "1. ¿Qué pasa si el RFC es genérico?\n2. ¿Y si viene vacío?"
+	want := "1. ¿Qué pasa si el RFC es genérico?\n   - Lo acepta como cualquier otro\n   - Lo rechaza con 422\n2. ¿Y si viene vacío?"
 	if q != want {
 		t.Errorf("preguntas:\n%s\nwant:\n%s", q, want)
 	}

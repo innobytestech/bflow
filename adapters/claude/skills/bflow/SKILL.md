@@ -30,5 +30,5 @@ Pregunta hasta 3 cosas por tanda (alcance, datos clave, errores, restricciones),
 Si el brief lista decisiones `[N]`, ratifica cada una (A = lo decidido, B = la alternativa descartada) antes de preguntar si se aprueba.
 
 ## walkthrough
-Gate `questions`: escribe las preguntas de `display` en el chat y espera a que el humano conteste con sus palabras (no uses AskUserQuestion ni digas qué hace el código). Corre la opción "Ya respondí" con sus respuestas en `--note`.
+Gate `questions`: pregunta con AskUserQuestion, una pregunta por cada una de `display` (hasta 4) con sus respuestas posibles como opciones, en el mismo orden; el humano puede escribir otra. No digas cuál hace el código: la idea es comparar lo que espera con lo que hace. Corre la opción "Ya respondí" con sus respuestas en `--note`.
 Gate `walkthrough`: después de escribir `display`, señala dónde sus respuestas difieren de lo que dice el review-map. Luego recorre los 🔴 uno por uno, mostrando el hunk (`git diff <base>...HEAD -- <archivo>`), y al final pregunta.

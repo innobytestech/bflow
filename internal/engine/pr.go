@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path"
 	"slices"
 	"strings"
 
@@ -68,6 +69,9 @@ func (e *Engine) openPR(ctx context.Context, rec *store.Record) ([]string, error
 		return []string{"sin git: no se hizo push ni se abrió el PR"}, nil
 	}
 	warns := e.commitSpec(ctx, rec.Flow, "actualiza la spec") // tareas marcadas, decisiones en vuelo
+	if files := e.uncommitted(ctx, rec.Flow); len(files) > 0 {
+		return nil, uncommittedRejection(files, "aprueba otra vez para abrir el PR")
+	}
 	if err := e.Git.Push(ctx, rec.Branch); err != nil {
 		return nil, fmt.Errorf("push de %s: %w", rec.Branch, err)
 	}
@@ -106,4 +110,30 @@ func (e *Engine) degradePR(rec *store.Record, base string, cause error) []string
 		return []string{"no se pudo guardar pr-body.md: " + err.Error()}
 	}
 	return []string{fmt.Sprintf("%v: crea el PR aquí: %s (descripción lista en .bflow/tasks/%s/pr-body.md; bflow connect github para abrirlo solo)", cause, url, rec.Flow.ID)}
+}
+
+// uncommitted son los cambios de código sin commitear: no entrarían al PR.
+// La spec no cuenta (bflow la commitea solo) ni .bflow/ (git la ignora).
+func (e *Engine) uncommitted(ctx context.Context, s flow.State) []string {
+	if e.Git == nil {
+		return nil
+	}
+	dirty, err := e.Git.Dirty(ctx, e.Cfg.Check.CodePaths)
+	if err != nil {
+		return nil
+	}
+	specDir := path.Dir(flow.SpecPath(s.ID, s.Slug)) + "/"
+	var out []string
+	for _, f := range dirty {
+		f = strings.ReplaceAll(f, `\`, "/")
+		if !strings.HasPrefix(f, specDir) && !strings.HasPrefix(f, ".bflow/") {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+func uncommittedRejection(files []string, when string) *flow.Rejection {
+	return &flow.Rejection{Code: "uncommitted", Reason: "hay cambios de código sin commitear que no entrarían al PR:\n" + strings.Join(files, "\n") +
+		"\nCommitéalos (o descarta los que no van) y " + when + "."}
 }

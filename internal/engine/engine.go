@@ -96,6 +96,11 @@ func (e *Engine) apply(ctx context.Context, id string, ev flow.Event, slug strin
 					strings.Join(hollow, "\n") + "\nEscribe su cuerpo real (preparar, actuar, verificar contra las firmas) para que fallen contra los stubs, y reporta otra vez."}
 			}
 		}
+		if ev.Kind == flow.EvReport && ev.Verdict == flow.DoneV && rec.Flow.Phase == flow.Documenting {
+			if files := e.uncommitted(ctx, rec.Flow); len(files) > 0 {
+				return uncommittedRejection(files, "reporta DONE otra vez")
+			}
+		}
 		if ev.Kind == flow.EvReport && ev.Verdict == flow.DoneV && rec.Flow.Phase == flow.Implementing {
 			ok, detail, err := e.verify(ctx, id)
 			if err != nil {
@@ -110,6 +115,9 @@ func (e *Engine) apply(ctx context.Context, id string, ev flow.Event, slug strin
 			if open := openTasks(e, *rec); len(open) > 0 {
 				return &flow.Rejection{Code: "tasks_open", Reason: "DONE exige todas las tareas de la spec marcadas [x]; faltan:\n" + strings.Join(open, "\n") +
 					"\nMárcalas al terminarlas; si una ya no aplica, anótalo en Design y márcala con el motivo."}
+			}
+			if files := e.uncommitted(ctx, rec.Flow); len(files) > 0 {
+				return uncommittedRejection(files, "reporta DONE otra vez")
 			}
 			ev.CheckOK = true
 		}

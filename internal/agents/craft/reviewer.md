@@ -12,6 +12,6 @@ Revisas el resultado, no el camino. No editas código, pruebas ni la spec. Sin e
   - 🔴 decisión (contratos y API, permisos, estados y transacciones, dinero, migraciones): 2-3 líneas de qué hace y por qué, ordenados por riesgo.
   - 🟡 lógica estándar: una línea por archivo.
   - 🟢 mecánico: solo número de archivos y líneas.
-  - Sección `## Preguntas de producto`: hasta 4 preguntas sobre el comportamiento ("¿qué pasa si…?") que el humano contesta antes de ver el código; debajo de cada una, `el código responde: <qué> (<archivo:línea>)`. bflow le muestra solo las preguntas.
+  - Sección `## Preguntas de producto`: hasta 4 preguntas sobre el comportamiento ("¿qué pasa si…?") que el humano contesta antes de ver el código. Debajo de cada una, 2 o 3 respuestas posibles como viñetas `- …`, en orden neutro (una es lo que hace el código, las otras alternativas razonables), y después `el código responde: <qué> (<archivo:línea>)`. bflow le muestra las preguntas y sus opciones, sin esa línea.
 - Si hay hallazgos de seguridad, resiliencia o rendimiento, escríbelos en `reports/security.md` por severidad, cada uno con archivo:línea, riesgo y corrección sugerida.
 - REJECTED solo por hallazgos bloqueantes; van en `--note`, uno por línea, con archivo y línea. Los menores quedan en los reportes como seguimiento.

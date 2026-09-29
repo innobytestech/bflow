@@ -134,11 +134,11 @@ func TestRenderWatchFitsRows(t *testing.T) {
 
 func TestStartupCheck(t *testing.T) {
 	st, d := startupCheck([]agents.ContextSource{{Label: "CLAUDE.md", Bytes: 1500}, {Label: "MEMORY.md", Bytes: 3000}})
-	if st != "ok" || !strings.Contains(d, "≈1k tokens") || !strings.Contains(d, "MEMORY.md ≈1k, CLAUDE.md ≈500") {
+	if st != "ok" || !strings.Contains(d, "≈2k tokens") || !strings.Contains(d, "MEMORY.md ≈1k, CLAUDE.md ≈682") {
 		t.Errorf("chico: %s %s", st, d)
 	}
 	st, d = startupCheck([]agents.ContextSource{{Label: "CLAUDE.md", Bytes: 1500}, {Label: "MEMORY.md", Bytes: 19048}})
-	if st != "warn" || !strings.Contains(d, "MEMORY.md ≈6k tokens, más de 4k en un solo archivo") {
+	if st != "warn" || !strings.Contains(d, "MEMORY.md ≈8k tokens, más de 4k en un solo archivo") {
 		t.Errorf("MEMORY.md de ms-sys: %s %s", st, d)
 	}
 	st, d = startupCheck([]agents.ContextSource{{Label: "a", Bytes: 11000}, {Label: "b", Bytes: 11000}, {Label: "c", Bytes: 11000}})
