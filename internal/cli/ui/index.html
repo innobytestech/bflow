@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bflow</title>
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #0b0e17;
+  --panel: #121726;
+  --panel-2: #171d30;
+  --line: #242c44;
+  --text: #e6e9f2;
+  --muted: #8a93ad;
+  --agent: #38b6ff;
+  --agent-bg: rgba(56, 182, 255, .12);
+  --human: #f5b83d;
+  --human-bg: rgba(245, 184, 61, .12);
+  --done: #3ecf8e;
+  --brand-a: #3346ff;
+  --brand-b: #1e9be6;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --bg: #f5f6fa;
+    --panel: #ffffff;
+    --panel-2: #f0f2f8;
+    --line: #dde1ec;
+    --text: #151a2b;
+    --muted: #5d6680;
+    --agent: #0b78c2;
+    --agent-bg: rgba(11, 120, 194, .10);
+    --human: #a86a00;
+    --human-bg: rgba(214, 144, 0, .14);
+    --done: #1a8f5c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+header {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  padding: 14px 24px; border-bottom: 1px solid var(--line); background: var(--panel);
+}
+.brand { display: flex; align-items: baseline; gap: 10px; }
+.wordmark {
+  font-weight: 800; font-size: 22px; letter-spacing: .5px;
+  background: linear-gradient(90deg, var(--brand-a), var(--brand-b));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.dim { color: var(--muted); }
+.small { font-size: 13px; }
+.live { display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--done); }
+.dot.off { background: #e5484d; }
+main { max-width: 980px; margin: 0 auto; padding: 24px 16px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; min-width: 0; overflow-wrap: anywhere; }
+.grid > * { min-width: 0; }
+.task-id { font-family: var(--mono); font-size: 22px; font-weight: 700; }
+.chips { display: inline-flex; gap: 8px; margin-left: 10px; vertical-align: middle; }
+.chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--panel-2); color: var(--muted); border: 1px solid var(--line); }
+.title { margin-top: 4px; font-size: 16px; }
+.steps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 16px; }
+.step {
+  font-family: var(--mono); font-size: 13px; padding: 4px 10px; border-radius: 8px;
+  border: 1px solid var(--line); color: var(--muted); background: var(--panel-2);
+}
+.step.done { color: var(--done); border-color: color-mix(in srgb, var(--done) 40%, var(--line)); }
+.step.current { color: var(--agent); background: var(--agent-bg); border-color: var(--agent); font-weight: 700; }
+.waiting .step.current { color: var(--human); background: var(--human-bg); border-color: var(--human); }
+.sep { color: var(--muted); font-size: 12px; }
+h3 { margin: 14px 0 4px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.flow { display: grid; gap: 14px; }
+.row { display: grid; grid-template-columns: 92px 84px 1fr; align-items: baseline; gap: 12px; }
+.row .label { font-size: 12px; font-weight: 700; letter-spacing: 1px; color: var(--muted); }
+.who { font-size: 12px; font-weight: 800; letter-spacing: .5px; padding: 3px 0; text-align: center; border-radius: 6px; }
+.who.agent { color: var(--agent); background: var(--agent-bg); }
+.who.human { color: var(--human); background: var(--human-bg); }
+.row .text { font-size: 18px; }
+.row.now .text { font-size: 20px; font-weight: 600; }
+.row.now.human .text { color: var(--human); }
+.ago { font-size: 13px; color: var(--muted); margin-left: 8px; font-weight: 400; }
+.card.now-card { border-left: 4px solid var(--agent); }
+.waiting .card.now-card { border-left-color: var(--human); animation: pulse 2.4s ease-in-out infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 4px var(--human-bg); } }
+@media (prefers-reduced-motion: reduce) { .waiting .card.now-card { animation: none; } }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 18px; }
+h2 { margin: 0 0 10px; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+.big { font-size: 24px; font-weight: 700; }
+.kv { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px dashed var(--line); }
+.kv:last-child { border-bottom: 0; }
+.kv span:last-child { font-family: var(--mono); font-size: 13px; }
+.events { list-style: none; margin: 0; padding: 0; }
+.events li { display: grid; grid-template-columns: 96px 1fr; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.events li:last-child { border-bottom: 0; }
+.events time { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.friction { color: var(--human); }
+button {
+  font: inherit; font-size: 13px; color: var(--text); background: var(--panel-2);
+  border: 1px solid var(--line); border-radius: 8px; padding: 5px 12px; cursor: pointer;
+}
+button:hover { border-color: var(--agent); }
+.empty { text-align: center; padding: 48px 20px; }
+@media (max-width: 560px) {
+  .row { grid-template-columns: 1fr; gap: 4px; }
+  .who { justify-self: start; padding: 3px 8px; }
+  .events li { grid-template-columns: 1fr; gap: 0; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="wordmark">bflow</span>
+    <span class="dim small">by innobytes.tech · <span id="version"></span></span>
+  </div>
+  <div class="dim small" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+    <span id="repo"></span>
+    <span class="live"><span class="dot" id="dot"></span><span id="status">en vivo</span></span>
+    <button id="notify" hidden>Avisarme en este navegador</button>
+  </div>
+</header>
+<main id="app"><div class="card empty dim">Cargando…</div></main>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+function ago(iso) {
+  if (!iso) return "";
+  const s = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  if (s < 60) return s + "s";
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + "m";
+  const h = Math.floor(m / 60);
+  return h < 48 ? h + "h" + String(m % 60).padStart(2, "0") + "m" : Math.floor(h / 24) + "d" + (h % 24) + "h";
+}
+
+let state = null;
+let lastWait = localStorage.getItem("bflow-last-wait") || "";
+
+function stepRow(kind, step) {
+  const row = el("div", "row " + kind + (step.human ? " human" : ""));
+  row.append(el("span", "label", kind === "now" ? "AHORA" : "DESPUÉS"));
+  row.append(el("span", "who " + (step.human ? "human" : "agent"), step.human ? "TÚ" : "AGENTE"));
+  const text = el("span", "text", step.text);
+  if (kind === "now" && step.since) {
+    const a = el("span", "ago");
+    a.dataset.since = step.since;
+    a.dataset.prefix = step.human ? "esperando hace " : "hace ";
+    text.append(a);
+  }
+  row.append(text);
+  return row;
+}
+
+function render() {
+  const app = $("app");
+  app.replaceChildren();
+  if (!state) return;
+  $("version").textContent = state.version;
+  $("repo").textContent = state.repo;
+  const t = state.task;
+  document.body.classList.toggle("waiting", !!(t && t.waiting));
+  document.title = t ? (t.waiting ? "Te toca · " + t.id : t.id) + " · bflow" : "bflow";
+  if (!t) {
+    const c = el("div", "card empty");
+    c.append(el("div", "big", "Ninguna tarea en curso"));
+    c.append(el("div", "dim", "Empieza una con bflow start <ID> --lane full|light|hotfix"));
+    app.append(c);
+  } else {
+    const head = el("div", "card");
+    const line = el("div");
+    line.append(el("span", "task-id", t.id));
+    const chips = el("span", "chips");
+    if (t.lane) chips.append(el("span", "chip", "carril " + t.lane));
+    if (t.round) chips.append(el("span", "chip", "ronda " + t.round));
+    line.append(chips);
+    head.append(line);
+    if (t.title) head.append(el("div", "title", t.title));
+    const steps = el("div", "steps");
+    t.phases.forEach((p, i) => {
+      if (i) steps.append(el("span", "sep", "›"));
+      steps.append(el("span", "step " + p.state, p.name));
+    });
+    head.append(steps);
+    app.append(head);
+
+    const now = el("div", "card now-card flow");
+    if (t.now) now.append(stepRow("now", t.now));
+    if (t.next) now.append(stepRow("next", t.next));
+    if (t.now || t.next) app.append(now);
+
+    const grid = el("div", "grid");
+    const time = el("div", "card");
+    time.append(el("h2", "", "Tiempo"));
+    time.append(el("div", "big", t.time.total));
+    const kv = (k, v) => { const r = el("div", "kv"); r.append(el("span", "dim", k), el("span", "", v)); return r; };
+    time.append(kv("agentes", t.time.agents), kv("tú", t.time.human));
+    if (t.time.blocked) time.append(kv("bloqueada", t.time.blocked));
+    if (t.by_phase && t.by_phase.length) {
+      time.append(el("h3", "", "Por fase"));
+      t.by_phase.forEach((p) => time.append(kv(p.phase, p.time)));
+    }
+    grid.append(time);
+    if (t.tokens) {
+      const tok = el("div", "card");
+      tok.append(el("h2", "", "Tokens"));
+      tok.append(el("div", "big", t.tokens));
+      (t.agents || []).forEach((a) => tok.append(kv(a.name, a.tokens)));
+      grid.append(tok);
+    }
+    app.append(grid);
+    if (t.friction) {
+      const f = el("div", "card");
+      f.append(el("h2", "", "Fricción"), el("div", "friction", t.friction));
+      app.append(f);
+    }
+    if (t.events && t.events.length) {
+      const ev = el("div", "card");
+      ev.append(el("h2", "", "Últimos eventos"));
+      const ul = el("ul", "events");
+      t.events.forEach((e) => { const li = el("li"); li.append(el("time", "", e.time), el("span", "", e.text)); ul.append(li); });
+      ev.append(ul);
+      app.append(ev);
+    }
+  }
+  if (state.others && state.others.length) {
+    const o = el("div", "card");
+    o.append(el("h2", "", "Otras tareas"));
+    state.others.forEach((x) => { const r = el("div", "kv"); r.append(el("span", "", x.id + " · " + x.phase), el("span", "dim", x.next)); o.append(r); });
+    app.append(o);
+  }
+  tick();
+}
+
+function tick() {
+  document.querySelectorAll(".ago").forEach((a) => { a.textContent = " · " + a.dataset.prefix + ago(a.dataset.since); });
+}
+
+function maybeNotify() {
+  const t = state && state.task;
+  const key = t && t.waiting && t.now ? t.id + "|" + t.now.text + "|" + (t.now.since || "") : "";
+  if (key && key !== lastWait && "Notification" in window && Notification.permission === "granted") {
+    new Notification("bflow · " + t.id, { body: "Espera tu decisión: " + t.now.text, tag: "bflow-" + t.id });
+  }
+  lastWait = key;
+  localStorage.setItem("bflow-last-wait", key);
+}
+
+async function poll() {
+  try {
+    const r = await fetch("/api/state", { cache: "no-store" });
+    const next = await r.json();
+    if (!r.ok) throw new Error(next.error || r.statusText);
+    state = next;
+    $("dot").classList.remove("off");
+    $("status").textContent = "en vivo";
+    render();
+    maybeNotify();
+  } catch (e) {
+    $("dot").classList.add("off");
+    $("status").textContent = "sin conexión con bflow ui";
+  }
+}
+
+if ("Notification" in window && Notification.permission === "default") {
+  const b = $("notify");
+  b.hidden = false;
+  b.onclick = () => Notification.requestPermission().then(() => { b.hidden = true; });
+}
+poll();
+setInterval(poll, 2000);
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
