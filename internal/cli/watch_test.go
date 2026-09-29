@@ -37,7 +37,8 @@ func TestRenderWatch(t *testing.T) {
 	}
 	out := renderWatch(bannerPlain, "dev", d, now, 0)
 	for _, want := range []string{
-		"bflow by innobytes.tech · dev · api · 17:42:00",
+		"████",
+		"bflow by innobytes.tech · dev\n  flow engine Spec-Driven Development\n\n  api · 17:42:00",
 		"API-7 · carril light · ronda 1",
 		"spec > implementing > [quality] > documenting > walkthrough > in_review",
 		"AHORA    AGENTE  security-auditor audita la seguridad del diff · ya reportó reviewer · hace 2m",
@@ -129,6 +130,13 @@ func TestRenderWatchFitsRows(t *testing.T) {
 	}
 	if !strings.Contains(short, "AHORA") || !strings.Contains(short, "guard bloqueó: 11") || strings.Contains(short, "guard bloqueó: 4") {
 		t.Errorf("se quitan los eventos más viejos, nunca AHORA:\n%s", short)
+	}
+	if strings.Contains(short, "████") || !strings.Contains(short, "bflow by innobytes.tech · dev · api · 17:42:00") {
+		t.Errorf("sin espacio el banner pasa a una línea:\n%s", short)
+	}
+	d.WebURL = "http://127.0.0.1:7719/"
+	if out := renderWatch(bannerPlain, "dev", d, now, 0); !strings.Contains(out, "████") || !strings.Contains(out, "api · 17:42:00 · página: http://127.0.0.1:7719/") {
+		t.Errorf("con espacio, banner completo y la página:\n%s", out)
 	}
 }
 

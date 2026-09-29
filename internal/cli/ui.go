@@ -162,27 +162,41 @@ func uiHandler(allowed []string, state func() (panelState, error)) http.Handler 
 	})
 }
 
-func runUI(c *Ctx) output.Envelope {
-	if _, err := engineFor(c); err != nil {
-		return output.Fail("config", err)
-	}
-	port, _ := strconv.Atoi(str(c.Flags, "port"))
+// serveUI levanta la página en 127.0.0.1 (en port o, si está ocupado, en
+// otro) y devuelve su dirección y cómo cerrarla.
+func serveUI(c *Ctx, port int) (string, func(), error) {
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		ln, err = net.Listen("tcp", "127.0.0.1:0") // ocupado: otro puerto
 	}
 	if err != nil {
-		return fail(err)
+		return "", nil, err
 	}
 	addr := ln.Addr().(*net.TCPAddr)
-	url := fmt.Sprintf("http://127.0.0.1:%d/", addr.Port)
 	allowed := []string{fmt.Sprintf("127.0.0.1:%d", addr.Port), fmt.Sprintf("localhost:%d", addr.Port)}
 	srv := &http.Server{Handler: uiHandler(allowed, func() (panelState, error) {
 		d, err := readWatch(c)
 		return buildPanel(c.Version, d, time.Now()), err
 	}), ReadHeaderTimeout: 5 * time.Second}
 	go srv.Serve(ln)
+	stop := func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(ctx)
+	}
+	return fmt.Sprintf("http://127.0.0.1:%d/", addr.Port), stop, nil
+}
 
+func runUI(c *Ctx) output.Envelope {
+	if _, err := engineFor(c); err != nil {
+		return output.Fail("config", err)
+	}
+	port, _ := strconv.Atoi(str(c.Flags, "port"))
+	url, stopUI, err := serveUI(c, port)
+	if err != nil {
+		return fail(err)
+	}
+	defer stopUI()
 	fmt.Fprintln(c.Stdout, "bflow ui en "+url+" (Ctrl+C para cerrar)")
 	if str(c.Flags, "no-open") != "true" {
 		if err := openBrowser(url); err != nil {
@@ -192,9 +206,6 @@ func runUI(c *Ctx) output.Envelope {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt)
 	<-stop
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	_ = srv.Shutdown(ctx)
 	return output.Envelope{OK: true, Code: "ui", Quiet: true}
 }
 

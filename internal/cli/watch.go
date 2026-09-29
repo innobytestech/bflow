@@ -19,11 +19,12 @@ import (
 )
 
 func init() {
-	Register(&Command{Name: "watch", Summary: "panel en vivo de la tarea: paso actual, siguiente, tiempos, tokens por agente y eventos: watch [--interval 2s] [--once]",
+	Register(&Command{Name: "watch", Summary: "panel en vivo de la tarea: paso actual, siguiente, tiempos, tokens por agente y eventos: watch [--interval 2s] [--once] [--open] [--web]",
 		Setup: func(fs *flag.FlagSet) {
 			fs.Duration("interval", 2*time.Second, "cada cuánto refrescar")
 			fs.Bool("once", false, "dibujar una vez y salir")
 			fs.Bool("open", false, "abrir el panel en otra ventana o pestaña (si no hay uno abierto)")
+			fs.Bool("web", false, "además, servir la página del panel y abrirla en el navegador (bflow ui)")
 		},
 		Run: runWatch})
 }
@@ -40,6 +41,7 @@ type watchData struct {
 	Stats  metrics.TaskStats
 	Events []store.Entry // de la tarea activa, en orden del log
 	Others []engine.View
+	WebURL string // la página del panel, si esta ventana la sirve
 }
 
 func runWatch(c *Ctx) output.Envelope {
@@ -70,11 +72,20 @@ func runWatch(c *Ctx) output.Envelope {
 		storeDir = e.Store.Dir()
 		defer os.Remove(alivePath(storeDir)) // al cerrar la ventana no corre: el latido envejece solo
 	}
+	var webURL string
+	if str(c.Flags, "web") == "true" {
+		if url, stopUI, err := serveUI(c, uiDefaultPort); err == nil {
+			defer stopUI()
+			webURL = url
+			_ = openBrowser(url)
+		}
+	}
 	for {
 		frame := ""
 		if d, err := readWatch(c); err != nil {
 			frame = "bflow watch: " + err.Error()
 		} else {
+			d.WebURL = webURL
 			frame = renderWatch(m, c.Version, d, time.Now(), termRows(f)-1)
 		}
 		if storeDir != "" {
@@ -279,18 +290,29 @@ func progress(m bannerMode, v engine.View, width int) []string {
 	return lines
 }
 
-// renderWatch arma el cuadro. Con rows > 0 lo ajusta a ese alto quitando los
-// eventos más viejos: si el cuadro no cabe, el repintado deja basura.
+// renderWatch arma el cuadro. Con rows > 0 lo ajusta a ese alto: primero
+// cambia el banner por una línea y después quita los eventos más viejos; si
+// el cuadro no cabe, el repintado deja basura.
 func renderWatch(m bannerMode, version string, d watchData, now time.Time, rows int) string {
 	var b, tail strings.Builder
 	line := func(s string) { b.WriteString("  " + s + "\n") }
 	label := func(l, v string) { dimLabel(&b, m, l, v) }
+	where := d.Repo + " · " + now.Format("15:04:05")
+	if d.WebURL != "" {
+		where += " · página: " + d.WebURL
+	}
+	var head string // el banner completo, si cabe
+	if m != bannerOff {
+		head = renderBanner(m, version) + "\n  " + paint(m, cDim, where) + "\n\n"
+	}
 	brand := "bflow"
 	if m == bannerColor {
 		brand = fmt.Sprintf("\x1b[1;38;2;%d;%d;%dmbflow\x1b[0m", gradTo[0], gradTo[1], gradTo[2])
 	}
-	line(brand + paint(m, cDim, " by innobytes.tech · "+version+" · "+d.Repo+" · "+now.Format("15:04:05")))
-	b.WriteString("\n")
+	compact := "  " + brand + paint(m, cDim, " by innobytes.tech · "+version+" · "+where) + "\n\n"
+	if head == "" {
+		head = compact
+	}
 	var events []string
 	if d.Active == nil {
 		line("Ninguna tarea en curso. Empieza una con bflow start <ID> --lane full|light|hotfix")
@@ -364,16 +386,19 @@ func renderWatch(m bannerMode, version string, d watchData, now time.Time, rows 
 	watchOthers(&tail, m, d.Others)
 
 	lines := func() int {
-		n := strings.Count(b.String(), "\n") + strings.Count(tail.String(), "\n")
+		n := strings.Count(head, "\n") + strings.Count(b.String(), "\n") + strings.Count(tail.String(), "\n")
 		if len(events) > 0 {
 			n += len(events) + 1
 		}
 		return n
 	}
+	if rows > 0 && lines() > rows {
+		head = compact
+	}
 	for rows > 0 && lines() > rows && len(events) > 0 {
 		events = events[:len(events)-1]
 	}
-	out := b.String()
+	out := head + b.String()
 	if len(events) > 0 {
 		out += "\n" + strings.Join(events, "\n") + "\n"
 	}
@@ -501,7 +526,7 @@ func runWatchOpen(c *Ctx) output.Envelope {
 	if err != nil {
 		return output.Fail("config", err)
 	}
-	st, err := openWatch(e.Cfg.Root, e.Store.Dir())
+	st, err := openWatch(e.Cfg.Root, e.Store.Dir(), e.Cfg.UI.Web || str(c.Flags, "web") == "true")
 	if err != nil {
 		return output.Fail("no_terminal", fmt.Errorf("no se pudo abrir el panel: %w; córrelo a mano en otra terminal: bflow watch", err))
 	}

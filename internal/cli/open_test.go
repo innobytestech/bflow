@@ -40,7 +40,7 @@ func TestTerminalCmd(t *testing.T) {
 		{"linux sin terminal", "linux", []string{"DISPLAY", ":0"}, nil, ""},
 	}
 	for _, c := range cases {
-		got, err := terminalCmd(c.goos, env(c.env...), look(c.have...), bf, dir)
+		got, err := terminalCmd(c.goos, env(c.env...), look(c.have...), bf, dir, "", false)
 		if c.want == "" {
 			if !errors.Is(err, errNoDesktop) {
 				t.Errorf("%s: esperaba sin escritorio, got %v %v", c.name, got, err)
@@ -73,5 +73,33 @@ func TestWatchHeartbeat(t *testing.T) {
 	os.Remove(filepath.Join(dir, "cache", "watch.alive"))
 	if watchOpen(dir, now) {
 		t.Error("al salir con Ctrl+C se borra")
+	}
+}
+
+func TestTerminalCmdProfileAndWeb(t *testing.T) {
+	look := func(string) (string, error) { return "wt.exe", nil }
+	got, _ := terminalCmd("windows", env(), look, "bflow.exe", `C:\repo`, "{61c54bbd}", true)
+	want := []string{"wt.exe", "-w", "0", "new-tab", "-p", "{61c54bbd}", "--title", "bflow", "-d", `C:\repo`, "bflow.exe", "watch", "--web"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Errorf("%q", got)
+	}
+}
+
+func TestWTProfile(t *testing.T) {
+	settings := []byte("// comentario\n{\n    \"$schema\": \"x\",\n    \"defaultProfile\": \"{61c54bbd-c2c6-5271-96e7-009a87ff44bf}\",\n}")
+	read := func(p string) ([]byte, error) {
+		if strings.Contains(p, "Microsoft.WindowsTerminal_8wekyb3d8bbwe") {
+			return settings, nil
+		}
+		return nil, os.ErrNotExist
+	}
+	if got := wtProfile(env("LOCALAPPDATA", `C:\u\AppData\Local`), read); got != "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}" {
+		t.Errorf("perfil por defecto: %q", got)
+	}
+	if got := wtProfile(env("WT_PROFILE_ID", "{abc}", "LOCALAPPDATA", `C:\x`), read); got != "{abc}" {
+		t.Errorf("la pestaña actual manda: %q", got)
+	}
+	if got := wtProfile(env(), read); got != "" {
+		t.Errorf("sin WT: %q", got)
 	}
 }

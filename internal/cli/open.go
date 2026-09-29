@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -23,27 +24,38 @@ var goos = runtime.GOOS
 var errNoDesktop = errors.New("sin escritorio")
 
 // terminalCmd arma el comando que abre una ventana o pestaña con `bflow
-// watch` en dir. No abre nada en CI ni sin escritorio (SSH, Linux sin
-// DISPLAY). lookPath dice qué programas hay.
-func terminalCmd(goos string, getenv func(string) string, lookPath func(string) (string, error), bflow, dir string) ([]string, error) {
+// watch` (y --web si web) en dir. No abre nada en CI ni sin escritorio (SSH,
+// Linux sin DISPLAY). lookPath dice qué programas hay; wtProfile es el perfil
+// de Windows Terminal con que se abre la pestaña ("" = el que elija WT).
+func terminalCmd(goos string, getenv func(string) string, lookPath func(string) (string, error), bflow, dir, wtProfile string, web bool) ([]string, error) {
 	if getenv("CI") != "" {
 		return nil, fmt.Errorf("%w: CI", errNoDesktop)
 	}
 	has := func(p string) bool { _, err := lookPath(p); return err == nil }
+	run := []string{bflow, "watch"}
+	if web {
+		run = append(run, "--web")
+	}
 	switch goos {
 	case "windows":
 		if has("wt.exe") { // Windows Terminal: pestaña nueva en la ventana más reciente
-			return []string{"wt.exe", "-w", "0", "new-tab", "--title", "bflow", "-d", dir, bflow, "watch"}, nil
+			// Con el perfil explícito: un comando suelto se abre con la
+			// configuración base de WT y no con la fuente y colores del usuario.
+			args := []string{"wt.exe", "-w", "0", "new-tab"}
+			if wtProfile != "" {
+				args = append(args, "-p", wtProfile)
+			}
+			return append(append(args, "--title", "bflow", "-d", dir), run...), nil
 		}
 		// Sin Windows Terminal, una consola nueva. Start-Process y no `cmd /c start`,
 		// que confunde el primer argumento entre comillas con el título.
-		ps := fmt.Sprintf("Start-Process -FilePath %s -ArgumentList watch -WorkingDirectory %s", psQuote(bflow), psQuote(dir))
+		ps := fmt.Sprintf("Start-Process -FilePath %s -ArgumentList %s -WorkingDirectory %s", psQuote(bflow), strings.Join(run[1:], ","), psQuote(dir))
 		return []string{"powershell.exe", "-NoProfile", "-Command", ps}, nil
 	case "darwin":
 		if getenv("SSH_CONNECTION") != "" {
 			return nil, fmt.Errorf("%w: sesión SSH", errNoDesktop)
 		}
-		script := fmt.Sprintf(`tell application "Terminal" to do script "cd %s && %s watch"`, shellQuote(dir), shellQuote(bflow))
+		script := fmt.Sprintf(`tell application "Terminal" to do script "cd %s && %s %s"`, shellQuote(dir), shellQuote(bflow), strings.Join(run[1:], " "))
 		return []string{"osascript", "-e", script, "-e", `tell application "Terminal" to activate`}, nil
 	}
 	if getenv("DISPLAY") == "" && getenv("WAYLAND_DISPLAY") == "" {
@@ -52,27 +64,57 @@ func terminalCmd(goos string, getenv func(string) string, lookPath func(string) 
 	// La terminal hereda el directorio del proceso (cmd.Dir); las que lo
 	// ignoran lo reciben como argumento.
 	if t := getenv("TERMINAL"); t != "" && has(t) {
-		return []string{t, "-e", bflow, "watch"}, nil
+		return append([]string{t, "-e"}, run...), nil
 	}
 	for _, t := range []struct {
 		name string
 		args []string
 	}{
-		{"x-terminal-emulator", []string{"-e", bflow, "watch"}},
-		{"gnome-terminal", []string{"--working-directory=" + dir, "--", bflow, "watch"}},
-		{"konsole", []string{"--workdir", dir, "-e", bflow, "watch"}},
-		{"xfce4-terminal", []string{"--working-directory", dir, "-x", bflow, "watch"}},
-		{"kitty", []string{"--directory", dir, bflow, "watch"}},
-		{"alacritty", []string{"--working-directory", dir, "-e", bflow, "watch"}},
-		{"wezterm", []string{"start", "--cwd", dir, bflow, "watch"}},
-		{"xterm", []string{"-e", bflow, "watch"}},
+		{"x-terminal-emulator", []string{"-e"}},
+		{"gnome-terminal", []string{"--working-directory=" + dir, "--"}},
+		{"konsole", []string{"--workdir", dir, "-e"}},
+		{"xfce4-terminal", []string{"--working-directory", dir, "-x"}},
+		{"kitty", []string{"--directory", dir}},
+		{"alacritty", []string{"--working-directory", dir, "-e"}},
+		{"wezterm", []string{"start", "--cwd", dir}},
+		{"xterm", []string{"-e"}},
 	} {
 		if has(t.name) {
-			return append([]string{t.name}, t.args...), nil
+			return append(append([]string{t.name}, t.args...), run...), nil
 		}
 	}
 	return nil, fmt.Errorf("%w: no se encontró una terminal (define TERMINAL)", errNoDesktop)
 }
+
+// wtProfile es el perfil de Windows Terminal para la pestaña del panel: el
+// de la pestaña desde donde se corre bflow (WT_PROFILE_ID) o, si bflow corre
+// fuera de WT (la sesión de Claude en VS Code), el perfil por defecto del
+// usuario, leído de su settings.json.
+func wtProfile(getenv func(string) string, readFile func(string) ([]byte, error)) string {
+	if id := getenv("WT_PROFILE_ID"); id != "" {
+		return id
+	}
+	base := getenv("LOCALAPPDATA")
+	if base == "" {
+		return ""
+	}
+	for _, p := range []string{
+		`Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json`,
+		`Packages\Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe\LocalState\settings.json`,
+		`Microsoft\Windows Terminal\settings.json`,
+	} {
+		if b, err := readFile(filepath.Join(base, p)); err == nil {
+			if m := defaultProfileRe.FindSubmatch(b); m != nil {
+				return string(m[1])
+			}
+		}
+	}
+	return ""
+}
+
+// defaultProfileRe saca defaultProfile de settings.json, que admite
+// comentarios y por eso no siempre es JSON válido.
+var defaultProfileRe = regexp.MustCompile(`"defaultProfile"\s*:\s*"([^"]+)"`)
 
 func psQuote(s string) string { return `'` + strings.ReplaceAll(s, `'`, `''`) + `'` }
 
@@ -103,9 +145,10 @@ func watchOpen(storeDir string, now time.Time) bool {
 	return now.Sub(st.ModTime()) < 2*time.Duration(ms)*time.Millisecond+5*time.Second
 }
 
-// openWatch abre el panel en otra ventana si no hay uno abierto. Devuelve
+// openWatch abre el panel en otra ventana si no hay uno abierto; con web,
+// además sirve la página y abre el navegador. Devuelve
 // "opened" o "already".
-func openWatch(root, storeDir string) (string, error) {
+func openWatch(root, storeDir string, web bool) (string, error) {
 	if watchOpen(storeDir, time.Now()) {
 		return "already", nil
 	}
@@ -113,7 +156,7 @@ func openWatch(root, storeDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	args, err := terminalCmd(goos, os.Getenv, exec.LookPath, self, root)
+	args, err := terminalCmd(goos, os.Getenv, exec.LookPath, self, root, wtProfile(os.Getenv, os.ReadFile), web)
 	if err != nil {
 		return "", err
 	}
