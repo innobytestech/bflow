@@ -84,13 +84,18 @@ code { font: inherit; }
 }
 h2 { font: 30px/1 var(--px); letter-spacing: 3px; text-transform: uppercase; margin: 0 0 16px; color: var(--ink); }
 
-/* ---------- Franja superior ---------- */
+/* ---------- Franja superior ----------
+   Todo va en una columna de 1440px como máximo, centrada. */
+.strip, .layout { max-width: 1440px; margin-inline: auto; }
 .strip {
   display: flex; align-items: center; justify-content: space-between; gap: 16px 32px; flex-wrap: wrap;
-  padding: 18px clamp(16px, 3vw, 32px) 14px;
+  padding: 18px clamp(16px, 3vw, 32px) 16px; margin-bottom: 20px;
+  background: linear-gradient(var(--rule), var(--rule)) bottom / calc(100% - 2 * clamp(16px, 3vw, 32px)) 2px no-repeat;
 }
-.lockup { display: grid; gap: 6px; }
+/* bflow y, a su lado, by innobytes, separados por una línea. */
+.lockup { display: flex; align-items: center; gap: 12px 18px; flex-wrap: wrap; }
 .wordmark { width: 215px; height: 60px; }
+.lockup .by { padding-left: 18px; min-height: 60px; box-shadow: inset 2px 0 0 0 var(--rule-soft); }
 /* El degradado de la marca, en escalones como en la terminal. */
 .band0 { fill: var(--g0); }
 .band1 { fill: color-mix(in srgb, var(--g1) 20%, var(--g0)); }
@@ -134,18 +139,18 @@ h2 { font: 30px/1 var(--px); letter-spacing: 3px; text-transform: uppercase; mar
 .foot { grid-area: foot; }
 
 /* ---------- Tablero LED ----------
-   Una sola rejilla de LEDs cuadrados de 3px (2px de luz, 1px de rejilla)
-   delante de todo el tablero: fondo, texto y la fila invertida la comparten. */
+   Una sola rejilla de LEDs cuadrados de 3px (2px de luz, 1px de rejilla) en
+   el fondo del tablero y de la fila invertida. El texto va encima, sólido:
+   pasado por la rejilla, a 20px no se leía. */
+:root {
+  --grille: linear-gradient(to right, var(--led-grid) 1px, transparent 1px) 0 0 / 3px 3px,
+            linear-gradient(to bottom, var(--led-grid) 1px, transparent 1px) 0 0 / 3px 3px;
+}
 .board {
-  position: relative; background: var(--led-unlit); color: var(--led-white);
+  position: relative; background: var(--grille), var(--led-unlit); color: var(--led-white);
   padding: 20px 24px; --f: #1a2a8c; overflow: hidden;
 }
 [data-theme="light"] .board { --f: var(--ink); }
-.board::after {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(to right, var(--led-grid) 1px, transparent 1px) 0 0 / 3px 3px,
-              linear-gradient(to bottom, var(--led-grid) 1px, transparent 1px) 0 0 / 3px 3px;
-}
 .b-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px 20px; align-items: start; margin-bottom: 18px; }
 .route { display: grid; justify-items: start; gap: 6px; color: var(--led-dim); }
 .route .badge { width: 44px; height: 44px; font-size: 40px; }
@@ -163,7 +168,7 @@ h2 { font: 30px/1 var(--px); letter-spacing: 3px; text-transform: uppercase; mar
 .human-c { color: var(--led-amber); }
 .row.now.human .what { color: var(--led-amber); }
 /* Te toca: la fila se invierte, como el video inverso de la terminal. */
-.row.now.waiting { background: var(--led-amber); }
+.row.now.waiting { background: var(--grille), var(--led-amber); }
 .row.now.waiting .k, .row.now.waiting .who, .row.now.waiting .what, .row.now.waiting .ago { color: var(--led-face); }
 .row.blank .what { color: var(--led-dim); }
 .wipe { animation: wipe .48s steps(12, end); }
@@ -252,8 +257,9 @@ svg.px.train.v { width: 14px; height: 48px; transform: translate(-50%, -50%); }
 .lane-row code { grid-column: 2; color: var(--ink); }
 
 /* ---------- Medidores ---------- */
-.gauges { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 24px; align-items: start; }
+.gauges { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr)); gap: 24px; align-items: start; }
 .gauge { background: var(--panel); padding: 18px 18px 20px; }
+.gauge.log-g { grid-column: 1 / -1; } /* la bitácora a lo ancho: un evento por línea */
 .kv { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 2px dotted var(--rule-soft); }
 .kv:last-child { border-bottom: 0; }
 .kv dt { color: var(--ink-2); display: flex; align-items: center; gap: 8px; }
@@ -310,8 +316,12 @@ svg.px.arrow { display: inline-block; width: 14px; height: 10px; margin: 0 6px; 
 .others { margin: 6px 0 0 44px; padding: 0; list-style: none; display: grid; gap: 2px; color: var(--ink-2); }
 
 /* ---------- Cajetín (como el de un plano) ---------- */
-.foot { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 0; --f: var(--rule); background: var(--panel); }
-.foot div { padding: 8px 12px 10px; display: grid; gap: 4px; box-shadow: inset -2px 0 0 0 var(--rule-soft); }
+/* Pegado abajo mientras la página sea más alta que la ventana: el estado
+   del enlace siempre a la vista. */
+.foot { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 0; --f: var(--rule); background: var(--panel);
+  position: sticky; bottom: 0; z-index: 5; }
+.foot div { padding: 8px 12px; display: flex; gap: 10px; align-items: baseline; min-width: 0; box-shadow: inset -2px 0 0 0 var(--rule-soft); }
+.foot div span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .foot div:last-child { box-shadow: none; }
 .foot small { font: inherit; color: var(--ink-2); letter-spacing: 2px; text-transform: uppercase; }
 .foot .off { color: var(--offline); }
@@ -338,7 +348,10 @@ svg.px.arrow { display: inline-block; width: 14px; height: 10px; margin: 0 6px; 
   .st.pending .track::before, .st.pending .track::after, .st.current .track::after { background: repeating-linear-gradient(180deg, var(--ink-3) 0 6px, transparent 6px 12px); }
   .node { top: 50%; left: 5px; transform: translateY(-50%); }
   svg.px.stop-mark { right: auto; left: 0; top: auto; bottom: -8px; width: 22px; height: 4px; transform: none; }
+  .foot { position: static; }
   .foot div { box-shadow: inset 0 -2px 0 0 var(--rule-soft); }
+  .foot div span { white-space: normal; overflow-wrap: anywhere; }
+  .lockup .by { padding-left: 0; min-height: 0; box-shadow: none; }
   .st .nm { grid-area: nm; } .st .t { grid-area: t; } .tags { grid-area: tags; align-items: flex-start; flex-direction: row; flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) { .wipe { animation: none; } .train.moving, .btn, .repo { transition: none; } }
@@ -772,7 +785,7 @@ function renderGauges() {
     g.append(tok);
   }
   if (t.events && t.events.length) {
-    const ev = el("section", "gauge frame");
+    const ev = el("section", "gauge frame log-g");
     ev.append(el("h2", "", "Bitácora"));
     const ol = el("ol", "log");
     t.events.forEach((e) => { const li = el("li"); const sp = el("span"); sp.append(withArrows(e.text)); li.append(el("time", "", e.time), sp); ol.append(li); });
@@ -834,6 +847,7 @@ function renderNet() {
 
 function render() {
   setText($("version"), state.version);
+  $("version").title = state.version;
   setText($("repo"), (state.profile ? state.profile + " / " : "") + state.repo);
   const where = $("where");
   where.replaceChildren();
