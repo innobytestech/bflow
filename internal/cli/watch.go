@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"innobytes.tech/bflow/internal/config"
 	"innobytes.tech/bflow/internal/engine"
 	"innobytes.tech/bflow/internal/flow"
 	"innobytes.tech/bflow/internal/metrics"
@@ -70,22 +71,23 @@ func runWatch(c *Ctx) output.Envelope {
 	var storeDir string
 	if e, err := engineFor(c); err == nil {
 		storeDir = e.Store.Dir()
+		_ = config.RememberRepo(e.Cfg.Root)
 		defer os.Remove(alivePath(storeDir)) // al cerrar la ventana no corre: el latido envejece solo
 	}
-	var webURL string
+	var web *webPanel
 	if str(c.Flags, "web") == "true" {
-		if url, stopUI, err := serveUI(c, uiDefaultPort); err == nil {
-			defer stopUI()
-			webURL = url
-			_ = openBrowser(url)
-		}
+		web = startWeb(c)
+		defer web.close()
 	}
 	for {
 		frame := ""
 		if d, err := readWatch(c); err != nil {
 			frame = "bflow watch: " + err.Error()
 		} else {
-			d.WebURL = webURL
+			if web != nil {
+				web.tick()
+				d.WebURL = web.url
+			}
 			frame = renderWatch(m, c.Version, d, time.Now(), termRows(f)-1)
 		}
 		if storeDir != "" {
@@ -106,12 +108,17 @@ func readWatch(c *Ctx) (watchData, error) {
 	if err != nil {
 		return watchData{}, err
 	}
+	return readWatchIn(e)
+}
+
+// readWatchIn lee el panel del repo de e.
+func readWatchIn(e *engine.Engine) (watchData, error) {
 	ctx := context.Background()
+	d := watchData{Repo: filepath.Base(e.Cfg.Root)}
 	views, err := e.Views(ctx)
 	if err != nil {
-		return watchData{}, err
+		return d, err
 	}
-	d := watchData{Repo: filepath.Base(e.Cfg.Root)}
 	active, _ := e.Active(ctx)
 	for i := range views {
 		if views[i].ID == active {

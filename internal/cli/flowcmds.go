@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 
+	"innobytes.tech/bflow/internal/config"
 	"innobytes.tech/bflow/internal/engine"
 	"innobytes.tech/bflow/internal/flow"
 	"innobytes.tech/bflow/internal/output"
@@ -115,6 +116,9 @@ func init() {
 			}
 			return flowCommand(func(ctx context.Context, e *engine.Engine, id string, c *Ctx, _ []string) (engine.Outcome, error) {
 				o, err := e.Start(ctx, id, flow.Lane(lane), str(c.Flags, "slug"), str(c.Flags, "fixes"))
+				if err == nil {
+					_ = config.RememberRepo(e.Cfg.Root) // para la red de la página del panel
+				}
 				if err == nil && (e.Cfg.UI.Watch || e.Cfg.UI.Web) {
 					// Sin escritorio (CI, SSH) no se abre y no se avisa: es lo esperado.
 					if _, werr := openWatch(e.Cfg.Root, e.Store.Dir(), e.Cfg.UI.Web); werr != nil && !errors.Is(werr, errNoDesktop) {

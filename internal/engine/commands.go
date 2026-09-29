@@ -153,6 +153,8 @@ type View struct {
 	Phases    []flow.Phase `json:"-"` // las del carril, en orden
 	Reported  []string     `json:"-"` // agentes que ya reportaron en esta fase
 	GateSince time.Time    `json:"-"`
+	// Dónde estaba al bloquearse.
+	BlockedFrom flow.Phase `json:"-"`
 }
 
 // Status devuelve la vista de una tarea, empezada o no.
@@ -188,6 +190,7 @@ func (e *Engine) view(rec store.Record) View {
 	}
 	if rec.Flow.Block != nil {
 		v.Blocked = rec.Flow.Block.Reason
+		v.BlockedFrom = rec.Flow.Block.From
 	}
 	return v
 }

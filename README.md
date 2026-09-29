@@ -257,7 +257,13 @@ API-12 · implementing · 1h42m · ronda 1 · 145k nuevos · 2.9M caché
 
 Para seguir la tarea sin leer la conversación, `bflow watch` es un panel en vivo en otra terminal: quién trabaja y desde cuándo, o qué gate espera tu decisión; lo que sigue; tiempos por fase; tokens por agente; fricción, y los últimos eventos. `bflow watch --open` lo abre en otra pestaña o ventana (Windows Terminal, PowerShell, Terminal de macOS o la terminal de Linux) si no hay uno abierto. Con `ui: { watch: true }`, `bflow start` lo abre solo; nunca en CI ni sin escritorio. Como es una preferencia personal, puede ir en la config global en lugar de `bflow.yaml`.
 
-`bflow ui` muestra el mismo panel en el navegador, en una página local de solo lectura. Con `ui: { web: true }`, la ventana del panel también la abre al empezar una tarea.
+`bflow ui` muestra el panel en el navegador, en una página local de solo lectura.
+- **Tablero.** Arriba, quién tiene la tarea ahora y qué sigue.
+- **Línea del carril.** Cada fase es una estación, con su tiempo y las que terminan en tu decisión.
+- **Métricas.** Tiempos, tokens por agente y bitácora.
+- **Tus repos.** Aparecen todos los repos donde usaste bflow, agrupados por perfil, así que ves de un vistazo en cuál te toca.
+
+Con `ui: { web: true }`, la ventana del panel también la abre al empezar una tarea. Si ya hay una página abierta, no abre otra.
 
 Cuando la tarea espera tu decisión (una gate o un bloqueo) y Claude termina su turno, bflow manda una notificación del sistema que dice qué hay que decidir, una vez por espera. `ui: { notify: false }` la apaga.
 
@@ -323,7 +329,7 @@ La validación junta todos los problemas en un solo mensaje, indica la línea de
 | Agentes | `render [--check]` |
 | Git y PR | `pr` · `panel [--sla]` (cierra lo mergeado, recuerda gates vencidos) |
 | Calidad | `check [--quick pkg] [--verify]` · `env check` · `guard` |
-| Métricas | `stats [ID]` · `statusline` · `watch [--open]` (panel en vivo) · `ui` (panel en el navegador) |
+| Métricas | `stats [ID]` · `statusline` · `watch [--open] [--web]` (panel en vivo) · `ui` (panel en el navegador, con todos tus repos) |
 | Configuración | `init` · `doctor` · `connect plane\|github` · `profile add\|list\|use` · `tracker setup` · `tracker states` |
 | Hooks | `hook session-start` · `hook tokens` |
 

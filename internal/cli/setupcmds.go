@@ -254,6 +254,7 @@ func runInit(c *Ctx) output.Envelope {
 	if _, err := config.Load(root); err != nil {
 		return output.Fail("invalid", fmt.Errorf("el bflow.yaml generado no es válido (repórtalo): %w", err))
 	}
+	_ = config.RememberRepo(root)
 	var next []string
 	if a.Tracker == "plane" {
 		next = append(next, "bflow connect plane (si aún no hay token)", "bflow tracker setup --dry-run")

@@ -5,162 +5,506 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>bflow</title>
 <style>
-:root {
-  color-scheme: dark;
-  --bg: #0d1017;
-  --surface: #141925;
-  --rule: #262d3d;
-  --text: #e7eaf1;
-  --muted: #98a1b6;
-  --brand: #4d8dff;
-  --agent: #5aaeff;
-  --human: #f2b441;
-  --human-tint: rgba(242, 180, 65, .10);
-  --human-rule: rgba(242, 180, 65, .45);
-  --done: #4cc38a;
-  --danger: #ff6b6b;
-  --select: rgba(77, 141, 255, .35);
-  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-  --mono: ui-monospace, "Cascadia Mono", SFMono-Regular, Menlo, Consolas, monospace;
+/* Una sola fuente de pixeles (rejilla de 10px) y solo en múltiplos enteros:
+   20px (2x) el texto, 30px (3x) los títulos y 40px (4x) lo que manda. */
+@font-face { font-family: "Jersey 10"; src: url(fonts/Jersey10.woff2) format("woff2"); font-display: block; }
+
+/* Blanco: tira esmaltada. Marino: muro azul de la marca. El tablero LED es
+   el mismo aparato en los dos. */
+:root, [data-theme="light"] {
+  color-scheme: light;
+  --ground: #ffffff;
+  --panel: #ffffff;
+  --ink: #0b1450;
+  --ink-2: #3d4a8a;
+  --ink-3: #7f89b8;
+  --rule: #0b1450;
+  --rule-soft: #cfd5ea;
+  --agent: #0a6fd6;
+  --you-ink: #8a5a00;
+  --current-row: rgba(27, 44, 242, .08);
+  --select: rgba(27, 44, 242, .18);
+  --g0: #3346ff;
+  --g1: #1e9be6;
+  --full: #1b2cf2;
+  --light: #0a8bd6;
+  --hotfix: #e0461c;
+  --offline: #c4241c;
 }
-@media (prefers-color-scheme: light) {
-  :root {
-    color-scheme: light;
-    --bg: #f6f7f9;
-    --surface: #ffffff;
-    --rule: #dfe3ea;
-    --text: #161b26;
-    --muted: #586176;
-    --brand: #2449d8;
-    --agent: #0a66b8;
-    --human: #8a5a00;
-    --human-tint: rgba(214, 150, 20, .12);
-    --human-rule: rgba(160, 105, 0, .45);
-    --done: #147a4c;
-    --danger: #c62828;
-    --select: rgba(36, 73, 216, .22);
-  }
+[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #0b1450;
+  --panel: #0f1a5e;
+  --ink: #eaf1ff;
+  --ink-2: #b4c2f0;
+  --ink-3: #6f7fc4;
+  --rule: #2f42b0;
+  --rule-soft: #24338f;
+  --agent: #38b6ff;
+  --you-ink: #ffb000;
+  --current-row: rgba(56, 182, 255, .12);
+  --select: rgba(56, 182, 255, .28);
+  --g0: #6474ff;
+  --g1: #38b6ff;
+  --full: #6474ff;
+  --light: #38b6ff;
+  --hotfix: #ff7a4d;
+  --offline: #ff6b63;
+}
+:root {
+  --amber: #ffb000;
+  --led-face: #030718;
+  --led-unlit: #101c52;
+  --led-grid: rgba(3, 7, 24, .5);
+  --led-cyan: #86d6ff;
+  --led-white: #f4faff;
+  --led-amber: #ffc02e;
+  --led-dim: rgba(150, 205, 255, .88);
+  --px: "Jersey 10", ui-monospace, Consolas, monospace;
+  --lane: var(--light);
 }
 * { box-sizing: border-box; }
-html { scrollbar-color: var(--rule) transparent; }
-::selection { background: var(--select); }
+html { scrollbar-color: var(--ink-3) var(--ground); }
+::selection { background: var(--select); color: var(--ink); }
 body {
-  margin: 0; background: var(--bg); color: var(--text);
-  font: 15px/1.55 var(--sans); font-variant-numeric: tabular-nums;
-  -webkit-font-smoothing: antialiased;
+  margin: 0; background: var(--ground); color: var(--ink);
+  font: 20px/1.2 var(--px); font-variant-numeric: tabular-nums;
+  caret-color: var(--amber);
 }
-:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 4px; }
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 4px; }
+button { font: inherit; color: inherit; }
+svg.px { display: block; shape-rendering: crispEdges; }
+code { font: inherit; }
 
-header {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap;
-  max-width: 920px; margin: 0 auto; padding: 20px 20px 0;
+/* Marco de pixel: cuatro franjas de 2px, sin las esquinas. */
+.frame {
+  margin: 2px;
+  box-shadow: 0 -2px 0 0 var(--f, var(--rule)), 0 2px 0 0 var(--f, var(--rule)),
+              -2px 0 0 0 var(--f, var(--rule)), 2px 0 0 0 var(--f, var(--rule));
 }
-.wordmark { font-weight: 750; font-size: 18px; color: var(--brand); letter-spacing: -.01em; }
-.meta { color: var(--muted); font-size: 13px; }
-.meta b { color: var(--text); font-weight: 500; }
-.bar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-.offline { color: var(--danger); }
+h2 { font: 30px/1 var(--px); letter-spacing: 3px; text-transform: uppercase; margin: 0 0 16px; color: var(--ink); }
 
-button {
-  font: 500 13px/1 var(--sans); color: var(--text); background: var(--surface);
-  border: 1px solid var(--rule); border-radius: 6px; padding: 7px 12px; cursor: pointer;
-  transition: border-color .15s ease-out, background .15s ease-out;
+/* ---------- Franja superior ---------- */
+.strip {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px 32px; flex-wrap: wrap;
+  padding: 18px clamp(16px, 3vw, 32px) 14px;
 }
-button:hover { border-color: var(--brand); }
-button:active { background: var(--bg); }
-button:disabled { opacity: .5; cursor: default; }
+.lockup { display: grid; gap: 6px; }
+.wordmark { width: 215px; height: 60px; }
+/* El degradado de la marca, en escalones como en la terminal. */
+.band0 { fill: var(--g0); }
+.band1 { fill: color-mix(in srgb, var(--g1) 20%, var(--g0)); }
+.band2 { fill: color-mix(in srgb, var(--g1) 40%, var(--g0)); }
+.band3 { fill: color-mix(in srgb, var(--g1) 60%, var(--g0)); }
+.band4 { fill: color-mix(in srgb, var(--g1) 80%, var(--g0)); }
+.band5 { fill: var(--g1); }
+.sym0 { fill: #1b2cf2; } .sym1 { fill: #1f43f5; } .sym2 { fill: #235af7; } .sym3 { fill: #2871f9; }
+.sym4 { fill: #2c88fb; } .sym5 { fill: #309ffd; } .sym6 { fill: #38b6ff; }
+.by { display: flex; align-items: center; gap: 8px; color: var(--ink-2); }
+.by svg { width: 56px; height: 28px; }
+.by b { color: var(--ink); font-weight: 400; }
+.tools { display: flex; align-items: center; gap: 12px 18px; flex-wrap: wrap; }
+.where { color: var(--ink-2); }
+.where b { color: var(--ink); font-weight: 400; }
 
-main { max-width: 920px; margin: 0 auto; padding: 8px 20px 48px; }
-section { padding: 28px 0; border-top: 1px solid var(--rule); }
-section:first-child { border-top: 0; padding-top: 20px; }
-section.flush { border-top: 0; padding-top: 4px; }
-h1 { font-size: 22px; line-height: 1.3; font-weight: 650; margin: 4px 0 0; letter-spacing: -.01em; text-wrap: balance; }
-h2 { font-size: 15px; font-weight: 650; margin: 0 0 12px; }
-h3 { font-size: 13px; font-weight: 600; color: var(--muted); margin: 18px 0 6px; }
-.id { color: var(--muted); font-size: 13px; }
-.id b { color: var(--text); font-weight: 600; font-family: var(--mono); font-size: 13px; }
-
-/* Progreso del carril: un riel continuo; lo hecho y la fase actual lo llenan. */
-.rail { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); margin-top: 22px; }
-.stage { position: relative; padding-top: 12px; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; padding-right: 6px; }
-.stage::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--rule); }
-.stage:first-child::before { border-radius: 3px 0 0 3px; }
-.stage:last-child::before { border-radius: 0 3px 3px 0; }
-.stage.done { color: var(--text); }
-.stage.done::before { background: var(--done); }
-.stage.current { color: var(--agent); font-weight: 650; }
-.stage.current::before { background: var(--agent); }
-.waiting .stage.current { color: var(--human); }
-.waiting .stage.current::before { background: var(--human); }
-
-/* AHORA y DESPUÉS: lo único que pide atención; se tiñe cuando le toca a la persona. */
-.status {
-  display: grid; gap: 14px; padding: 20px 22px; margin: 0 -22px;
-  border-radius: 10px; background: transparent; border: 1px solid transparent;
-  transition: background .2s ease-out, border-color .2s ease-out;
+.btn {
+  background: var(--panel); border: 0; padding: 4px 12px 6px; cursor: pointer; line-height: 1;
+  --f: var(--rule); transition: background .15s ease-out, color .15s ease-out;
 }
-.waiting .status { background: var(--human-tint); border-color: var(--human-rule); }
-.step { display: grid; grid-template-columns: 76px 72px 1fr; gap: 12px; align-items: baseline; }
-.step .when { color: var(--muted); font-size: 13px; }
-.role { font-size: 12px; font-weight: 750; letter-spacing: .06em; }
-.role.agent { color: var(--agent); }
-.role.human { color: var(--human); }
-.step .what { font-size: 17px; }
-.step.now .what { font-size: 20px; font-weight: 650; line-height: 1.35; }
-.step.now.human .what { color: var(--human); }
-.ago { color: var(--muted); font-size: 13px; font-weight: 400; white-space: nowrap; }
+.btn:hover { --f: var(--agent); color: var(--agent); }
+.btn:active, .btn[aria-pressed="true"] { background: var(--ink); color: var(--panel); --f: var(--ink); }
+.btn:disabled { color: var(--ink-3); --f: var(--rule-soft); cursor: default; }
+.seg { display: flex; gap: 4px; }
 
-.details { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 12px 48px; }
-dl { margin: 0; }
-.kv { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; border-bottom: 1px solid var(--rule); }
+/* ---------- Distribución ---------- */
+.layout {
+  display: grid; gap: 24px 28px; padding: 4px clamp(16px, 3vw, 32px) 24px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "board" "line" "net" "gauges" "foot";
+}
+.layout.solo { grid-template-areas: "board" "line" "gauges" "foot"; }
+@media (min-width: 1180px) {
+  .layout { grid-template-columns: minmax(0, 1fr) 340px; grid-template-areas: "board net" "line net" "gauges net" "foot foot"; }
+  .layout.solo { grid-template-columns: minmax(0, 1fr); grid-template-areas: "board" "line" "gauges" "foot"; }
+}
+.board { grid-area: board; }
+.line { grid-area: line; }
+.net { grid-area: net; align-self: start; }
+.gauges { grid-area: gauges; }
+.foot { grid-area: foot; }
+
+/* ---------- Tablero LED ----------
+   Una sola rejilla de LEDs cuadrados de 3px (2px de luz, 1px de rejilla)
+   delante de todo el tablero: fondo, texto y la fila invertida la comparten. */
+.board {
+  position: relative; background: var(--led-unlit); color: var(--led-white);
+  padding: 20px 24px; --f: #1a2a8c; overflow: hidden;
+}
+[data-theme="light"] .board { --f: var(--ink); }
+.board::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(to right, var(--led-grid) 1px, transparent 1px) 0 0 / 3px 3px,
+              linear-gradient(to bottom, var(--led-grid) 1px, transparent 1px) 0 0 / 3px 3px;
+}
+.b-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px 20px; align-items: start; margin-bottom: 18px; }
+.route { display: grid; justify-items: start; gap: 6px; color: var(--led-dim); }
+.route .badge { width: 44px; height: 44px; font-size: 40px; }
+.b-title { font: 40px/1 var(--px); margin: 2px 0 0; color: var(--led-white); text-wrap: balance;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.b-clock { font: 30px/1 var(--px); letter-spacing: 3px; color: var(--led-white); }
+.row { display: grid; grid-template-columns: 120px max-content minmax(0, 1fr); gap: 4px 16px; align-items: baseline; padding: 8px 12px; margin: 0 -12px; }
+.row .k { letter-spacing: 2px; color: var(--led-dim); }
+.row .who { letter-spacing: 2px; }
+.row .what { overflow-wrap: anywhere; color: var(--led-white); }
+.row.now .who, .row.now .what { font-size: 40px; line-height: 1; }
+.row.now .who { letter-spacing: 4px; }
+.row .ago { font-size: 20px; color: var(--led-dim); white-space: nowrap; }
+.agent-c { color: var(--led-cyan); }
+.human-c { color: var(--led-amber); }
+.row.now.human .what { color: var(--led-amber); }
+/* Te toca: la fila se invierte, como el video inverso de la terminal. */
+.row.now.waiting { background: var(--led-amber); }
+.row.now.waiting .k, .row.now.waiting .who, .row.now.waiting .what, .row.now.waiting .ago { color: var(--led-face); }
+.row.blank .what { color: var(--led-dim); }
+.wipe { animation: wipe .48s steps(12, end); }
+@keyframes wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+
+.b-prog { display: flex; align-items: center; gap: 16px; margin-top: 16px; letter-spacing: 2px; color: var(--led-dim); text-transform: uppercase; }
+.cells { display: flex; gap: 4px; flex: 1; max-width: 520px; }
+.cells i { flex: 1; height: 12px; background: rgba(150, 205, 255, .16); }
+.cells i.on { background: var(--led-cyan); }
+.cells i.cur { background: var(--led-white); }
+.waiting-task .cells i.cur { background: var(--led-amber); }
+.b-msg { font: 40px/1 var(--px); color: var(--led-white); margin: 0 0 12px; }
+.b-hint { color: var(--led-dim); margin: 0; }
+.b-hint code { color: var(--led-cyan); }
+.b-lost { margin: -8px -12px 16px; padding: 8px 12px; background: #ff5a4f; color: var(--led-face); }
+.b-lost code { text-decoration: underline; text-underline-offset: 4px; }
+
+/* ---------- Línea del carril ---------- */
+.line { background: var(--panel); padding: 20px 20px 22px; }
+.l-head { display: flex; justify-content: space-between; align-items: center; gap: 10px 24px; flex-wrap: wrap; margin-bottom: 20px; }
+.l-head h2 { margin: 0; display: flex; align-items: center; gap: 12px; }
+.legend { display: flex; gap: 8px 20px; flex-wrap: wrap; color: var(--ink-2); }
+.legend span { display: inline-flex; gap: 8px; align-items: center; }
+.badge {
+  display: inline-grid; place-items: center; width: 28px; height: 28px; margin: 2px;
+  background: var(--lane); color: #fff; font: 20px/1 var(--px); --f: var(--lane);
+}
+[data-theme="dark"] .badge.lane-light { color: var(--led-face); }
+.tag { display: inline-block; line-height: 1; letter-spacing: 2px; padding: 2px 6px 4px; margin: 2px; --f: var(--ink-2); color: var(--ink-2); text-transform: uppercase; white-space: nowrap; }
+.tag.you { --f: #c98a00; color: var(--you-ink); }
+.tag.you.now { background: var(--amber); color: var(--led-face); --f: var(--amber); }
+.tag.nr { --f: var(--ink); color: var(--ink); }
+
+ol.stations { list-style: none; margin: 0; padding: 0; position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.st { display: grid; align-content: start; justify-items: center; text-align: center; gap: 8px; min-width: 0; position: relative; }
+.pict { width: 44px; height: 44px; display: grid; place-items: center; background: var(--panel); --f: var(--rule-soft); color: var(--ink-3); }
+.pict svg { width: 27px; height: 27px; }
+.st.done .pict { --f: var(--lane); color: var(--ink-2); }
+.st.current .pict { background: var(--lane); --f: var(--lane); color: #fff; }
+.waiting-task .st.current .pict { background: var(--amber); --f: var(--amber); color: var(--led-face); }
+/* Bloqueada: rayado en el marco, el texto queda legible. */
+.tag.blocked,
+.st.current.blocked .pict, .waiting-task .st.current.blocked .pict {
+  box-shadow: none; border: 4px solid transparent; color: var(--ink);
+  background: linear-gradient(var(--panel), var(--panel)) padding-box,
+              repeating-linear-gradient(135deg, var(--amber) 0 4px, var(--led-face) 4px 8px) border-box;
+}
+.track { position: relative; width: 100%; height: 22px; }
+.track::before, .track::after { content: ""; position: absolute; top: 8px; height: 6px; width: 50%; }
+.track::before { left: 0; }
+.track::after { right: 0; }
+.st:first-child .track::before, .st:last-child .track::after { display: none; }
+/* Hecho: vía llena. Pendiente: vía punteada (forma, no solo color). */
+.st.done .track::before, .st.done .track::after, .st.current .track::before { background: var(--lane); }
+.st.pending .track::before, .st.pending .track::after, .st.current .track::after {
+  background: repeating-linear-gradient(90deg, var(--ink-3) 0 6px, transparent 6px 12px);
+}
+.node { position: absolute; left: 50%; top: 5px; width: 12px; height: 12px; transform: translateX(-50%); background: var(--panel); --f: var(--lane); margin: 0; z-index: 1; }
+.st.pending .node { --f: var(--ink-3); }
+.st.done .node { background: var(--lane); }
+.st.current .node { visibility: hidden; }
+/* El tope: al aprobar el contrato no hay vuelta atrás. */
+svg.px.stop-mark { position: absolute; right: -2px; top: 0; width: 4px; height: 22px; z-index: 1; }
+.stop-mark .k { fill: var(--ink); }
+.stop-mark .a { fill: var(--amber); }
+.st .nm { color: var(--ink-2); overflow-wrap: anywhere; line-height: 1; }
+.st.current .nm { color: var(--ink); }
+.st .t { color: var(--ink-2); min-height: 1lh; line-height: 1; }
+.tags { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+
+svg.px.train { position: absolute; width: 48px; height: 14px; z-index: 2; left: 0; top: 0; transform: translateX(-50%); pointer-events: none; }
+svg.px.train.v { width: 14px; height: 48px; transform: translate(-50%, -50%); }
+.train.moving { transition: left .9s steps(18, end), top .9s steps(18, end); }
+.train .body { fill: var(--lane); }
+.waiting-task .train .body { fill: var(--amber); }
+.train .win { fill: var(--panel); }
+.train .wheel { fill: var(--ink); }
+
+/* Sin tarea: los carriles del repo, para empezar. */
+.lanes { display: grid; gap: 18px; }
+.lane-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 14px; align-items: center; }
+.lane-row .stops { display: flex; flex-wrap: wrap; gap: 8px 6px; align-items: center; color: var(--ink-2); }
+.lane-row .stops span { display: inline-flex; align-items: center; gap: 6px; }
+.lane-row .stops svg { width: 18px; height: 18px; color: var(--ink-2); }
+.lane-row .stops i { width: 12px; height: 4px; background: var(--lane); }
+.lane-row code { grid-column: 2; color: var(--ink); }
+
+/* ---------- Medidores ---------- */
+.gauges { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 24px; align-items: start; }
+.gauge { background: var(--panel); padding: 18px 18px 20px; }
+.kv { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 2px dotted var(--rule-soft); }
 .kv:last-child { border-bottom: 0; }
-.kv dt { color: var(--muted); }
+.kv dt { color: var(--ink-2); display: flex; align-items: center; gap: 8px; }
 .kv dd { margin: 0; text-align: right; }
-.kv.total dt, .kv.total dd { color: var(--text); font-weight: 650; }
-.friction { color: var(--human); margin-top: 18px; }
+.kv.total dt, .kv.total dd { color: var(--ink); }
+dl { margin: 0; }
+.sw { width: 12px; height: 12px; display: inline-block; }
+.sw.a, .stack i.a { background: var(--agent); }
+.sw.h, .stack i.h { background: var(--amber); }
+.sw.b, .stack i.b { background: repeating-linear-gradient(135deg, var(--amber) 0 3px, var(--led-face) 3px 6px); }
+.stack { display: flex; gap: 2px; margin: 4px 0 12px; }
+.stack i { flex: 1; height: 16px; background: var(--rule-soft); }
+.bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 6px 0; }
+.bar .n { color: var(--ink-2); overflow-wrap: anywhere; }
+.bar .v { text-align: right; color: var(--ink); }
+.bar .blocks { grid-column: 1 / -1; display: flex; gap: 2px; }
+.bar .blocks i { flex: 1; height: 8px; background: var(--rule-soft); }
+.bar .blocks i.on { background: var(--agent); }
+.total-line { color: var(--ink); margin: 0 0 8px; }
+.friction { color: var(--ink-2); margin: 12px 0 0; }
 
-ol.events { list-style: none; margin: 0; padding: 0; }
-.events li { display: grid; grid-template-columns: 92px 1fr; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--rule); }
-.events li:last-child { border-bottom: 0; }
-.events time { color: var(--muted); font-size: 13px; }
+ol.log { list-style: none; margin: 0; padding: 0 0 0 20px; position: relative; }
+ol.log::before { content: ""; position: absolute; left: 4px; top: 8px; bottom: 8px; width: 2px; background: var(--rule-soft); }
+.log li { position: relative; padding: 4px 0; display: grid; grid-template-columns: 5.5ch minmax(0, 1fr); gap: 12px; }
+.log li::before { content: ""; position: absolute; left: -19px; top: 10px; width: 8px; height: 8px; background: var(--ink-3); }
+.log li:first-child::before { background: var(--agent); }
+.log time { color: var(--ink-2); }
+.log li > span { overflow-wrap: anywhere; }
+svg.px.arrow { display: inline-block; width: 14px; height: 10px; margin: 0 6px; vertical-align: 1px; }
 
-.empty h1 { margin-bottom: 6px; }
-.empty p, .lost p { color: var(--muted); margin: 0; }
-.empty code, .lost code { font-family: var(--mono); font-size: 13px; color: var(--text); }
-.skeleton { height: 14px; border-radius: 4px; background: var(--rule); margin: 10px 0; }
-
-@media (max-width: 640px) {
-  .rail { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 14px; }
-  .step { grid-template-columns: 1fr; gap: 2px; }
-  .status { margin: 0 -14px; padding: 16px 14px; }
-  .events li { grid-template-columns: 1fr; gap: 0; }
+/* ---------- Tus repos ---------- */
+.net { background: var(--panel); padding: 18px 16px 14px; }
+.net h3 { font: 20px/1 var(--px); letter-spacing: 2px; text-transform: uppercase; color: var(--ink-2); margin: 18px 0 10px; display: flex; gap: 8px; align-items: baseline; }
+.net h3:first-of-type { margin-top: 0; }
+.net h3 b { color: var(--ink); font-weight: 400; }
+.net ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.repo {
+  width: calc(100% - 4px); text-align: left; background: var(--panel); border: 0; cursor: pointer; padding: 8px 10px;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 10px; align-items: center;
+  --f: var(--rule-soft); transition: background .15s ease-out;
 }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+.repo:hover { --f: var(--agent); }
+.repo[aria-current="true"] { --f: var(--ink); background: var(--current-row); }
+.repo .badge { grid-row: span 2; }
+.repo .badge.idle { background: var(--panel); color: var(--ink-2); --f: var(--ink-3); }
+.repo .badge.idle svg { width: 18px; height: 14px; }
+.repo .rn { color: var(--ink); overflow-wrap: anywhere; }
+.repo .rt { grid-column: 2 / 4; color: var(--ink-2); overflow-wrap: anywhere; }
+.repo .rw { letter-spacing: 2px; }
+.repo .rw.agent-c { color: var(--agent); }
+.repo .rw.human-c { color: var(--you-ink); }
+.repo.wait .rw { background: var(--amber); color: var(--led-face); padding: 0 6px 2px; }
+.repo .err { grid-column: 2 / 4; color: var(--offline); }
+.others { margin: 6px 0 0 44px; padding: 0; list-style: none; display: grid; gap: 2px; color: var(--ink-2); }
+
+/* ---------- Cajetín (como el de un plano) ---------- */
+.foot { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 0; --f: var(--rule); background: var(--panel); }
+.foot div { padding: 8px 12px 10px; display: grid; gap: 4px; box-shadow: inset -2px 0 0 0 var(--rule-soft); }
+.foot div:last-child { box-shadow: none; }
+.foot small { font: inherit; color: var(--ink-2); letter-spacing: 2px; text-transform: uppercase; }
+.foot .off { color: var(--offline); }
+
+.skel { height: 20px; background: rgba(150, 205, 255, .16); margin: 12px 0; }
+
+@media (max-width: 760px) {
+  .b-head { grid-template-columns: auto minmax(0, 1fr); }
+  .b-clock { grid-column: 1 / -1; grid-row: 1; justify-self: end; }
+  .b-title { font-size: 30px; }
+  .route .badge { width: 34px; height: 34px; font-size: 30px; }
+  .row { grid-template-columns: max-content minmax(0, 1fr); }
+  .row .k { grid-column: 1 / -1; }
+  .row.now .who, .row.now .what { font-size: 30px; }
+  .row.now .who { letter-spacing: 3px; }
+  /* La línea pasa a vertical: las estaciones bajan como en un riel. */
+  ol.stations { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: 1fr; }
+  .st { grid-template-columns: 44px 22px minmax(0, 1fr); grid-template-areas: "pict track nm" "pict track t" ". track tags"; justify-items: start; text-align: left; gap: 4px 12px; padding-bottom: 12px; }
+  .pict { grid-area: pict; }
+  .track { grid-area: track; width: 22px; height: auto; align-self: stretch; }
+  .track::before, .track::after { top: auto; left: 8px; right: auto; width: 6px; height: 50%; }
+  .track::before { top: 0; }
+  .track::after { bottom: -12px; height: calc(50% + 12px); }
+  .st.pending .track::before, .st.pending .track::after, .st.current .track::after { background: repeating-linear-gradient(180deg, var(--ink-3) 0 6px, transparent 6px 12px); }
+  .node { top: 50%; left: 5px; transform: translateY(-50%); }
+  svg.px.stop-mark { right: auto; left: 0; top: auto; bottom: -8px; width: 22px; height: 4px; transform: none; }
+  .foot div { box-shadow: inset 0 -2px 0 0 var(--rule-soft); }
+  .st .nm { grid-area: nm; } .st .t { grid-area: t; } .tags { grid-area: tags; align-items: flex-start; flex-direction: row; flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) { .wipe { animation: none; } .train.moving, .btn, .repo { transition: none; } }
 </style>
 </head>
 <body>
-<header>
-  <div class="bar">
-    <span class="wordmark">bflow</span>
-    <span class="meta"><b id="repo"></b> · <span id="version"></span></span>
+<header class="strip">
+  <div class="lockup">
+    <svg class="px wordmark" id="wordmark" role="img" aria-label="bflow"></svg>
+    <div class="by">by <svg class="px" id="innobytes" role="img" aria-label="innobytes"></svg> <b>innobytes.tech</b></div>
   </div>
-  <div class="bar">
-    <span class="meta" id="status" aria-live="polite"></span>
-    <button id="notify" hidden>Avisarme cuando me toque</button>
+  <div class="tools">
+    <span class="where" id="where"></span>
+    <div class="seg" role="group" aria-label="Fondo">
+      <button class="btn frame" data-theme-pick="light" aria-pressed="false">Blanco</button>
+      <button class="btn frame" data-theme-pick="dark" aria-pressed="false">Marino</button>
+    </div>
+    <button class="btn frame" id="notify" hidden>Avisarme cuando me toque</button>
   </div>
 </header>
-<main id="app">
-  <section><div class="skeleton" style="width:30%"></div><div class="skeleton" style="width:60%;height:22px"></div><div class="skeleton" style="width:100%"></div></section>
-</main>
+
+<div class="layout solo" id="layout">
+  <section class="board frame" id="board" aria-label="Tablero">
+    <div id="b-body"><div class="skel" style="width:40%"></div><div class="skel" style="width:75%;height:40px"></div><div class="skel" style="width:60%"></div></div>
+  </section>
+  <section class="line frame" id="line" aria-label="Línea del carril" hidden></section>
+  <aside class="net frame" id="net" aria-label="Tus repos" hidden></aside>
+  <div class="gauges" id="gauges"></div>
+  <footer class="foot frame" id="foot">
+    <div><small>Motor</small><span>bflow by innobytes.tech</span></div>
+    <div><small>Versión</small><span id="version">…</span></div>
+    <div><small>Repo</small><span id="repo">…</span></div>
+    <div><small>Enlace</small><span id="conn" aria-live="polite">Conectando…</span></div>
+  </footer>
+</div>
+
 <script>
 "use strict";
 const $ = (id) => document.getElementById(id);
+const SVGNS = "http://www.w3.org/2000/svg";
 function el(tag, cls, text) {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
   if (text !== undefined) e.textContent = text;
   return e;
 }
+function setText(e, t) { if (e.textContent !== t) e.textContent = t; }
+
+/* ---------- Pixel art ---------- */
+// rects: [x, y, w, h, clase]. Dibuja un SVG de pixeles nítidos.
+function pixels(svg, w, h, rects) {
+  svg.setAttribute("viewBox", "0 0 " + w + " " + h);
+  svg.replaceChildren();
+  rects.forEach(([x, y, rw, rh, c]) => {
+    const r = document.createElementNS(SVGNS, "rect");
+    r.setAttribute("x", x); r.setAttribute("y", y); r.setAttribute("width", rw); r.setAttribute("height", rh);
+    if (c) r.setAttribute("class", c);
+    svg.append(r);
+  });
+  return svg;
+}
+// Una rejilla de texto ("#" lleno, "." vacío, otras letras = clases) a rects por tramos.
+function grid(rows, cls) {
+  const out = [];
+  rows.forEach((row, y) => {
+    let x = 0;
+    while (x < row.length) {
+      const ch = row[x];
+      let n = 1;
+      while (x + n < row.length && row[x + n] === ch) n++;
+      if (ch !== ".") out.push([x, y, n, 1, cls ? cls[ch] || "" : ""]);
+      x += n;
+    }
+  });
+  return out;
+}
+function pixSVG(rows, cls, extra) {
+  const s = document.createElementNS(SVGNS, "svg");
+  s.setAttribute("class", "px" + (extra ? " " + extra : ""));
+  s.setAttribute("aria-hidden", "true");
+  s.setAttribute("fill", "currentColor");
+  return pixels(s, rows[0].length, rows.length, grid(rows, cls));
+}
+
+// El banner de la terminal (bflow banner.go), dibujado celda por celda:
+// cada carácter es una celda de 5x10; los bloques llenan, las líneas dobles
+// son la sombra.
+const BANNER = [
+  "██████╗ ███████╗██╗      ██████╗ ██╗    ██╗",
+  "██╔══██╗██╔════╝██║     ██╔═══██╗██║    ██║",
+  "██████╔╝█████╗  ██║     ██║   ██║██║ █╗ ██║",
+  "██╔══██╗██╔══╝  ██║     ██║   ██║██║███╗██║",
+  "██████╔╝██║     ███████╗╚██████╔╝╚███╔███╔╝",
+  "╚═════╝ ╚═╝     ╚══════╝ ╚═════╝  ╚══╝╚══╝ ",
+];
+const GLYPH = {
+  "═": [[0, 3, 5, 1], [0, 6, 5, 1]],
+  "║": [[1, 0, 1, 10], [3, 0, 1, 10]],
+  "╗": [[0, 3, 4, 1], [3, 3, 1, 7], [0, 6, 2, 1], [1, 6, 1, 4]],
+  "╔": [[1, 3, 4, 1], [1, 3, 1, 7], [3, 6, 2, 1], [3, 6, 1, 4]],
+  "╝": [[0, 6, 4, 1], [3, 0, 1, 7], [0, 3, 2, 1], [1, 0, 1, 4]],
+  "╚": [[1, 6, 4, 1], [1, 0, 1, 7], [3, 3, 2, 1], [3, 0, 1, 4]],
+};
+const BANDS = 6;
+function band(col, cols) { return "band" + Math.min(BANDS - 1, Math.floor(col * BANDS / cols)); }
+function drawWordmark(svg) {
+  const cols = BANNER[0].length, rects = [];
+  BANNER.forEach((row, y) => {
+    const chars = Array.from(row);
+    let x = 0;
+    while (x < chars.length) {
+      if (chars[x] === "█") { // un tramo de bloques del mismo tono
+        let n = 1;
+        while (x + n < chars.length && chars[x + n] === "█" && band(x + n, cols) === band(x, cols)) n++;
+        rects.push([x * 5, y * 10, n * 5, 10, band(x, cols)]);
+        x += n;
+        continue;
+      }
+      (GLYPH[chars[x]] || []).forEach(([gx, gy, gw, gh]) => rects.push([x * 5 + gx, y * 10 + gy, gw, gh, band(x, cols)]));
+      x++;
+    }
+  });
+  pixels(svg, cols * 5, BANNER.length * 10, rects);
+}
+// El símbolo de innobytes (líneas redondeadas y puntos) a una rejilla de 28x14.
+const SYMBOL = [[0, 6, 7], [0, 9, 17], [3, 7, 19], [6, 0, 1], [6, 3, 25], [9, 1, 27], [12, 1, 2], [12, 4, 26]];
+function drawSymbol(svg) {
+  const rects = [];
+  SYMBOL.forEach(([y, a, b]) => {
+    for (let x = a; x <= b; x++) rects.push([x, y, 1, 2, "sym" + Math.min(6, Math.floor(x / 4))]);
+  });
+  pixels(svg, 28, 14, rects);
+}
+
+// Pictogramas de cada estación, 9x9.
+const PICT = {
+  discovery: ["..###....", ".#...#...", "#.....#..", "#.....#..", "#.....#..", ".#...#...", "..###.#..", ".......#.", "........#"],
+  spec: [".######..", ".#....##.", ".#.....#.", ".#.###.#.", ".#.....#.", ".#.###.#.", ".#.....#.", ".#.##..#.", ".#######."],
+  contract: ["...###...", "..#...#..", "..#...#..", ".#######.", ".#######.", ".###.###.", ".###.###.", ".#######.", ".#######."],
+  implementing: [".........", ".#.......", "..#......", "...#.....", "..#......", ".#.......", ".........", "....####.", "........."],
+  paused: [".........", "..##.##..", "..##.##..", "..##.##..", "..##.##..", "..##.##..", "..##.##..", "..##.##..", "........."],
+  quality: [".#######.", ".#....##.", ".#...#.#.", ".##.#..#.", ".#.#...#.", ".#.....#.", "..#...#..", "...#.#...", "....#...."],
+  documenting: [".......#.", "......#.#", ".....#.#.", "....#.#..", "...#.#...", "..#.#....", ".#.#.....", ".##......", "#........"],
+  walkthrough: [".........", ".........", "...###...", ".##.#.##.", "#..###..#", ".##.#.##.", "...###...", ".........", "........."],
+  in_review: [".#.....#.", ".#.....#.", "..#...#..", "...#.#...", "....#....", "....#....", "...###...", "...#.#...", "...###..."],
+};
+// Vía libre: el repo no tiene tarea en curso.
+const IDLE = ["#.#.#.#.#", "#########", ".........", ".........", "#########", "#.#.#.#.#", "........."];
+// El tope de la vía, donde no hay vuelta atrás: una barrera a rayas.
+const STOP = ["kk", "kk", "aa", "aa", "kk", "kk", "aa", "aa", "kk", "kk", "aa"];
+const STOP_H = [STOP.join("").match(/../g).map((p) => p[0]).join(""), STOP.join("").match(/../g).map((p) => p[0]).join("")];
+const TRAIN = [
+  "..##################....",
+  ".####################...",
+  "##www##www##www##www##..",
+  "##www##www##www##www###.",
+  "########################",
+  "########################",
+  ".oo.oo............oo.oo.",
+];
+// De lado en la vía horizontal; de frente hacia abajo en la vertical.
+const TRAIN_V = Array.from(TRAIN[0], (_, c) => TRAIN.map((r) => r[c]).join(""));
+const ARROW = ["....#..", ".....#.", "#######", ".....#.", "....#.."];
+const LANE_ORDER = ["full", "light", "hotfix"];
+
+/* ---------- Tiempo ---------- */
 function ago(iso) {
   const s = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
   if (s < 60) return s + "s";
@@ -169,174 +513,405 @@ function ago(iso) {
   const h = Math.floor(m / 60);
   return h < 48 ? h + "h" + String(m % 60).padStart(2, "0") + "m" : Math.floor(h / 24) + "d" + (h % 24) + "h";
 }
-function clock(iso) {
-  return new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+function clock(d) {
+  return d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+}
+function tick() {
+  const c = $("b-clock");
+  if (c) setText(c, clock(new Date()));
+  document.querySelectorAll("[data-since]").forEach((a) => setText(a, a.dataset.prefix + ago(a.dataset.since)));
 }
 
-let state = null;
-let lastWait = "";
-try { lastWait = localStorage.getItem("bflow-last-wait") || ""; } catch (e) {}
+/* ---------- Tema ---------- */
+function applyTheme(t) {
+  document.documentElement.dataset.theme = t;
+  document.querySelectorAll("[data-theme-pick]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.themePick === t)));
+}
+let theme = "";
+try { theme = localStorage.getItem("bflow-theme") || ""; } catch (e) {}
+const sysDark = window.matchMedia("(prefers-color-scheme: dark)");
+applyTheme(theme || (sysDark.matches ? "dark" : "light"));
+sysDark.addEventListener("change", (e) => { if (!theme) applyTheme(e.matches ? "dark" : "light"); });
+document.querySelectorAll("[data-theme-pick]").forEach((b) => b.addEventListener("click", () => {
+  theme = b.dataset.themePick;
+  try { localStorage.setItem("bflow-theme", theme); } catch (e) {}
+  applyTheme(theme);
+}));
 
-function stepRow(kind, s) {
-  const row = el("div", "step " + kind + (s.human ? " human" : ""));
-  row.append(el("span", "when", kind === "now" ? "Ahora" : "Después"));
-  row.append(el("span", "role " + (s.human ? "human" : "agent"), s.human ? "TÚ" : "AGENTE"));
-  const what = el("span", "what", s.text + " ");
+/* ---------- Estado ---------- */
+let state = null, sel = "", lastNow = "", lastSig = {}, trainAt = -1, lostSince = null;
+const fromHash = () => (location.hash.match(/^#r=([0-9a-f]{8})$/) || [])[1] || "";
+sel = fromHash();
+const narrow = window.matchMedia("(max-width: 760px)");
+const notified = {};
+try { Object.assign(notified, JSON.parse(localStorage.getItem("bflow-notified") || "{}")); } catch (e) {}
+
+// Se reconstruye una parte solo si cambió lo que muestra.
+function changed(part, data) {
+  const sig = JSON.stringify(data);
+  if (lastSig[part] === sig) return false;
+  lastSig[part] = sig;
+  return true;
+}
+function laneColor(lane) { return lane === "full" ? "var(--full)" : lane === "hotfix" ? "var(--hotfix)" : "var(--light)"; }
+function badge(lane) {
+  const b = el("span", "badge frame lane-" + (lane || "none"), lane ? lane[0].toUpperCase() : "");
+  b.style.setProperty("--lane", laneColor(lane));
+  b.setAttribute("aria-hidden", "true");
+  return b;
+}
+// "→" no está en la fuente de pixeles: se dibuja.
+function withArrows(text) {
+  const f = document.createDocumentFragment();
+  text.split("→").forEach((part, i) => {
+    if (i) f.append(pixSVG(ARROW, null, "arrow"));
+    f.append(document.createTextNode(i ? part.replace(/^\s+/, "") : part.replace(/\s+$/, "")));
+  });
+  return f;
+}
+
+function renderBoard() {
+  const t = state.task, body = $("b-body");
+  document.body.classList.toggle("waiting-task", !!(t && t.waiting));
+  if (!changed("board", { t: t && { id: t.id, title: t.title, lane: t.lane, round: t.round, now: t.now, next: t.next, phases: t.phases, waiting: t.waiting }, repo: state.repo })) return;
+  const lost = $("b-lost");
+  body.replaceChildren();
+  const head = el("div", "b-head");
+  const clockEl = el("span", "b-clock", clock(new Date()));
+  clockEl.id = "b-clock";
+  if (!t) {
+    body.append(head);
+    head.append(el("span"), el("span"), clockEl);
+    body.append(el("p", "b-msg", "Vía libre en " + state.repo));
+    const h = el("p", "b-hint", "Sin tarea en curso. Empieza una con ");
+    h.append(el("code", "", "bflow start <ID> --lane full|light|hotfix"));
+    body.append(h);
+    lastNow = "";
+    if (lost) body.prepend(lost);
+    return;
+  }
+  const route = el("div", "route");
+  route.append(badge(t.lane), el("span", "", t.id + (t.round ? " · ronda " + t.round : "")));
+  head.append(route, el("h1", "b-title", t.title || t.id), clockEl);
+  body.append(head);
+  const nowKey = t.now ? t.now.text : "";
+  body.append(stepRow("now", t.now, t.waiting, lastNow && lastNow !== nowKey));
+  if (t.next || !t.blocked) body.append(stepRow("next", t.next, false, false)); // bloqueada: no hay después hasta desbloquear
+  lastNow = nowKey;
+  const prog = el("div", "b-prog");
+  const n = t.phases.length, at = t.phases.findIndex((p) => p.state === "current") + 1 || n;
+  prog.append(el("span", "", "Avance"));
+  const cells = el("div", "cells");
+  cells.setAttribute("aria-hidden", "true");
+  t.phases.forEach((p) => cells.append(el("i", p.state === "done" ? "on" : p.state === "current" ? "cur" : "")));
+  prog.append(cells, el("span", "", at + " de " + n));
+  body.append(prog);
+  if (lost) body.prepend(lost);
+}
+
+function stepRow(kind, s, waiting, wipe) {
+  const row = el("div", "row " + kind + (s && s.human ? " human" : "") + (waiting ? " waiting" : "") + (s ? "" : " blank"));
+  row.append(el("span", "k", kind === "now" ? "AHORA" : "DESPUÉS"));
+  if (!s) {
+    row.append(el("span", "who", ""), el("span", "what", kind === "now" ? "sin acción pendiente" : "fin del carril"));
+    return row;
+  }
+  row.append(el("span", "who " + (s.human ? "human-c" : "agent-c"), s.human ? "TÚ" : "AGENTE"));
+  const what = el("span", "what");
+  what.append(withArrows(s.text));
   if (kind === "now" && s.since) {
     const a = el("span", "ago");
     a.dataset.since = s.since;
-    a.dataset.prefix = s.human ? "esperando hace " : "hace ";
+    a.dataset.prefix = s.human ? " · esperando hace " : " · hace ";
     what.append(a);
   }
   row.append(what);
+  if (wipe) row.classList.add("wipe");
   return row;
 }
 
-function kv(k, v, cls) {
+function renderLine() {
+  const t = state.task, sec = $("line");
+  if (!t) { trainAt = -1; renderLanes(sec); return; }
+  sec.hidden = false;
+  sec.style.setProperty("--lane", laneColor(t.lane));
+  const vertical = narrow.matches;
+  if (!changed("line", { lane: t.lane, phases: t.phases, waiting: t.waiting, blocked: t.blocked, vertical })) return;
+  const prevTrain = sec.querySelector(".train");
+  sec.replaceChildren();
+  const head = el("div", "l-head");
+  const h = el("h2");
+  h.append(badge(t.lane), document.createTextNode("Línea " + (t.lane || "")));
+  const leg = el("div", "legend");
+  const l1 = el("span"); l1.append(el("span", "tag you frame", "TÚ"), document.createTextNode("decides tú al terminar la fase"));
+  leg.append(l1);
+  if (t.phases.some((p) => p.name === "contract")) {
+    const l2 = el("span"); l2.append(el("span", "tag nr frame", "Sin retorno"), document.createTextNode("al aprobar el contrato se congelan las pruebas"));
+    leg.append(l2);
+  }
+  head.append(h, leg);
+  sec.append(head);
+
+  const ol = el("ol", "stations");
+  ol.setAttribute("aria-label", "Fases del carril " + (t.lane || ""));
+  let cur = -1;
+  t.phases.forEach((p, i) => {
+    const blocked = p.state === "current" && t.blocked;
+    const li = el("li", "st " + p.state + (blocked ? " blocked" : ""));
+    if (p.state === "current") { li.setAttribute("aria-current", "step"); cur = i; }
+    const pict = el("span", "pict" + (blocked ? "" : " frame"));
+    if (PICT[p.name]) pict.append(pixSVG(PICT[p.name]));
+    const track = el("span", "track");
+    track.append(el("span", "node frame"));
+    if (p.name === "contract") track.append(pixSVG(vertical ? STOP_H : STOP, { k: "k", a: "a" }, "stop-mark"));
+    const tags = el("span", "tags");
+    if (p.stop) tags.append(el("span", "tag you frame" + (p.state === "current" && t.waiting && !t.blocked ? " now" : ""), p.state === "current" && t.waiting && !t.blocked ? "Te toca" : "TÚ"));
+    if (p.name === "contract") tags.append(el("span", "tag nr frame", "Sin retorno"));
+    if (blocked) tags.append(el("span", "tag blocked", "Bloqueada"));
+    li.append(pict, track, el("span", "nm", p.name), el("span", "t", p.time || ""), tags);
+    const st = { done: "hecha", current: blocked ? "bloqueada" : "actual", pending: "pendiente" }[p.state];
+    li.setAttribute("aria-label", p.name + ", " + st + (p.time ? ", " + p.time : "") + (p.stop ? ", decides tú al terminar" : ""));
+    ol.append(li);
+  });
+  sec.append(ol);
+  // El tren: en la estación actual; si cambia de estación, avanza por la vía.
+  let train = prevTrain;
+  if (!train || train.classList.contains("v") !== vertical) {
+    train = pixSVG(vertical ? TRAIN_V : TRAIN, { "#": "body", w: "win", o: "wheel" }, "train" + (vertical ? " v" : ""));
+  }
+  ol.append(train);
+  if (cur < 0) { train.style.display = "none"; trainAt = -1; return; }
+  train.style.display = "";
+  requestAnimationFrame(() => {
+    const li = ol.children[cur], track = li.querySelector(".track");
+    let left, top;
+    if (vertical) {
+      left = li.offsetLeft + track.offsetLeft + track.offsetWidth / 2;
+      top = li.offsetTop + track.offsetTop + track.offsetHeight / 2;
+    } else {
+      left = li.offsetLeft + li.offsetWidth / 2;
+      top = li.offsetTop + track.offsetTop + 4;
+    }
+    train.classList.toggle("moving", trainAt >= 0 && trainAt !== cur);
+    train.style.left = left + "px";
+    train.style.top = top + "px";
+    trainAt = cur;
+  });
+}
+
+// Sin tarea: los carriles del repo con sus estaciones y cómo empezar.
+function renderLanes(sec) {
+  const lanes = state.lanes || {};
+  const names = LANE_ORDER.filter((l) => lanes[l]).concat(Object.keys(lanes).filter((l) => !LANE_ORDER.includes(l)));
+  sec.hidden = !names.length;
+  if (!changed("line", { lanes })) return;
+  sec.style.removeProperty("--lane");
+  sec.replaceChildren(el("h2", "", "Carriles de este repo"));
+  const list = el("div", "lanes");
+  names.forEach((l) => {
+    const row = el("div", "lane-row");
+    row.style.setProperty("--lane", laneColor(l));
+    const stops = el("div", "stops");
+    lanes[l].forEach((p, i) => {
+      if (i) stops.append(el("i"));
+      const s = el("span");
+      if (PICT[p]) s.append(pixSVG(PICT[p]));
+      s.append(document.createTextNode(p));
+      stops.append(s);
+    });
+    row.append(badge(l), stops, el("code", "", "bflow start <ID> --lane " + l));
+    list.append(row);
+  });
+  sec.append(list);
+}
+
+function kv(k, v, cls, sw) {
   const d = el("div", "kv" + (cls ? " " + cls : ""));
-  d.append(el("dt", "", k), el("dd", "", v));
+  const dt = el("dt");
+  if (sw) dt.append(el("span", "sw " + sw));
+  dt.append(document.createTextNode(k));
+  d.append(dt, el("dd", "", v));
+  return d;
+}
+function blocks(n, on, cls) {
+  const d = el("div", cls);
+  for (let i = 0; i < n; i++) d.append(el("i", i < on ? "on" : ""));
   return d;
 }
 
-function render() {
-  const app = $("app");
-  app.replaceChildren();
-  $("version").textContent = state.version;
-  $("repo").textContent = state.repo;
-  const t = state.task;
-  document.body.classList.toggle("waiting", !!(t && t.waiting));
-  document.title = t ? (t.waiting ? "Te toca · " : "") + t.id + " · bflow" : "bflow";
+function renderGauges() {
+  const t = state.task, g = $("gauges");
+  if (!changed("gauges", t && { time: t.time, tokens: t.tokens, agents: t.agents, friction: t.friction, events: t.events })) return;
+  g.replaceChildren();
+  if (!t) return;
+  const time = el("section", "gauge frame");
+  time.append(el("h2", "", "Tiempo"));
+  const stack = el("div", "stack");
+  stack.setAttribute("aria-hidden", "true");
+  const cells = 30, pa = +t.time.agents_pct || 0, ph = +t.time.human_pct || 0, pb = +t.time.blocked_pct || 0;
+  const na = Math.round(pa * cells / 100), nh = Math.round(ph * cells / 100), nb = Math.round(pb * cells / 100);
+  for (let i = 0; i < cells; i++) stack.append(el("i", i < na ? "a" : i < na + nh ? "h" : i < na + nh + nb ? "b" : ""));
+  time.append(stack);
+  const dl = el("dl");
+  dl.append(kv("Total", t.time.total, "total"), kv("Agentes", t.time.agents, "", "a"), kv("Tú", t.time.human, "", "h"));
+  if (t.time.blocked) dl.append(kv("Bloqueada", t.time.blocked, "", "b"));
+  time.append(dl);
+  if (t.friction) time.append(el("p", "friction", "Fricción: " + t.friction));
+  g.append(time);
 
-  if (!t) {
-    const s = el("section", "empty");
-    s.append(el("h1", "", "Ninguna tarea en curso"));
-    const p = el("p", "", "Empieza una desde la sesión con ");
-    p.append(el("code", "", "bflow start <ID> --lane full|light|hotfix"), document.createTextNode(". Este panel la muestra en cuanto arranca."));
-    s.append(p);
-    app.append(s);
-  } else {
-    const head = el("section");
-    const id = el("div", "id");
-    id.append(el("b", "", t.id));
-    let extra = t.lane ? " · carril " + t.lane : "";
-    if (t.round) extra += " · ronda " + t.round;
-    id.append(document.createTextNode(extra));
-    head.append(id, el("h1", "", t.title || t.id));
-    const rail = el("div", "rail");
-    rail.setAttribute("role", "list");
-    rail.setAttribute("aria-label", "Fases del carril");
-    t.phases.forEach((p) => {
-      const st = el("span", "stage " + p.state, p.name);
-      st.setAttribute("role", "listitem");
-      if (p.state === "current") st.setAttribute("aria-current", "step");
-      rail.append(st);
+  if (t.tokens) {
+    const tok = el("section", "gauge frame");
+    tok.append(el("h2", "", "Tokens"), el("p", "total-line", t.tokens));
+    (t.agents || []).forEach((a) => {
+      const r = el("div", "bar");
+      const b = blocks(20, Math.round((+a.share || 0) / 5), "blocks");
+      b.setAttribute("aria-hidden", "true");
+      r.append(el("span", "n", a.name), el("span", "v", a.tokens), b);
+      tok.append(r);
     });
-    head.append(rail);
-    app.append(head);
-
-    if (t.now || t.next) {
-      const sec = el("section", "flush");
-      const box = el("div", "status");
-      if (t.now) box.append(stepRow("now", t.now));
-      if (t.next) box.append(stepRow("next", t.next));
-      sec.append(box);
-      app.append(sec);
-    }
-
-    const det = el("section");
-    const grid = el("div", "details");
-    const time = el("div");
-    time.append(el("h2", "", "Tiempo"));
-    const tl = el("dl");
-    tl.append(kv("Total", t.time.total, "total"), kv("Agentes", t.time.agents), kv("Tú", t.time.human));
-    if (t.time.blocked) tl.append(kv("Bloqueada", t.time.blocked));
-    time.append(tl);
-    if (t.by_phase && t.by_phase.length) {
-      time.append(el("h3", "", "Por fase"));
-      const pl = el("dl");
-      t.by_phase.forEach((p) => pl.append(kv(p.phase, p.time)));
-      time.append(pl);
-    }
-    grid.append(time);
-    if (t.tokens) {
-      const tok = el("div");
-      tok.append(el("h2", "", "Tokens"));
-      const dl = el("dl");
-      dl.append(kv("Total", t.tokens, "total"));
-      (t.agents || []).forEach((a) => dl.append(kv(a.name, a.tokens)));
-      tok.append(dl);
-      if (t.friction) tok.append(el("p", "friction", "Fricción: " + t.friction));
-      grid.append(tok);
-    }
-    det.append(grid);
-    app.append(det);
-
-    if (t.events && t.events.length) {
-      const ev = el("section");
-      ev.append(el("h2", "", "Últimos eventos"));
-      const ol = el("ol", "events");
-      t.events.forEach((e) => { const li = el("li"); li.append(el("time", "", e.time), el("span", "", e.text)); ol.append(li); });
-      ev.append(ol);
-      app.append(ev);
-    }
+    g.append(tok);
   }
-  if (state.others && state.others.length) {
-    const o = el("section");
-    o.append(el("h2", "", "Otras tareas en curso"));
-    const dl = el("dl");
-    state.others.forEach((x) => dl.append(kv(x.id + " · " + x.phase, x.next)));
-    o.append(dl);
-    app.append(o);
+  if (t.events && t.events.length) {
+    const ev = el("section", "gauge frame");
+    ev.append(el("h2", "", "Bitácora"));
+    const ol = el("ol", "log");
+    t.events.forEach((e) => { const li = el("li"); const sp = el("span"); sp.append(withArrows(e.text)); li.append(el("time", "", e.time), sp); ol.append(li); });
+    ev.append(ol);
+    g.append(ev);
   }
+}
+
+function renderNet() {
+  const nw = state.network || [], aside = $("net");
+  const count = nw.reduce((n, g) => n + g.repos.length, 0);
+  $("layout").classList.toggle("solo", count < 2);
+  aside.hidden = count < 2;
+  if (count < 2 || !changed("net", { nw, key: state.key, others: state.others })) return;
+  const focused = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.key : "";
+  aside.replaceChildren(el("h2", "", "Tus repos"));
+  nw.forEach((g) => {
+    const h = el("h3");
+    if (g.profile) h.append(el("span", "", "perfil"), el("b", "", g.profile));
+    else h.append(document.createTextNode("sin perfil"));
+    const ul = el("ul");
+    g.repos.forEach((r) => {
+      const li = el("li");
+      const b = el("button", "repo frame" + (r.task && r.task.waiting ? " wait" : ""));
+      b.dataset.key = r.key;
+      if (r.key === state.key) b.setAttribute("aria-current", "true");
+      let bd;
+      if (r.task) bd = badge(r.task.lane);
+      else { bd = el("span", "badge frame idle"); bd.setAttribute("aria-hidden", "true"); bd.append(pixSVG(IDLE)); }
+      b.append(bd, el("span", "rn", r.name));
+      if (r.task) {
+        const who = r.task.now ? (r.task.waiting ? "TE TOCA" : r.task.now.human ? "TÚ" : "AGENTE") : "";
+        b.append(el("span", "rw " + (r.task.now && r.task.now.human ? "human-c" : "agent-c"), who));
+        const rt = el("span", "rt", r.task.id + " · " + r.task.phase);
+        if (r.task.now && r.task.now.since) {
+          const a = el("span");
+          a.dataset.since = r.task.now.since;
+          a.dataset.prefix = " · ";
+          rt.append(a);
+        }
+        b.append(rt);
+      } else {
+        b.append(el("span", "rw", ""), el("span", "rt", r.open ? r.open + " tarea(s) abierta(s)" : "vía libre"));
+      }
+      if (r.error) b.append(el("span", "err", r.error));
+      b.addEventListener("click", () => { location.hash = "r=" + r.key; });
+      li.append(b);
+      if (r.key === state.key && state.others && state.others.length) {
+        const o = el("ul", "others");
+        state.others.forEach((x) => o.append(el("li", "", x.id + " · " + x.phase + " · " + x.next)));
+        li.append(o);
+      }
+      ul.append(li);
+    });
+    aside.append(h, ul);
+  });
+  if (focused) { const f = aside.querySelector('[data-key="' + focused + '"]'); if (f) f.focus(); }
+}
+
+function render() {
+  setText($("version"), state.version);
+  setText($("repo"), (state.profile ? state.profile + " / " : "") + state.repo);
+  const where = $("where");
+  where.replaceChildren();
+  if (state.profile) where.append(document.createTextNode(state.profile + " / "));
+  where.append(el("b", "", state.repo));
+  const waitingElsewhere = (state.network || []).some((g) => g.repos.some((r) => r.key !== state.key && r.task && r.task.waiting));
+  const t = state.task;
+  document.title = (t && t.waiting ? "Te toca · " : waitingElsewhere ? "Te toca en otro repo · " : "") + (t ? t.id + " · " : "") + "bflow";
+  renderBoard();
+  renderLine();
+  renderNet();
+  renderGauges();
   tick();
 }
 
-function tick() {
-  document.querySelectorAll(".ago").forEach((a) => { a.textContent = a.dataset.prefix + ago(a.dataset.since); });
-}
-
-function lost(msg) {
-  $("status").textContent = "Sin conexión";
-  $("status").className = "meta offline";
-  if (state) return; // se queda el último estado; el encabezado avisa
-  const s = el("section", "lost");
-  s.append(el("h1", "", "Sin conexión con bflow"));
-  const p = el("p", "", "La página la sirve la ventana del panel. Si la cerraste, ábrela otra vez con ");
-  p.append(el("code", "", "bflow watch --web"), document.createTextNode(" o "), el("code", "", "bflow ui"), document.createTextNode(". (" + msg + ")"));
-  s.append(p);
-  $("app").replaceChildren(s);
+function showLost(msg) {
+  if (!lostSince) lostSince = new Date();
+  const c = $("conn");
+  setText(c, "Sin conexión desde " + clock(lostSince));
+  c.className = "off";
+  let b = $("b-lost");
+  if (!b) {
+    b = el("div", "b-lost");
+    b.id = "b-lost";
+    b.setAttribute("role", "alert");
+    b.append(document.createTextNode("Sin conexión con bflow. La página la sirve la ventana del panel: ábrela con "),
+      el("code", "", "bflow watch --web"), document.createTextNode(" o "), el("code", "", "bflow ui"), document.createTextNode("; se reconecta sola."));
+    $("b-body").prepend(b);
+  }
+  b.title = msg;
 }
 
 function maybeNotify() {
-  const t = state.task;
-  const key = t && t.waiting && t.now ? t.id + "|" + t.now.text + "|" + (t.now.since || "") : "";
-  if (key && key !== lastWait && "Notification" in window && Notification.permission === "granted") {
-    new Notification("bflow · " + t.id, { body: "Espera tu decisión: " + t.now.text, tag: "bflow-" + t.id });
-  }
-  lastWait = key;
-  try { localStorage.setItem("bflow-last-wait", key); } catch (e) {}
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  (state.network || []).forEach((g) => g.repos.forEach((r) => {
+    const t = r.task;
+    const key = t && t.waiting && t.now ? t.id + "|" + t.now.text + "|" + (t.now.since || "") : "";
+    if (key && notified[r.key] !== key) {
+      const n = new Notification("bflow · " + r.name + " · " + t.id, { body: "Te toca: " + t.now.text, tag: "bflow-" + r.key });
+      n.onclick = () => { window.focus(); location.hash = "r=" + r.key; };
+    }
+    notified[r.key] = key;
+  }));
+  try { localStorage.setItem("bflow-notified", JSON.stringify(notified)); } catch (e) {}
 }
 
+let polling = false;
 async function poll() {
+  if (polling) return;
+  polling = true;
   try {
-    const r = await fetch("/api/state", { cache: "no-store" });
+    const r = await fetch("api/state" + (sel ? "?repo=" + sel : ""), { cache: "no-store" });
     const next = await r.json();
     if (!r.ok) throw new Error(next.error || r.statusText);
     state = next;
-    $("status").textContent = "Actualizado " + clock(state.now);
-    $("status").className = "meta";
+    lostSince = null;
+    const lostBar = $("b-lost");
+    if (lostBar) lostBar.remove();
+    setText($("conn"), "En vivo");
+    $("conn").className = "";
     render();
     maybeNotify();
   } catch (e) {
-    lost(e.message);
+    showLost(e.message);
+  } finally {
+    polling = false;
   }
 }
 
+window.addEventListener("hashchange", () => { sel = fromHash(); lastSig = {}; trainAt = -1; lastNow = ""; poll(); });
+window.addEventListener("resize", () => { lastSig.line = ""; if (state) renderLine(); });
 if ("Notification" in window && Notification.permission === "default") {
   const b = $("notify");
   b.hidden = false;
   b.onclick = () => { b.disabled = true; Notification.requestPermission().then(() => { b.hidden = true; }); };
 }
+drawWordmark($("wordmark"));
+drawSymbol($("innobytes"));
 poll();
 setInterval(poll, 2000);
 setInterval(tick, 1000);

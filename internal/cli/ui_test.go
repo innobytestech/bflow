@@ -19,7 +19,9 @@ func TestUIHandler(t *testing.T) {
 	v := engine.View{ID: "API-7", Lane: flow.Light, Phase: flow.Spec, Gate: "spec", GateSince: since, Since: &since,
 		Phases: flow.DefaultLanes()[flow.Light], Upcoming: flow.Step{Phase: flow.Implementing, Agents: []string{"implementer"}},
 		Next: output.Next{Action: output.ActionAsk}}
-	h := uiHandler([]string{"127.0.0.1:7719"}, func() (panelState, error) {
+	var asked string
+	h := uiHandler([]string{"127.0.0.1:7719"}, func(key string) (panelState, error) {
+		asked = key
 		return buildPanel("dev", watchData{Repo: "api", Active: &v}, since.Add(time.Minute)), nil
 	})
 	get := func(host, path string) *httptest.ResponseRecorder {
@@ -35,7 +37,13 @@ func TestUIHandler(t *testing.T) {
 	if w := get("127.0.0.1:7719", "/"); w.Code != 200 || !strings.Contains(w.Body.String(), "Avisarme cuando me toque") || w.Header().Get("Content-Security-Policy") == "" {
 		t.Errorf("página: %d %v", w.Code, w.Header())
 	}
-	w := get("127.0.0.1:7719", "/api/state")
+	if w := get("127.0.0.1:7719", "/fonts/Jersey10.woff2"); w.Code != 200 || w.Body.Len() < 1000 {
+		t.Errorf("fuente: %d", w.Code)
+	}
+	w := get("127.0.0.1:7719", "/api/state?repo=ab12cd34")
+	if asked != "ab12cd34" {
+		t.Errorf("repo pedido: %q", asked)
+	}
 	var ps panelState
 	if err := json.Unmarshal(w.Body.Bytes(), &ps); err != nil {
 		t.Fatal(err)
@@ -44,11 +52,20 @@ func TestUIHandler(t *testing.T) {
 	if tk == nil || !tk.Waiting || tk.Now == nil || !tk.Now.Human || tk.Now.Text != "aprobar la spec" || tk.Next.Text != "implementer implementa las tareas de la spec" {
 		t.Fatalf("estado: %+v", tk)
 	}
-	if tk.Phases[0]["state"] != "current" || tk.Phases[1]["state"] != "pending" || len(tk.Phases) != 6 {
-		t.Errorf("fases: %v", tk.Phases)
+	if p := tk.Phases; p[0].State != "current" || !p[0].Stop || p[1].State != "pending" || p[1].Stop || len(p) != 6 {
+		t.Errorf("fases: %+v", tk.Phases)
 	}
 	if w := get("127.0.0.1:7719", "/otra"); w.Code != http.StatusNotFound {
 		t.Errorf("ruta desconocida: %d", w.Code)
+	}
+}
+
+// La página dibuja el mismo banner que la terminal.
+func TestUIPageBanner(t *testing.T) {
+	for _, l := range bannerWord {
+		if !strings.Contains(string(uiPage), `"`+l+`"`) {
+			t.Errorf("la página no tiene la línea del banner %q", l)
+		}
 	}
 }
 
