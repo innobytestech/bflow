@@ -98,6 +98,9 @@ type AgentConf struct {
 // UI son preferencias de cómo bflow se muestra a la persona.
 type UI struct {
 	Watch bool `yaml:"watch,omitempty"` // start abre el panel (bflow watch) en otra ventana
+	// Notificación del sistema cuando una tarea espera a la persona. Encendida
+	// salvo notify: false; nunca en CI ni sin escritorio.
+	Notify *bool `yaml:"notify,omitempty"`
 }
 
 type Doctor struct {

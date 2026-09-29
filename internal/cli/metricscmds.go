@@ -23,7 +23,7 @@ import (
 func init() {
 	Register(&Command{Name: "stats", Summary: "tiempo por fase (agente, humano, bloqueada), iteraciones y tokens: stats [ID]", Run: runStats})
 	Register(&Command{Name: "statusline", Summary: "una línea para la barra de estado (lee una caché: milisegundos)", Run: runStatusline})
-	Register(&Command{Name: "hook tokens", Summary: "hook Stop/SubagentStop: suma los tokens nuevos del transcript a la fase activa", Run: runHookTokens})
+	Register(&Command{Name: "hook tokens", Summary: "hook Stop/SubagentStop: suma los tokens nuevos a la fase y, al terminar el turno, avisa si la tarea espera a la persona", Run: runHookTokens})
 }
 
 func runStats(c *Ctx) output.Envelope {
@@ -222,7 +222,8 @@ func nextLabel(v engine.View) string {
 // runHookTokens suma los tokens nuevos de un transcript a la tarea activa. En
 // Stop lee solo la sesión principal y reparte cada respuesta en la fase en que
 // ocurrió; en SubagentStop lee solo el transcript de ese agente y lo asigna a
-// la fase donde trabajó. Nunca falla ni imprime: es un hook.
+// la fase donde trabajó. Al terminar el turno de la sesión principal, además
+// avisa a la persona si la tarea la espera. Nunca falla ni imprime: es un hook.
 func runHookTokens(c *Ctx) output.Envelope {
 	quiet := output.Envelope{OK: true, Code: "tokens", Quiet: true}
 	raw, _ := io.ReadAll(c.Stdin)
@@ -236,6 +237,9 @@ func runHookTokens(c *Ctx) output.Envelope {
 	e, err := engineFor(c)
 	if err != nil {
 		return quiet
+	}
+	if agent == "" {
+		defer notifyActive(e)
 	}
 	curPath := filepath.Join(e.Store.Dir(), "cache", "tokens-cursor.json")
 	_ = store.EnsureDirFor(curPath)

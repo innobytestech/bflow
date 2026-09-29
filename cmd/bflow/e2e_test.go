@@ -67,6 +67,7 @@ func newRepo(t *testing.T) *repo {
 	dir := testutil.TempDir(t)
 	t.Setenv("BFLOW_CONFIG_HOME", testutil.TempDir(t))
 	t.Setenv("BFLOW_USER", "dev")
+	t.Setenv("CI", "1") // sin ventanas ni notificaciones reales al probar
 	return &repo{t: t, dir: dir}
 }
 

@@ -257,6 +257,8 @@ API-12 · implementing · 1h42m · ronda 1 · 145k nuevos · 2.9M caché
 
 Para seguir la tarea sin leer la conversación, `bflow watch` es un panel en vivo en otra terminal: quién trabaja y desde cuándo, o qué gate espera tu decisión; lo que sigue; tiempos por fase; tokens por agente; fricción, y los últimos eventos. `bflow watch --open` lo abre en otra pestaña o ventana (Windows Terminal, PowerShell, Terminal de macOS o la terminal de Linux) si no hay uno abierto. Con `ui: { watch: true }`, `bflow start` lo abre solo; nunca en CI ni sin escritorio. Como es una preferencia personal, puede ir en la config global en lugar de `bflow.yaml`.
 
+Cuando la tarea espera tu decisión (una gate o un bloqueo) y Claude termina su turno, bflow manda una notificación del sistema que dice qué hay que decidir, una vez por espera. `ui: { notify: false }` la apaga.
+
 Los agentes los genera bflow en el repo:
 
 ```bash
