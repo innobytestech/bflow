@@ -519,6 +519,9 @@ func runDoctor(c *Ctx) output.Envelope {
 		}
 		status, detail := startupCheck(c.Agent.StartupContext(cfg.Root))
 		add("contexto", status, "%s", detail)
+		if cfg.Guard.ForbidCoauthor && !c.Agent.CoauthorOff(cfg.Root) {
+			add("agente", "warn", `claude agrega Co-Authored-By a sus commits y guard.forbid_coauthor los bloquea: cada commit se rechaza y se repite. Pon "attribution": { "commit": "", "pr": "" } en .claude/settings.json`)
+		}
 	}
 
 	if exe, err := os.Executable(); err == nil {

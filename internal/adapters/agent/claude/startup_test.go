@@ -66,3 +66,26 @@ func TestMemoryLoadedByteLimit(t *testing.T) {
 		t.Errorf("corto y sin salto final: %d %v", n, cut)
 	}
 }
+
+func TestCoauthorOff(t *testing.T) {
+	root, home := testutil.TempDir(t), testutil.TempDir(t)
+	if coauthorOff(root, home) {
+		t.Fatal("sin configuración Claude agrega el trailer")
+	}
+	put(t, filepath.Join(home, ".claude", "settings.json"), `{"includeCoAuthoredBy": false}`)
+	if !coauthorOff(root, home) {
+		t.Error("includeCoAuthoredBy: false del usuario")
+	}
+	put(t, filepath.Join(root, ".claude", "settings.json"), `{"attribution": {"commit": "Co-Authored-By: Claude"}}`)
+	if coauthorOff(root, home) {
+		t.Error("el proyecto manda sobre el usuario")
+	}
+	put(t, filepath.Join(root, ".claude", "settings.local.json"), `{"attribution": {"commit": ""}}`)
+	if !coauthorOff(root, home) {
+		t.Error("local manda sobre proyecto")
+	}
+	put(t, filepath.Join(root, ".claude", "settings.local.json"), `{"attribution": {"commit": false}}`)
+	if !coauthorOff(root, home) {
+		t.Error("commit: false")
+	}
+}

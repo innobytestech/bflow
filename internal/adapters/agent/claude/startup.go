@@ -2,6 +2,7 @@ package claude
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -216,4 +217,42 @@ func agentDescriptions(root, home string) []string {
 		}
 	}
 	return out
+}
+
+// CoauthorOff dice si Claude Code tiene apagado el trailer Co-Authored-By en
+// sus commits: attribution.commit en false o "" (o el viejo
+// includeCoAuthoredBy: false). Manda el archivo más específico: local,
+// proyecto, usuario.
+func (Agent) CoauthorOff(root string) bool {
+	home, _ := os.UserHomeDir()
+	return coauthorOff(root, home)
+}
+
+func coauthorOff(root, home string) bool {
+	files := []string{filepath.Join(root, ".claude", "settings.local.json"), filepath.Join(root, ".claude", "settings.json")}
+	if home != "" {
+		files = append(files, filepath.Join(home, ".claude", "settings.json"))
+	}
+	for _, f := range files {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			continue
+		}
+		var s struct {
+			Attribution *struct {
+				Commit any `json:"commit"`
+			} `json:"attribution"`
+			IncludeCoAuthoredBy *bool `json:"includeCoAuthoredBy"`
+		}
+		if json.Unmarshal(b, &s) != nil {
+			continue
+		}
+		if s.Attribution != nil && s.Attribution.Commit != nil {
+			return s.Attribution.Commit == false || s.Attribution.Commit == ""
+		}
+		if s.IncludeCoAuthoredBy != nil {
+			return !*s.IncludeCoAuthoredBy
+		}
+	}
+	return false
 }
