@@ -20,6 +20,7 @@ import (
 	"innobytes.tech/bflow/internal/config"
 	"innobytes.tech/bflow/internal/envcheck"
 	"innobytes.tech/bflow/internal/flow"
+	"innobytes.tech/bflow/internal/metrics"
 	"innobytes.tech/bflow/internal/output"
 	"innobytes.tech/bflow/internal/setup"
 	"innobytes.tech/bflow/internal/tracker"
@@ -516,6 +517,8 @@ func runDoctor(c *Ctx) output.Envelope {
 		if len(procs) > 0 {
 			add("skills", "warn", "parecen skills de proceso y pueden chocar con bflow (ramas, PR, tracker, specs): %s. Si no chocan, agrégalas a doctor.ignore_skills", strings.Join(procs, "; "))
 		}
+		status, detail := startupCheck(c.Agent.StartupContext(cfg.Root))
+		add("contexto", status, "%s", detail)
 	}
 
 	if exe, err := os.Executable(); err == nil {
@@ -606,4 +609,47 @@ func usesClaude(root string) bool {
 		}
 	}
 	return false
+}
+
+// Presupuesto del contexto de archivos al iniciar. Se paga en cada llamada de
+// la sesión principal (en la piloto de ms-sys arrancaba con ~50k tokens). Un
+// solo archivo que pasa de fileBudget, como un MEMORY.md de 124 entradas, casi
+// siempre arrastra cosas que ya no aplican.
+const (
+	startupBudget = 10_000
+	fileBudget    = 4_000
+)
+
+// startupCheck resume lo que se carga al iniciar cada sesión: el total, las
+// tres fuentes más pesadas y lo que conviene podar.
+func startupCheck(srcs []agents.ContextSource) (status, detail string) {
+	if len(srcs) == 0 {
+		return "ok", "sin CLAUDE.md, memoria ni skills que cargar al iniciar"
+	}
+	total := 0
+	var notes []string
+	for _, s := range srcs {
+		total += s.Bytes
+		if t := agents.EstimateTokens(s.Bytes); t > fileBudget && s.Note == "" {
+			s.Note = fmt.Sprintf("≈%s tokens, más de %s en un solo archivo", metrics.Human(int64(t)), metrics.Human(fileBudget))
+		}
+		if s.Note != "" {
+			notes = append(notes, s.Label+" "+s.Note)
+		}
+	}
+	top := slices.Clone(srcs)
+	slices.SortStableFunc(top, func(a, b agents.ContextSource) int { return b.Bytes - a.Bytes })
+	var parts []string
+	for _, s := range top[:min(3, len(top))] {
+		parts = append(parts, fmt.Sprintf("%s ≈%s", s.Label, metrics.Human(int64(agents.EstimateTokens(s.Bytes)))))
+	}
+	tok := agents.EstimateTokens(total)
+	detail = fmt.Sprintf("≈%s tokens de archivos en cada llamada de la sesión principal (%s)", metrics.Human(int64(tok)), strings.Join(parts, ", "))
+	if tok > startupBudget {
+		notes = append(notes, "el total pasa de "+metrics.Human(startupBudget))
+	}
+	if len(notes) == 0 {
+		return "ok", detail
+	}
+	return "warn", detail + ". " + strings.Join(notes, "; ") + ". Poda lo que ya no aplica o muévelo a archivos que se lean al necesitarlos"
 }

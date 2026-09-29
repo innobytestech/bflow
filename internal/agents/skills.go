@@ -45,3 +45,16 @@ func ProcessTerms(description string) []string {
 	}
 	return found
 }
+
+// ContextSource es algo que la herramienta del agente carga al iniciar cada
+// sesión y que se paga en cada llamada.
+type ContextSource struct {
+	Label string
+	Bytes int
+	Note  string // un problema concreto (p. ej. "se corta")
+}
+
+// EstimateTokens aproxima tokens a partir de bytes. Estos archivos llevan
+// rutas, identificadores y acentos, que rinden menos que la prosa: ~3 bytes
+// por token. Es una estimación; el conteo exacto lo da el API del modelo.
+func EstimateTokens(bytes int) int { return (bytes + 2) / 3 }

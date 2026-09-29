@@ -6,6 +6,7 @@ package main
 
 import (
 	"os"
+	"runtime/debug"
 
 	"innobytes.tech/bflow/internal/adapters/agent/claude"
 	"innobytes.tech/bflow/internal/cli"
@@ -20,7 +21,7 @@ func main() {
 		Stdout:   os.Stdout,
 		Stderr:   os.Stderr,
 		Stdin:    os.Stdin,
-		Version:  version,
+		Version:  buildVersion(version, debug.ReadBuildInfo),
 		Dir:      dir,
 		Build:    build,
 		Connect:  connect,

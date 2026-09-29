@@ -86,6 +86,7 @@ Tus reglas de arquitectura en CLAUDE.md o en los documentos de `read` son bienve
 
 ## Gastar menos contexto
 
+- **Lo que se carga al iniciar se paga en cada llamada.** CLAUDE.md (con sus `@imports`), las reglas sin `paths:` y el índice de la memoria automática (`MEMORY.md`) viajan en cada llamada de la sesión principal. `bflow doctor` estima cuánto pesan y avisa si un archivo pasa de ~4k tokens o el total de ~10k. Poda lo que ya no aplica y deja en el índice solo enlaces de una línea. La memoria se corta a 200 líneas o 25 KB, así que lo que pase de ahí no se carga.
 - **La conversación se puede descartar; el hilo vive en bflow.** El estado, las decisiones y los reportes están en `.bflow/`, la spec y el tracker. Después de aprobar una gate puedes hacer `/clear`: al reiniciar, bflow le vuelve a dar a la sesión la tarea y el siguiente paso.
 - **No pegues specs ni código en el chat.** Los agentes leen por ruta y por sección (`bflow show <ID> spec --section design`).
 - **Agentes con modelo y esfuerzo a su medida:** los mecánicos (documenter) con un modelo menor y esfuerzo bajo.

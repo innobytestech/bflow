@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"innobytes.tech/bflow/internal/agents"
 	"innobytes.tech/bflow/internal/engine"
 	"innobytes.tech/bflow/internal/flow"
 	"innobytes.tech/bflow/internal/metrics"
@@ -108,5 +109,23 @@ func TestRenderWatchFitsRows(t *testing.T) {
 	}
 	if !strings.Contains(short, "guard bloqueó: 11") || strings.Contains(short, "guard bloqueó: 4") {
 		t.Errorf("se quitan los eventos más viejos:\n%s", short)
+	}
+}
+
+func TestStartupCheck(t *testing.T) {
+	st, d := startupCheck([]agents.ContextSource{{Label: "CLAUDE.md", Bytes: 1500}, {Label: "MEMORY.md", Bytes: 3000}})
+	if st != "ok" || !strings.Contains(d, "≈1k tokens") || !strings.Contains(d, "MEMORY.md ≈1k, CLAUDE.md ≈500") {
+		t.Errorf("chico: %s %s", st, d)
+	}
+	st, d = startupCheck([]agents.ContextSource{{Label: "CLAUDE.md", Bytes: 1500}, {Label: "MEMORY.md", Bytes: 19048}})
+	if st != "warn" || !strings.Contains(d, "MEMORY.md ≈6k tokens, más de 4k en un solo archivo") {
+		t.Errorf("MEMORY.md de ms-sys: %s %s", st, d)
+	}
+	st, d = startupCheck([]agents.ContextSource{{Label: "a", Bytes: 11000}, {Label: "b", Bytes: 11000}, {Label: "c", Bytes: 11000}})
+	if st != "warn" || !strings.Contains(d, "el total pasa de 10k") {
+		t.Errorf("total: %s %s", st, d)
+	}
+	if st, d := startupCheck([]agents.ContextSource{{Label: "MEMORY.md", Bytes: 900, Note: "se corta"}}); st != "warn" || !strings.Contains(d, "MEMORY.md se corta") {
+		t.Errorf("nota: %s %s", st, d)
 	}
 }

@@ -197,6 +197,8 @@ type AgentAdapter interface {
 	SubagentStopped(raw []byte) (subagent, cwd string, ok bool)
 	// KeepWorking es la salida de ese hook que hace seguir al subagente.
 	KeepWorking(reason string) string
+	// StartupContext lista lo que la herramienta carga al iniciar cada sesión.
+	StartupContext(root string) []agents.ContextSource
 	// Version compara la versión instalada de la herramienta con la mínima.
 	Version() (have, min string, ok bool, err error)
 }
