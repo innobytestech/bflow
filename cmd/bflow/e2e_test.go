@@ -43,6 +43,7 @@ type envelope struct {
 		Gate    string `json:"gate"`
 		Skill   string `json:"skill"`
 		Show    []string
+		Display string `json:"display"`
 		Options []struct {
 			ID      string `json:"id"`
 			Command string `json:"command"`
@@ -179,9 +180,16 @@ func TestFullFeatureWithLocalTracker(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(r.dir, spec)); err != nil {
 		t.Fatalf("spec no creado en %s", spec)
 	}
+	// Lo que escribe el spec-author es lo que el humano ve en la gate, sin correr show.
+	specAbs := filepath.Join(r.dir, spec)
+	sb, _ := os.ReadFile(specAbs)
+	os.WriteFile(specAbs, []byte(strings.Replace(string(sb), "## Brief\n", "## Brief\n\n**Objetivo:** borrador compartido de cotización.\n", 1)), 0o644)
 
 	env = r.ok("report", id, "--agent", "spec-author", "--verdict", "READY")
 	expectNext(t, env, "ask", "spec")
+	if !strings.Contains(env.Next.Display, "borrador compartido de cotización") {
+		t.Errorf("la gate de spec trae el brief en display: %q", env.Next.Display)
+	}
 	if len(env.Next.Show) != 1 {
 		t.Fatalf("el gate spec debe pedir mostrar el brief: %+v", env.Next)
 	}
@@ -240,10 +248,18 @@ func TestFullFeatureWithLocalTracker(t *testing.T) {
 	r.ok("report", id, "--agent", "security-auditor", "--verdict", "APPROVED")
 	env = r.ok("report", id, "--agent", "reviewer", "--verdict", "APPROVED")
 	spawned(t, env, "documenter")
+	os.MkdirAll(filepath.Join(r.dir, ".bflow", "tasks", id, "reports"), 0o755)
+	os.WriteFile(filepath.Join(r.dir, ".bflow", "tasks", id, "reports", "review-map.md"),
+		[]byte("## 🔴 Decisión\n- folio: se reserva al confirmar\n\n## Preguntas de producto\n1. ¿El borrador consume folio?\n   el código responde: no (quotation.go:10)\n"), 0o644)
 	env = r.ok("report", id, "--agent", "documenter", "--verdict", "DONE")
+	expectNext(t, env, "ask", "questions")
+	if env.Next.Skill != "walkthrough" || !strings.Contains(env.Next.Display, "¿El borrador consume folio?") || strings.Contains(env.Next.Display, "el código responde") {
+		t.Errorf("preguntas sin las respuestas del código: %+v", env.Next)
+	}
+	env = r.ok(option(t, env, "answer", map[string]string{"<respuestas>": "no debe consumir folio"})...)
 	expectNext(t, env, "ask", "walkthrough")
-	if env.Next.Skill != "walkthrough" {
-		t.Errorf("skill: %s", env.Next.Skill)
+	if !strings.Contains(env.Next.Display, "no debe consumir folio") || !strings.Contains(env.Next.Display, "el código responde: no") {
+		t.Errorf("el recorrido compara sus respuestas con el review-map: %q", env.Next.Display)
 	}
 	env = r.ok(option(t, env, "approve", nil)...)
 	expectNext(t, env, "wait", "")
@@ -279,6 +295,8 @@ func TestHotfixWithLocalTracker(t *testing.T) {
 	env = r.ok("report", "--agent", "security-auditor", "--verdict", "APPROVED")
 	spawned(t, env, "documenter")
 	env = r.ok("report", "--agent", "documenter", "--verdict", "DONE")
+	expectNext(t, env, "ask", "questions")
+	env = r.ok(option(t, env, "approve", nil)...) // saltar las preguntas
 	expectNext(t, env, "ask", "walkthrough")
 	for _, o := range env.Next.Options {
 		if o.ID == "spec" {

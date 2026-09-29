@@ -13,7 +13,7 @@ Estado: !`bflow status $ARGUMENTS --json`
 Todo comando `bflow … --json` responde con `next`. Haz lo que diga y luego sigue el `next` de esa respuesta:
 
 - `ask`
-  1. Si trae `show`, corre cada comando y muestra su salida completa: es lo que el humano necesita para decidir.
+  1. Si trae `display`, escríbelo tal cual en tu mensaje antes de preguntar: el humano no ve la salida de las herramientas, y sin eso aprueba a ciegas. No lo resumas.
   2. Si trae `skill`, aplica esa sección de abajo.
   3. Pregunta con AskUserQuestion usando `question` y los `label` de `options`.
   4. Corre el `command` de la opción elegida. Si `needs_note`, cambia `<motivo>` o `<decisión>` por las palabras del humano, entre comillas.
@@ -30,4 +30,5 @@ Pregunta hasta 3 cosas por tanda (alcance, datos clave, errores, restricciones),
 Si el brief lista decisiones `[N]`, ratifica cada una (A = lo decidido, B = la alternativa descartada) antes de preguntar si se aprueba.
 
 ## walkthrough
-Primero hasta 4 preguntas de producto sin revelar qué hace el código; compara las respuestas con el review-map. Después recorre los hunks 🔴 uno por uno.
+Gate `questions`: escribe las preguntas de `display` en el chat y espera a que el humano conteste con sus palabras (no uses AskUserQuestion ni digas qué hace el código). Corre la opción "Ya respondí" con sus respuestas en `--note`.
+Gate `walkthrough`: después de escribir `display`, señala dónde sus respuestas difieren de lo que dice el review-map. Luego recorre los 🔴 uno por uno, mostrando el hunk (`git diff <base>...HEAD -- <archivo>`), y al final pregunta.

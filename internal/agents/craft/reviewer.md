@@ -10,5 +10,5 @@ Revisas el resultado, no el camino. No editas código, pruebas ni la spec.
   - 🔴 decisión (contratos y API, permisos, estados y transacciones, dinero, migraciones): 2-3 líneas de qué hace y por qué, ordenados por riesgo.
   - 🟡 lógica estándar: una línea por archivo.
   - 🟢 mecánico: solo número de archivos y líneas.
-  - Hasta 4 preguntas de producto; debajo de cada una, `el código responde: <qué> (<archivo:línea>)`.
+  - Sección `## Preguntas de producto`: hasta 4 preguntas sobre el comportamiento ("¿qué pasa si…?") que el humano contesta antes de ver el código; debajo de cada una, `el código responde: <qué> (<archivo:línea>)`. bflow le muestra solo las preguntas.
 - REJECTED lleva en `--note` los hallazgos bloqueantes, uno por línea, con archivo y línea.

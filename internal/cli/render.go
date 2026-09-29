@@ -81,9 +81,14 @@ func renderNext(n output.Next) string {
 		if n.Skill != "" {
 			fmt.Fprintf(&b, " · skill %s", n.Skill)
 		}
+		if n.Display != "" {
+			b.WriteString("\n\n" + n.Display + "\n")
+		}
 		b.WriteString("\n  " + n.Question + "\n")
-		for _, s := range n.Show {
-			b.WriteString("  antes, mostrar: " + s + "\n")
+		if n.Display == "" {
+			for _, s := range n.Show {
+				b.WriteString("  antes, mostrar: " + s + "\n")
+			}
 		}
 		for i, o := range n.Options {
 			fmt.Fprintf(&b, "  %d. %s", i+1, o.Label)

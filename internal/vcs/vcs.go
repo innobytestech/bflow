@@ -31,6 +31,9 @@ type Git interface {
 	ChangedSince(ctx context.Context, sha string, paths []string) ([]string, error)
 	// DiffNames lista archivos cambiados entre base y HEAD (triple punto).
 	DiffNames(ctx context.Context, base string) ([]string, error)
+	// Commit hace commit solo de paths con msg, aunque haya otras cosas en
+	// stage. Devuelve false si esos archivos no tenían cambios.
+	Commit(ctx context.Context, paths []string, msg string) (bool, error)
 	// Push publica la rama actual en el remoto.
 	Push(ctx context.Context, branch string) error
 	// RemoteURL devuelve la URL del remoto.

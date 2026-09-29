@@ -16,6 +16,10 @@ Los cambios de bflow que ve quien lo usa. Las versiones siguen [semver](https://
 - **`doctor`** revisa la versión de Claude Code (2.1.271 o posterior), los agentes generados, el hook de fin de subagente y las skills que parecen de proceso (`doctor.ignore_skills`).
 - **Identidad en la terminal.** `bflow` sin argumentos muestra el banner, la tarea activa y el siguiente paso; `version` e `init` también. Solo en una terminal interactiva: para un agente o un pipe la salida no cambia.
 - **Guía** [Cómo trabajar con bflow](docs/guia.md).
+- **Gates visibles.** `next` de cada gate trae `display`: el brief, el contrato o el review-map ya leídos, para que la sesión los escriba en el chat antes de preguntar. En la piloto el humano aprobaba sin ver nada, porque la salida de las herramientas no se muestra.
+- **Gate `questions`** antes del walkthrough: el humano contesta las preguntas de producto sin ver el código (`bflow show <ID> questions` las saca del review-map sin las respuestas) y el walkthrough compara sus respuestas con lo implementado.
+- **La spec entra al PR.** Al aprobarla, bflow hace commit de ella en la rama nueva, y antes de abrir el PR hace commit de sus cambios (tareas marcadas). El mensaje sigue `vcs.commit_style` (`{type}: {id} {summary}` por defecto).
+- **`report DONE` exige las tareas de la spec marcadas `[x]`** (`tasks_open`).
 
 ### Cambiado
 

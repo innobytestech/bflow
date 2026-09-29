@@ -87,6 +87,9 @@ func gitRepo(t *testing.T, bflowYAML string) (*repo, string) {
 	remote := filepath.Join(root, "remote.git")
 	git(t, root, "init", "--bare", "-b", "dev", remote)
 	git(t, r.dir, "init", "-b", "dev")
+	// bflow hace commits (la spec) con la identidad del repo: en CI no hay una global.
+	git(t, r.dir, "config", "user.name", "t")
+	git(t, r.dir, "config", "user.email", "t@t")
 	os.MkdirAll(filepath.Join(r.dir, "internal"), 0o755)
 	os.WriteFile(filepath.Join(r.dir, "internal", "a.go"), []byte("package a\n"), 0o644)
 	os.WriteFile(filepath.Join(r.dir, "bflow.yaml"), []byte(bflowYAML), 0o644)
@@ -122,16 +125,33 @@ func TestGitAndGitHubEndToEnd(t *testing.T) {
 	if cur := git(t, r.dir, "rev-parse", "--abbrev-ref", "HEAD"); cur != branch {
 		t.Fatalf("rama actual %q, want %q", cur, branch)
 	}
+	// La spec entra a la rama con su propio commit.
+	spec := "specs/" + id + "-validacion-por-campo/spec.md"
+	if last := git(t, r.dir, "log", "-1", "--format=%s", "--name-only"); last != "docs: "+id+" spec\n\n"+spec {
+		t.Errorf("commit de la spec:\n%s", last)
+	}
 
 	os.WriteFile(filepath.Join(r.dir, "internal", "b.go"), []byte("package a\n"), 0o644)
-	git(t, r.dir, "add", ".")
+	git(t, r.dir, "add", "internal")
 	git(t, r.dir, "commit", "-m", "feat: validación")
+
+	// DONE exige las tareas marcadas.
+	specAbs := filepath.Join(r.dir, filepath.FromSlash(spec))
+	b, _ := os.ReadFile(specAbs)
+	doc := strings.Replace(string(b), "## Tasks\n", "## Tasks\n\n- [x] T1 validar RFC\n- [ ] T2 mensaje de error\n", 1)
+	os.WriteFile(specAbs, []byte(doc), 0o644)
+	env = r.run("report", "--agent", "implementer", "--verdict", "DONE")
+	if env.exit != 2 || env.Code != "tasks_open" || !strings.Contains(env.Data["reason"].(string), "T2 mensaje de error") {
+		t.Fatalf("DONE con tareas abiertas: exit %d %s %v", env.exit, env.Code, env.Data)
+	}
+	os.WriteFile(specAbs, []byte(strings.Replace(doc, "- [ ] T2", "- [x] T2", 1)), 0o644)
 	r.ok("report", "--agent", "implementer", "--verdict", "DONE") // tarea activa por rama
 	r.ok("report", "--agent", "reviewer", "--verdict", "APPROVED")
 	r.ok("report", "--agent", "security-auditor", "--verdict", "APPROVED")
 	os.MkdirAll(filepath.Join(r.dir, ".bflow", "tasks", id, "reports"), 0o755)
 	os.WriteFile(filepath.Join(r.dir, ".bflow", "tasks", id, "reports", "review-map.md"), []byte("🔴 internal/b.go: validación nueva\n"), 0o644)
 	r.ok("report", "--agent", "documenter", "--verdict", "DONE")
+	r.ok("approve", "--gate", "questions") // saltar las preguntas de producto
 	env = r.ok("approve", "--gate", "walkthrough")
 	pr, _ := env.Data["pr"].(map[string]any)
 	if pr == nil || pr["number"].(float64) != 41 {
@@ -139,6 +159,10 @@ func TestGitAndGitHubEndToEnd(t *testing.T) {
 	}
 	if !strings.Contains(git(t, remote, "branch", "--list", branch), branch) {
 		t.Error("la rama no llegó al remoto")
+	}
+	// Las tareas marcadas (la spec sin commitear) también llegan al PR.
+	if log := git(t, remote, "log", branch, "--format=%s"); !strings.Contains(log, "docs: "+id+" actualiza la spec") {
+		t.Errorf("commits en el remoto:\n%s", log)
 	}
 	if body := gh.get(41, "body").(string); !strings.Contains(body, "validación nueva") || !strings.Contains(body, "Spec: `specs/"+id) {
 		t.Errorf("cuerpo del PR:\n%s", body)
@@ -173,6 +197,7 @@ func TestPRDegradesWithoutToken(t *testing.T) {
 	r.ok("report", "--agent", "reviewer", "--verdict", "APPROVED")
 	r.ok("report", "--agent", "security-auditor", "--verdict", "APPROVED")
 	r.ok("report", "--agent", "documenter", "--verdict", "DONE")
+	r.ok("approve", "--gate", "questions")
 	env := r.ok("approve", "--gate", "walkthrough")
 	pr, _ := env.Data["pr"].(map[string]any)
 	want := "https://github.com/acme/app/compare/dev...hotfix/" + id + "-hotfix?expand=1"

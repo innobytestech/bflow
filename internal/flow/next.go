@@ -147,6 +147,14 @@ func gateNext(cfg Config, s State) output.Next {
 			n.Options = append(n.Options, rejectOpt(id, g.Name, "spec", "Volver a spec", ""))
 		}
 		n.Options = append(n.Options, approveOpt(id, g.Name, "Una ronda más"))
+	case GateQuestions:
+		n.Skill = "walkthrough"
+		n.Show = []string{cmd("show", id, "questions")}
+		n.Question = "Antes de ver el código: ¿qué esperas que haga el cambio en estos casos? Tus respuestas se comparan después con lo que hace el código."
+		n.Options = []output.Option{
+			{ID: "answer", Label: "Ya respondí", NeedsNote: true, Command: cmd("approve", id, "--gate", string(g.Name), `--note "<respuestas>"`)},
+			approveOpt(id, g.Name, "Saltar las preguntas"),
+		}
 	case GateWalkthrough:
 		n.Skill = "walkthrough"
 		n.Show = []string{cmd("show", id, "review-map")}

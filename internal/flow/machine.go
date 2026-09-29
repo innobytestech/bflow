@@ -116,7 +116,9 @@ func (t *tx) enter(p Phase) {
 	case Paused:
 		s.Gate = &PendingGate{Name: GatePause}
 	case Walkthrough:
-		s.Gate = &PendingGate{Name: GateWalkthrough}
+		// Primero el humano contesta qué espera del producto, sin ver el código;
+		// después recorre el diff. Si se pregunta todo junto, se aprueba sin mirar.
+		s.Gate = &PendingGate{Name: GateQuestions}
 	}
 }
 
@@ -192,6 +194,9 @@ func (t *tx) approve(ev Event) error {
 	case GateRounds:
 		s.Gate = nil
 		s.Resume = true
+	case GateQuestions:
+		s.Note = strings.TrimSpace(ev.Note) // sus respuestas, para compararlas en el recorrido
+		s.Gate = &PendingGate{Name: GateWalkthrough}
 	case GateWalkthrough:
 		t.openPR = true
 		t.enter(t.cfg.after(s.Lane, Walkthrough))

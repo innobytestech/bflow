@@ -197,7 +197,7 @@ func init() {
 		Setup: func(fs *flag.FlagSet) { fs.Bool("brief", false, "resumen de pocas líneas (hooks)") },
 		Run:   runStatus})
 
-	Register(&Command{Name: "show", Summary: "muestra un artefacto: show [ID] task|brief|spec|contract|review-map|decisions|discovery|check [--section s]",
+	Register(&Command{Name: "show", Summary: "muestra un artefacto: show [ID] task|brief|spec|contract|review-map|questions|decisions|discovery|check [--section s]",
 		Setup: func(fs *flag.FlagSet) { fs.String("section", "", "sección del spec") },
 		Run: func(c *Ctx) output.Envelope {
 			ctx := context.Background()
@@ -210,7 +210,7 @@ func init() {
 				return fail(err)
 			}
 			if len(rest) == 0 {
-				return output.Fail("usage", errors.New("uso: bflow show [ID] task|brief|spec|contract|review-map|decisions|discovery|check"))
+				return output.Fail("usage", errors.New("uso: bflow show [ID] task|brief|spec|contract|review-map|questions|decisions|discovery|check"))
 			}
 			text, err := e.Show(ctx, id, rest[0], str(c.Flags, "section"))
 			if err != nil {

@@ -50,10 +50,14 @@ type AgentCall struct {
 
 // Next dice a la sesión principal qué hacer a continuación.
 type Next struct {
-	Action   string      `json:"action"`
-	Gate     string      `json:"gate,omitempty"`
-	Skill    string      `json:"skill,omitempty"` // skill que la sesión carga para conducir este paso
-	Show     []string    `json:"show,omitempty"`  // comandos cuya salida se muestra íntegra antes de preguntar
+	Action string   `json:"action"`
+	Gate   string   `json:"gate,omitempty"`
+	Skill  string   `json:"skill,omitempty"` // skill que la sesión carga para conducir este paso
+	Show   []string `json:"show,omitempty"`  // comandos cuya salida se muestra íntegra antes de preguntar
+	// Display es la salida de Show ya leída: lo que el humano tiene que ver
+	// para decidir. La sesión lo escribe tal cual en su mensaje, porque la
+	// salida de las herramientas no la ve el humano.
+	Display  string      `json:"display,omitempty"`
 	Question string      `json:"question,omitempty"`
 	Options  []Option    `json:"options,omitempty"`
 	Agents   []AgentCall `json:"agents,omitempty"`

@@ -154,8 +154,12 @@ func TestFullLaneEndToEnd(t *testing.T) {
 	}
 	mustT(t)(v.e.Report(ctx, id, ReportOpts{Agent: "security-auditor", Verdict: flow.Approved}))
 	o = mustT(t)(v.e.Report(ctx, id, ReportOpts{Agent: "documenter", Verdict: flow.DoneV}))
-	if o.Next.Gate != "walkthrough" {
-		t.Fatalf("walkthrough: %+v", o.Next)
+	if o.Next.Gate != "questions" {
+		t.Fatalf("primero las preguntas de producto: %+v", o.Next)
+	}
+	o = mustT(t)(v.e.Approve(ctx, id, ApproveOpts{Note: "que rechace el RFC genérico"}))
+	if o.Next.Gate != "walkthrough" || !strings.Contains(o.Next.Display, "que rechace el RFC genérico") {
+		t.Fatalf("el recorrido trae las respuestas del humano: %+v", o.Next)
 	}
 	o = mustT(t)(v.e.Approve(ctx, id, ApproveOpts{}))
 	if o.To != flow.InReview || o.Next.Action != "wait" || !hasWarning(o, "PR") {

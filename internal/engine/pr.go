@@ -67,11 +67,12 @@ func (e *Engine) openPR(ctx context.Context, rec *store.Record) ([]string, error
 	if e.Git == nil {
 		return []string{"sin git: no se hizo push ni se abrió el PR"}, nil
 	}
+	warns := e.commitSpec(ctx, rec.Flow, "actualiza la spec") // tareas marcadas, decisiones en vuelo
 	if err := e.Git.Push(ctx, rec.Branch); err != nil {
 		return nil, fmt.Errorf("push de %s: %w", rec.Branch, err)
 	}
 	if e.Host == nil {
-		return []string{"push hecho; sin host remoto configurado: abre el PR a mano (vcs.host)"}, nil
+		return append(warns, "push hecho; sin host remoto configurado: abre el PR a mano (vcs.host)"), nil
 	}
 	base := e.Cfg.VCS.BaseBranch
 	body := e.PRBody(*rec)
@@ -80,22 +81,22 @@ func (e *Engine) openPR(ctx context.Context, rec *store.Record) ([]string, error
 			return nil, fmt.Errorf("actualizar PR #%d: %w", pr.Number, err)
 		}
 		rec.PR = &store.PR{Number: pr.Number, URL: pr.URL}
-		return []string{fmt.Sprintf("PR #%d ya existía; descripción actualizada: %s", pr.Number, pr.URL)}, nil
+		return append(warns, fmt.Sprintf("PR #%d ya existía; descripción actualizada: %s", pr.Number, pr.URL)), nil
 	} else if !errors.Is(err, vcs.ErrNoPR) {
 		if errors.Is(err, vcs.ErrNoCredentials) {
-			return e.degradePR(rec, base, err), nil
+			return append(warns, e.degradePR(rec, base, err)...), nil
 		}
 		return nil, fmt.Errorf("buscar PR: %w", err)
 	}
 	pr, err := e.Host.OpenPR(ctx, vcs.PRSpec{Base: base, Head: rec.Branch, Title: fmt.Sprintf("%s · %s", rec.Flow.ID, rec.Title), Body: body})
 	if errors.Is(err, vcs.ErrNoCredentials) {
-		return e.degradePR(rec, base, err), nil
+		return append(warns, e.degradePR(rec, base, err)...), nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("abrir PR: %w", err)
 	}
 	rec.PR = &store.PR{Number: pr.Number, URL: pr.URL}
-	return []string{fmt.Sprintf("PR #%d abierto: %s", pr.Number, pr.URL)}, nil
+	return append(warns, fmt.Sprintf("PR #%d abierto: %s", pr.Number, pr.URL)), nil
 }
 
 func (e *Engine) degradePR(rec *store.Record, base string, cause error) []string {

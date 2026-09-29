@@ -29,6 +29,10 @@ func (g *fakeGit) DiffNames(context.Context, string) ([]string, error) { return 
 func (g *fakeGit) ChangedSince(context.Context, string, []string) ([]string, error) {
 	return nil, nil
 }
+func (g *fakeGit) Commit(_ context.Context, paths []string, msg string) (bool, error) {
+	g.calls = append(g.calls, "commit "+msg+" "+strings.Join(paths, ","))
+	return true, nil
+}
 func (g *fakeGit) Push(_ context.Context, b string) error {
 	g.calls = append(g.calls, "push "+b)
 	return nil
@@ -98,6 +102,7 @@ func toWalkthrough(t *testing.T, v *env, id string) {
 	m(v.e.Report(ctx, id, ReportOpts{Agent: "reviewer", Verdict: flow.Approved}))
 	m(v.e.Report(ctx, id, ReportOpts{Agent: "security-auditor", Verdict: flow.Approved}))
 	m(v.e.Report(ctx, id, ReportOpts{Agent: "documenter", Verdict: flow.DoneV}))
+	m(v.e.Approve(ctx, id, ApproveOpts{Gate: "questions"})) // saltar las preguntas de producto
 }
 
 func TestBranchCreatedOnSpecApproval(t *testing.T) {
@@ -122,8 +127,10 @@ func TestBranchCreatedOnSpecApproval(t *testing.T) {
 	}
 	g.dirty = nil
 	o := mustT(t)(v.e.Approve(ctx, id, ApproveOpts{}))
-	if o.To != flow.Implementing || strings.Join(g.calls, ";") != "branch feature/"+id+"-demo from dev" {
-		t.Errorf("rama: %v %+v", g.calls, o)
+	// La spec entra a la rama nueva: si nadie la commitea, no llega al PR.
+	want := "branch feature/" + id + "-demo from dev;commit docs: " + id + " spec specs/" + id + "-demo/spec.md"
+	if o.To != flow.Implementing || strings.Join(g.calls, ";") != want {
+		t.Errorf("rama y commit de la spec: %v %+v", g.calls, o)
 	}
 	// La tarea activa sale de la rama actual aunque haya otras en curso.
 	other := v.task(t, "Otra")

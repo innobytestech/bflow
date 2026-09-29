@@ -52,6 +52,7 @@ const (
 	GateDecision    Gate = "decision"    // un agente devolvió NEEDS_DECISION
 	GatePause       Gate = "pause"       // permiso para lanzar la revisión
 	GateRounds      Gate = "rounds"      // cortacircuito de rondas de calidad
+	GateQuestions   Gate = "questions"   // preguntas de producto, antes de ver el código
 	GateWalkthrough Gate = "walkthrough" // aprobar el PR
 )
 

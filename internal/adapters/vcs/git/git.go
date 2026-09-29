@@ -129,6 +129,21 @@ func (g *Git) Dirty(ctx context.Context, paths []string) ([]string, error) {
 
 func (g *Git) HeadSHA(ctx context.Context) (string, error) { return g.run(ctx, "rev-parse", "HEAD") }
 
+func (g *Git) Commit(ctx context.Context, paths []string, msg string) (bool, error) {
+	dirty, err := g.Dirty(ctx, paths)
+	if err != nil || len(dirty) == 0 {
+		return false, err
+	}
+	if _, err := g.run(ctx, append([]string{"add", "--"}, paths...)...); err != nil {
+		return false, err
+	}
+	// Con rutas, commit toma solo esas (--only): lo que otro tenga en stage no se mezcla.
+	if _, err := g.run(ctx, append([]string{"commit", "-m", msg, "--"}, paths...)...); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 func (g *Git) ChangedSince(ctx context.Context, sha string, paths []string) ([]string, error) {
 	out, err := g.run(ctx, append([]string{"diff", "--name-only", sha, "HEAD", "--"}, paths...)...)
 	return lines(out), err

@@ -163,7 +163,9 @@ func (e *Engine) Status(ctx context.Context, id string) (View, error) {
 	if err != nil {
 		return View{}, err
 	}
-	return e.view(rec), nil
+	v := e.view(rec)
+	v.Next = e.withDisplay(ctx, rec, v.Next)
+	return v, nil
 }
 
 func (e *Engine) view(rec store.Record) View {

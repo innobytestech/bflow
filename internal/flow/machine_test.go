@@ -104,9 +104,11 @@ func commonRows(l Lane) []row {
 		// cortacircuito
 		{lane: l, from: Implementing, gate: GateRounds, round: 2, ev: approve(), want: Implementing, wantRound: 2},
 		// documenting
-		{lane: l, from: Documenting, ev: rep(doc, DoneV), want: Walkthrough, wantGate: GateWalkthrough, fx: []EffectKind{ts}},
+		{lane: l, from: Documenting, ev: rep(doc, DoneV), want: Walkthrough, wantGate: GateQuestions, fx: []EffectKind{ts}},
 		{lane: l, from: Documenting, ev: rep(doc, BlockedV), want: Blocked, fx: []EffectKind{ts, cm}},
-		// walkthrough
+		// walkthrough: primero las preguntas de producto, después el recorrido
+		{lane: l, from: Walkthrough, gate: GateQuestions, ev: Event{Kind: EvApprove, Note: "que rechace el RFC genérico"}, want: Walkthrough, wantGate: GateWalkthrough},
+		{lane: l, from: Walkthrough, gate: GateQuestions, ev: rej("no"), err: "not_rejectable"},
 		{lane: l, from: Walkthrough, gate: GateWalkthrough, ev: approve(), want: InReview, fx: []EffectKind{pr, ts}},
 		{lane: l, from: Walkthrough, gate: GateWalkthrough, ev: rej("no me convence"), want: Implementing, fx: []EffectKind{ts, cm}},
 		// in_review
@@ -555,5 +557,17 @@ func TestNoteDoesNotLeakToNextPhase(t *testing.T) {
 	}
 	if n, ok := res.Next.Agents[0].Args["note"]; ok {
 		t.Errorf("la nota del spec llegó al implementer: %q", n)
+	}
+}
+
+// Las respuestas a las preguntas de producto se guardan para el recorrido.
+func TestQuestionsKeepAnswers(t *testing.T) {
+	s := stateFor(row{lane: Light, from: Walkthrough, gate: GateQuestions})
+	res, err := Apply(DefaultConfig(), s, Event{Kind: EvApprove, Note: " rechaza el RFC genérico "})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.State.Note != "rechaza el RFC genérico" || res.State.Gate.Name != GateWalkthrough {
+		t.Errorf("estado: %+v", res.State)
 	}
 }

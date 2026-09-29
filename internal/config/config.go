@@ -77,7 +77,7 @@ type VCS struct {
 	BaseBranch        string       `yaml:"base_branch,omitempty"`
 	BranchPrefix      BranchPrefix `yaml:"branch_prefix,omitempty"`
 	BranchPattern     string       `yaml:"branch_pattern,omitempty"` // {prefix}{id}-{slug} por defecto
-	CommitStyle       string       `yaml:"commit_style,omitempty"`
+	CommitStyle       string       `yaml:"commit_style,omitempty"`   // commits que hace bflow: {type}: {id} {summary} por defecto
 	ProtectedBranches []string     `yaml:"protected_branches,omitempty"`
 }
 
@@ -382,6 +382,9 @@ func (c *Config) applyDefaults() {
 	}
 	if c.VCS.BranchPattern == "" {
 		c.VCS.BranchPattern = "{prefix}{id}-{slug}"
+	}
+	if c.VCS.CommitStyle == "" {
+		c.VCS.CommitStyle = "{type}: {id} {summary}"
 	}
 	if len(c.VCS.ProtectedBranches) == 0 {
 		c.VCS.ProtectedBranches = []string{"main", "master"}

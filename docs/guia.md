@@ -24,9 +24,12 @@ En Claude Code le dices a la sesión algo como "sigamos con API-12" o "qué sigu
 | Decisión | Un agente no puede decidir solo | El problema y 2-3 opciones | Una opción o tu propia decisión |
 | Pausa (full) | Implementación con el check en verde | — | Lanzar la revisión de calidad o volver a implementar |
 | Rondas | Calidad rechazó dos veces seguidas | — | Dividir la feature, volver a la spec o una ronda más |
-| Walkthrough | Todo revisado y documentado | El review-map: 🔴 decisiones, 🟡 lógica, 🟢 mecánico | Aprobar y abrir el PR, volver a implementar o volver a la spec |
+| Preguntas de producto | Todo revisado y documentado | Hasta 4 preguntas sobre el comportamiento, sin decirte qué hace el código | Las contestas con tus palabras (o las saltas) |
+| Walkthrough | Después de tus respuestas | Tus respuestas junto al review-map: 🔴 decisiones, 🟡 lógica, 🟢 mecánico | Aprobar y abrir el PR, volver a implementar o volver a la spec |
 
-En el walkthrough, la sesión primero te hace hasta 4 preguntas de producto sin decirte qué hace el código, y compara tus respuestas con lo implementado. Después recorre contigo los cambios 🔴 uno por uno. Es la forma de revisar sin leer todo el diff.
+Lo que necesitas para decidir llega escrito en el chat: bflow le entrega a la sesión el texto (el brief, el contrato, el review-map) y la sesión lo copia antes de preguntar. Si alguna vez te preguntan si apruebas algo que no ves, pídelo.
+
+El walkthrough va en dos pasos que controla bflow. Primero contestas qué esperas que haga el cambio, sin ver el código. Después la sesión compara tus respuestas con lo que el código hace, señala las diferencias y recorre contigo los cambios 🔴 uno por uno. Es la forma de revisar sin leer todo el diff.
 
 Nadie marca una tarea como terminada a mano: bflow la cierra cuando detecta el merge (`bflow panel`).
 

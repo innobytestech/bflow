@@ -195,3 +195,27 @@ func TestParseRepo(t *testing.T) {
 		t.Error("una ruta local no es un host remoto")
 	}
 }
+
+// Commit toma solo las rutas pedidas, aunque haya otras cosas en stage.
+func TestCommitOnlyPaths(t *testing.T) {
+	work, _ := fixture(t)
+	g := New(work)
+	ctx := context.Background()
+	write(t, work, "specs/API-1-x/spec.md", "# spec\n")
+	write(t, work, "internal/a.go", "package a // del implementer\n")
+	sh(t, work, "add", "internal/a.go")
+
+	done, err := g.Commit(ctx, []string{"specs/API-1-x/spec.md"}, "docs: API-1 spec")
+	if err != nil || !done {
+		t.Fatalf("commit: %v %v", done, err)
+	}
+	if files := sh(t, work, "show", "--name-only", "--format=%s", "HEAD"); files != "docs: API-1 spec\n\nspecs/API-1-x/spec.md" {
+		t.Errorf("el commit trae otras cosas:\n%s", files)
+	}
+	if st := sh(t, work, "status", "--porcelain"); st != "M  internal/a.go" {
+		t.Errorf("lo que estaba en stage sigue ahí: %q", st)
+	}
+	if done, err := g.Commit(ctx, []string{"specs/API-1-x/spec.md"}, "docs: otra vez"); done || err != nil {
+		t.Errorf("sin cambios no hay commit: %v %v", done, err)
+	}
+}

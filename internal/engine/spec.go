@@ -68,8 +68,11 @@ var artifacts = map[string]string{
 // Show devuelve un artefacto: una sección del spec (brief, spec --section X) o
 // un archivo de trabajo (contract, review-map, decisions, check).
 func (e *Engine) Show(ctx context.Context, id, what, section string) (string, error) {
-	if what == "task" {
+	switch what {
+	case "task":
 		return e.showTask(ctx, id)
+	case "questions":
+		return e.productQuestions(id)
 	}
 	rec, err := e.Store.Load(id)
 	if err != nil {
@@ -90,7 +93,7 @@ func (e *Engine) Show(ctx context.Context, id, what, section string) (string, er
 	}
 	rel, ok := artifacts[what]
 	if !ok {
-		return "", fmt.Errorf("no sé mostrar %q (disponibles: task, brief, spec, contract, review-map, decisions, discovery, check)", what)
+		return "", fmt.Errorf("no sé mostrar %q (disponibles: task, brief, spec, contract, review-map, questions, decisions, discovery, check)", what)
 	}
 	b, err := e.Store.ReadFile(id, rel)
 	if errors.Is(err, os.ErrNotExist) {

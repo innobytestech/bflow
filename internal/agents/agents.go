@@ -177,7 +177,7 @@ func contract(name string, phases []flow.Phase, b base) string {
 		w.WriteString("- Las pruebas del contrato quedan congeladas al aprobarse: después no se cambian. Si una está mal, reporta NEEDS_DECISION.\n")
 	}
 	if slices.Contains(phases, flow.Implementing) {
-		w.WriteString("- DONE exige `bflow check <id>` en verde sobre tu último commit. Mientras iteras, `bflow check <id> --quick <paquete>`.\n")
+		w.WriteString("- DONE exige `bflow check <id>` en verde sobre tu último commit y todas las tareas de la spec marcadas `[x]`. Mientras iteras, `bflow check <id> --quick <paquete>`.\n")
 	}
 
 	w.WriteString("- Al terminar, reporta:\n")
