@@ -200,11 +200,11 @@ func TestSpecGateShowsUIBlueprint(t *testing.T) {
 }
 
 func TestUpcoming(t *testing.T) {
-	cfg := testConfig()
+	cfg := DefaultConfig()
 	st := func(lane Lane, p Phase, g Gate) State {
 		s := State{ID: "T-1", Lane: lane, Phase: p}
 		if g != "" {
-			s.Gate = &PendingGate{Name: g}
+			s.Gate = &PendingGate{Name: g, Agent: "implementer"}
 		}
 		return s
 	}
@@ -212,21 +212,35 @@ func TestUpcoming(t *testing.T) {
 		s    State
 		want string
 	}{
-		{st(Light, Spec, ""), "gate spec"},
-		{st(Light, Spec, GateSpec), "implementing"},
-		{st(Full, Spec, GateSpec), "contract"},
-		{st(Full, Contract, GateContract), "implementing"},
-		{st(Full, Implementing, ""), "paused"},
-		{st(Light, Implementing, ""), "quality"},
-		{st(Light, Implementing, GateDecision), "sigue implementing"},
-		{st(Light, Quality, ""), "documenting"},
-		{st(Light, Walkthrough, GateQuestions), "gate walkthrough"},
-		{st(Light, Walkthrough, GateWalkthrough), "PR y in_review"},
-		{st(Light, InReview, ""), "merge del PR → done"},
-		{st(Light, Blocked, ""), "desbloquear (bflow unblock T-1)"},
+		{st(Light, Spec, ""), "spec gate=spec"},
+		{st(Light, Spec, GateSpec), "implementing agentes=implementer"},
+		{st(Full, Discovery, GateDiscovery), "spec agentes=spec-author"},
+		{st(Full, Spec, GateSpec), "contract agentes=implementer"},
+		{st(Full, Contract, ""), "contract gate=contract"},
+		{st(Full, Contract, GateContract), "implementing agentes=implementer"},
+		{st(Full, Implementing, ""), "paused gate=pause"},
+		{st(Full, Paused, GatePause), "quality agentes=reviewer"},
+		{st(Light, Implementing, ""), "quality agentes=reviewer"},
+		{st(Light, Implementing, GateDecision), "implementing agentes=implementer"},
+		{st(Light, Quality, ""), "documenting agentes=documenter"},
+		{st(Light, Documenting, ""), "walkthrough gate=questions"},
+		{st(Light, Walkthrough, GateQuestions), "walkthrough gate=walkthrough"},
+		{st(Light, Walkthrough, GateWalkthrough), "in_review merge"},
+		{st(Light, InReview, ""), "done"},
+		{st(Light, Blocked, ""), ""},
 		{st(Light, Done, ""), ""},
 	} {
-		if got := Upcoming(cfg, c.s); got != c.want {
+		u := Upcoming(cfg, c.s)
+		got := string(u.Phase)
+		switch {
+		case u.Gate != "":
+			got += " gate=" + string(u.Gate)
+		case len(u.Agents) > 0:
+			got += " agentes=" + strings.Join(u.Agents, ",")
+		case u.Merge:
+			got += " merge"
+		}
+		if got != c.want {
 			t.Errorf("%s/%s gate %v: %q, want %q", c.s.Lane, c.s.Phase, c.s.Gate, got, c.want)
 		}
 	}

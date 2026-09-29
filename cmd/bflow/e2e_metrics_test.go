@@ -194,7 +194,7 @@ func TestWatchOpen(t *testing.T) {
 		t.Errorf("con panel abierto: %v", env.Data)
 	}
 	text, _, _ := r.hook("", "watch", "--once")
-	if !strings.Contains(text, "spec · trabajando: spec-author") || !strings.Contains(text, "sigue     gate spec") {
+	if !strings.Contains(text, "AHORA    AGENTE  spec-author escribe la spec") || !strings.Contains(text, "DESPUÉS  TÚ      aprobar la spec") || !strings.Contains(text, "[spec] > implementing") {
 		t.Errorf("watch --once:\n%s", text)
 	}
 }

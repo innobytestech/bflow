@@ -125,34 +125,208 @@ func readWatch(c *Ctx) (watchData, error) {
 	return d, nil
 }
 
-// renderWatch arma el cuadro. Con rows > 0 lo ajusta a ese alto: primero
-// cambia el banner por una línea y después quita los eventos más viejos; si
-// el cuadro no cabe, el repintado deja basura en la terminal.
+// Colores del panel: el agente en cian, la persona en amarillo, lo hecho en
+// verde y lo pendiente atenuado. Sin color (NO_COLOR, un pipe) queda texto
+// plano con la fase actual entre corchetes.
+const (
+	cAgent = "1;36"
+	cHuman = "1;33"
+	cDone  = "32"
+	cDim   = "2"
+	cBold  = "1"
+)
+
+func paint(m bannerMode, code, s string) string {
+	if m != bannerColor || s == "" {
+		return s
+	}
+	return "\x1b[" + code + "m" + s + "\x1b[0m"
+}
+
+// who etiqueta quién actúa, con el mismo ancho para que el texto se alinee.
+func who(m bannerMode, human bool) string {
+	if human {
+		return paint(m, cHuman, "TÚ    ")
+	}
+	return paint(m, cAgent, "AGENTE")
+}
+
+// agentActivity es lo que hace cada agente, en palabras llanas.
+var agentActivity = map[string]string{
+	"spec-author":      "escribe la spec (brief, requisitos, diseño y tareas)",
+	"ui-designer":      "diseña el UI blueprint",
+	"reviewer":         "revisa el diff: pruebas, arquitectura y seguridad",
+	"security-auditor": "audita la seguridad del diff",
+	"ux-auditor":       "audita la interfaz contra el blueprint",
+	"documenter":       "documenta el cambio y escribe el walkthrough",
+}
+
+func activity(agents []string, phase flow.Phase) string {
+	if len(agents) == 0 {
+		return string(phase)
+	}
+	if len(agents) > 1 {
+		return strings.Join(agents, " y ") + " revisan en paralelo"
+	}
+	a := agents[0]
+	switch {
+	case a == "implementer" && phase == flow.Contract:
+		return a + " escribe el contrato: firmas y pruebas con su cuerpo"
+	case a == "implementer":
+		return a + " implementa las tareas de la spec"
+	}
+	if s, ok := agentActivity[a]; ok {
+		return a + " " + s
+	}
+	return a + " trabaja en " + string(phase)
+}
+
+// step es una línea de AHORA o DESPUÉS: quién actúa y qué hace.
+type step struct {
+	human bool
+	text  string
+	since time.Time // cuándo empezó (solo AHORA)
+}
+
+// nowStep dice quién tiene la tarea en este momento.
+func nowStep(v engine.View, evs []store.Entry) (step, bool) {
+	switch {
+	case v.Blocked != "" || v.Gate != "":
+		t := v.GateSince
+		if t.IsZero() {
+			t = since(v, evs)
+		}
+		return step{human: true, text: humanAction(v), since: t}, true
+	case v.Next.Action == output.ActionSpawn:
+		var as []string
+		for _, a := range v.Next.Agents {
+			as = append(as, a.Agent)
+		}
+		s := activity(as, v.Phase)
+		if len(v.Reported) > 0 {
+			s += " · ya reportó " + strings.Join(v.Reported, ", ")
+		}
+		return step{text: s, since: since(v, evs)}, true
+	case v.Phase == flow.InReview:
+		return step{human: true, text: "revisar y hacer merge del PR", since: since(v, evs)}, true
+	}
+	return step{}, false
+}
+
+// nextStep dice qué viene después si todo sale bien.
+func nextStep(v engine.View) (step, bool) {
+	u := v.Upcoming
+	switch {
+	case u.Gate != "":
+		return step{human: true, text: gateAction[string(u.Gate)]}, true
+	case len(u.Agents) > 0:
+		return step{text: activity(u.Agents, u.Phase)}, true
+	case u.Merge:
+		return step{human: true, text: "revisar y hacer merge del PR"}, true
+	}
+	return step{}, false
+}
+
+// progress es la línea del carril: lo hecho, la fase actual y lo que falta,
+// partida para que quepa en width columnas.
+func progress(m bannerMode, v engine.View, width int) []string {
+	cur := slices.Index(v.Phases, v.Phase)
+	waiting := v.Gate != "" || v.Blocked != ""
+	var parts []string
+	var widths []int
+	for i, p := range v.Phases {
+		if p == flow.Done {
+			continue
+		}
+		name := string(p)
+		switch {
+		case i == cur && m != bannerColor:
+			name = "[" + name + "]"
+		case i == cur && waiting:
+			name = paint(m, cHuman, name)
+		case i == cur:
+			name = paint(m, cAgent, name)
+		case cur >= 0 && i < cur:
+			name = paint(m, cDone, name)
+		default:
+			name = paint(m, cDim, name)
+		}
+		parts = append(parts, name)
+		widths = append(widths, len([]rune(string(p)))+map[bool]int{true: 2}[i == cur && m != bannerColor])
+	}
+	sep := " " + paint(m, cDim, ">") + " "
+	var lines []string
+	line, w := "", 0
+	for i, p := range parts {
+		add := widths[i]
+		if w > 0 {
+			add += 3
+		}
+		if w > 0 && w+add > width {
+			lines = append(lines, line+sep)
+			line, w = "", 0
+			add = widths[i]
+		}
+		if w > 0 {
+			line += sep
+		}
+		line += p
+		w += add
+	}
+	if line != "" {
+		lines = append(lines, line)
+	}
+	return lines
+}
+
+// renderWatch arma el cuadro. Con rows > 0 lo ajusta a ese alto quitando los
+// eventos más viejos: si el cuadro no cabe, el repintado deja basura.
 func renderWatch(m bannerMode, version string, d watchData, now time.Time, rows int) string {
 	var b, tail strings.Builder
+	line := func(s string) { b.WriteString("  " + s + "\n") }
 	label := func(l, v string) { dimLabel(&b, m, l, v) }
-	label("repo", d.Repo+" · "+now.Format("15:04:05"))
+	brand := "bflow"
+	if m == bannerColor {
+		brand = fmt.Sprintf("\x1b[1;38;2;%d;%d;%dmbflow\x1b[0m", gradTo[0], gradTo[1], gradTo[2])
+	}
+	line(brand + paint(m, cDim, " by innobytes.tech · "+version+" · "+d.Repo+" · "+now.Format("15:04:05")))
+	b.WriteString("\n")
 	var events []string
 	if d.Active == nil {
-		label("tarea", "ninguna en curso · bflow start <ID> --lane full|light|hotfix")
+		line("Ninguna tarea en curso. Empieza una con bflow start <ID> --lane full|light|hotfix")
 	} else {
 		v, st := *d.Active, d.Stats
-		task := v.ID
+		task := paint(m, cBold, v.ID)
 		if v.Lane != "" {
-			task += " · " + string(v.Lane)
+			task += " · carril " + string(v.Lane)
 		}
 		if v.Round > 0 {
 			task += fmt.Sprintf(" · ronda %d", v.Round)
 		}
-		label("tarea", task)
+		line(task)
 		if v.Title != "" {
-			label("", truncate(v.Title, 70))
+			line(truncate(v.Title, 76))
 		}
-		label("ahora", highlight(m, v, currentStep(v, d.Events, now)))
-		if v.Upcoming != "" {
-			label("sigue", v.Upcoming)
+		b.WriteString("\n")
+		for _, l := range progress(m, v, 74) {
+			line(l)
 		}
-		t := dur(st.Total) + " · agente " + dur(st.Agent) + " · humano " + dur(st.Human)
+		b.WriteString("\n")
+		if s, ok := nowStep(v, d.Events); ok {
+			text := s.text
+			if !s.since.IsZero() {
+				text += paint(m, cDim, " · "+map[bool]string{true: "esperando ", false: ""}[s.human]+"hace "+dur(max(now.Sub(s.since), time.Second)))
+			}
+			if s.human {
+				text = paint(m, cHuman, s.text) + strings.TrimPrefix(text, s.text)
+			}
+			line(paint(m, cBold, "AHORA  ") + "  " + who(m, s.human) + "  " + text)
+		}
+		if s, ok := nextStep(v); ok {
+			line(paint(m, cBold, "DESPUÉS") + "  " + who(m, s.human) + "  " + s.text)
+		}
+		b.WriteString("\n")
+		t := dur(st.Total) + " · agentes " + dur(st.Agent) + " · tú " + dur(st.Human)
 		if st.Blocked > 0 {
 			t += " · bloqueada " + dur(st.Blocked)
 		}
@@ -183,30 +357,23 @@ func renderWatch(m bannerMode, version string, d watchData, now time.Time, rows 
 				w = 11
 			}
 			for i := len(evs) - 1; i >= 0; i-- {
-				events = append(events, fmt.Sprintf("  %-*s %s", w, eventTime(evs[i].TS, now), describeEvent(evs[i])))
+				events = append(events, fmt.Sprintf("  %s %s", paint(m, cDim, fmt.Sprintf("%-*s", w, eventTime(evs[i].TS, now))), describeEvent(evs[i])))
 			}
 		}
 	}
 	watchOthers(&tail, m, d.Others)
 
-	head := ""
-	if m != bannerOff {
-		head = renderBanner(m, version) + "\n"
-	}
 	lines := func() int {
-		n := strings.Count(head, "\n") + strings.Count(b.String(), "\n") + strings.Count(tail.String(), "\n")
+		n := strings.Count(b.String(), "\n") + strings.Count(tail.String(), "\n")
 		if len(events) > 0 {
 			n += len(events) + 1
 		}
 		return n
 	}
-	if rows > 0 && lines() > rows && head != "" {
-		head = compactBanner(m, version) + "\n\n"
-	}
 	for rows > 0 && lines() > rows && len(events) > 0 {
 		events = events[:len(events)-1]
 	}
-	out := head + b.String()
+	out := b.String()
 	if len(events) > 0 {
 		out += "\n" + strings.Join(events, "\n") + "\n"
 	}
@@ -231,43 +398,6 @@ func watchOthers(b *strings.Builder, m bannerMode, others []engine.View) {
 	}
 }
 
-// currentStep dice quién tiene la tarea y desde cuándo.
-func currentStep(v engine.View, evs []store.Entry, now time.Time) string {
-	ago := func(t time.Time) string {
-		if t.IsZero() {
-			return ""
-		}
-		return " · hace " + dur(max(now.Sub(t), time.Second))
-	}
-	phase := string(v.Phase)
-	switch {
-	case v.Blocked != "":
-		return "bloqueada: " + v.Blocked + ago(since(v, evs))
-	case v.Gate != "":
-		t := v.GateSince
-		if t.IsZero() {
-			t = since(v, evs)
-		}
-		return phase + " · esperando tu decisión: gate " + v.Gate + ago(t)
-	case v.Next.Action == output.ActionSpawn:
-		var as []string
-		for _, a := range v.Next.Agents {
-			as = append(as, a.Agent)
-		}
-		s := phase + " · trabajando: " + strings.Join(as, ", ") + ago(since(v, evs))
-		if len(v.Reported) > 0 {
-			s += " · listos: " + strings.Join(v.Reported, ", ")
-		}
-		return s
-	case v.Phase == flow.InReview:
-		return phase + " · esperando el merge del PR" + ago(since(v, evs))
-	}
-	if v.Next.Reason != "" {
-		return phase + " · " + v.Next.Reason
-	}
-	return phase + " · " + nextLabel(v)
-}
-
 // since es cuándo empezó el paso actual: la entrada a la fase o, si después
 // se resolvió una gate sin cambiar de fase (una decisión), esa resolución.
 func since(v engine.View, evs []store.Entry) time.Time {
@@ -281,14 +411,6 @@ func since(v engine.View, evs []store.Entry) time.Time {
 		}
 	}
 	return t
-}
-
-// highlight resalta lo que pide a la persona actuar.
-func highlight(m bannerMode, v engine.View, s string) string {
-	if m != bannerColor || (v.Gate == "" && v.Blocked == "") {
-		return s
-	}
-	return "\x1b[1;33m" + s + "\x1b[0m"
 }
 
 func sameDay(a, b time.Time) bool {
@@ -335,6 +457,8 @@ func describeEvent(e store.Entry) string {
 		return fmt.Sprintf("el flujo rechazó %v (%v)", e.Data["event"], e.Data["code"])
 	case "nudge":
 		return e.Agent + " terminó sin reportar"
+	case "refreeze":
+		return "pruebas congeladas otra vez (bflow freeze)"
 	}
 	return e.Event + note + arrow
 }

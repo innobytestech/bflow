@@ -220,40 +220,65 @@ func spawnNext(cfg Config, s State) output.Next {
 	return n
 }
 
-// Upcoming dice qué viene después del paso actual si todo sale bien: la gate
-// que se abre o la fase que sigue. Es para el panel de una persona, no para la
-// sesión.
-func Upcoming(cfg Config, s State) string {
-	if s.Gate != nil {
-		switch s.Gate.Name {
-		case GateDiscovery:
-			return string(cfg.after(s.Lane, Discovery))
-		case GateSpec:
-			return string(cfg.after(s.Lane, Spec))
-		case GateContract:
-			return string(cfg.after(s.Lane, Contract))
-		case GatePause:
-			return string(cfg.after(s.Lane, Paused))
-		case GateQuestions:
-			return "gate " + string(GateWalkthrough)
-		case GateWalkthrough:
-			return "PR y " + string(cfg.after(s.Lane, Walkthrough))
-		case GateSplit:
-			return "bloquear y dividir la feature"
+// Step es lo que viene después del paso actual, para el panel de una persona:
+// una gate que decide ella, agentes que trabajan en una fase, o el merge.
+type Step struct {
+	Phase  Phase
+	Gate   Gate     // decide la persona
+	Agents []string // o trabajan estos agentes
+	Merge  bool     // o se espera el merge del PR
+}
+
+// Upcoming dice qué viene después del paso actual si todo sale bien. Vacío
+// si no hay un siguiente paso claro (terminada, bloqueada).
+func Upcoming(cfg Config, s State) Step {
+	enter := func(p Phase) Step {
+		switch p {
+		case Discovery:
+			return Step{Phase: p, Gate: GateDiscovery}
+		case Paused:
+			return Step{Phase: p, Gate: GatePause}
+		case Walkthrough:
+			return Step{Phase: p, Gate: GateQuestions}
+		case InReview:
+			return Step{Phase: p, Merge: true}
+		case Done:
+			return Step{Phase: p}
 		}
-		return "sigue " + string(s.Phase) // decision, rounds: el agente retoma
+		return Step{Phase: p, Agents: cfg.Agents[p]}
+	}
+	if g := s.Gate; g != nil {
+		switch g.Name {
+		case GateDiscovery:
+			return enter(cfg.after(s.Lane, Discovery))
+		case GateSpec:
+			return enter(cfg.after(s.Lane, Spec))
+		case GateContract:
+			return enter(cfg.after(s.Lane, Contract))
+		case GatePause:
+			return enter(cfg.after(s.Lane, Paused))
+		case GateQuestions:
+			return Step{Phase: Walkthrough, Gate: GateWalkthrough}
+		case GateWalkthrough:
+			return enter(cfg.after(s.Lane, Walkthrough))
+		case GateSplit:
+			return Step{}
+		}
+		agents := cfg.Agents[s.Phase] // decision, rounds: el agente retoma
+		if g.Agent != "" {
+			agents = []string{g.Agent}
+		}
+		return Step{Phase: s.Phase, Agents: agents}
 	}
 	switch s.Phase {
-	case Blocked:
-		return "desbloquear (bflow unblock " + s.ID + ")"
 	case Spec:
-		return "gate " + string(GateSpec)
+		return Step{Phase: Spec, Gate: GateSpec}
 	case Contract:
-		return "gate " + string(GateContract)
+		return Step{Phase: Contract, Gate: GateContract}
 	case InReview:
-		return "merge del PR → done"
-	case Done, Backlog:
-		return ""
+		return Step{Phase: Done}
+	case Implementing, Quality, Documenting:
+		return enter(cfg.after(s.Lane, s.Phase))
 	}
-	return string(cfg.after(s.Lane, s.Phase))
+	return Step{}
 }

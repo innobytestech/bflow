@@ -149,9 +149,10 @@ type View struct {
 	TrackerPhase flow.Phase  `json:"tracker_phase,omitempty"`
 	Next         output.Next `json:"-"`
 	// Para el panel de una persona (bflow watch); no van en la salida de status.
-	Upcoming  string    `json:"-"` // qué viene si todo sale bien
-	Reported  []string  `json:"-"` // agentes que ya reportaron en esta fase
-	GateSince time.Time `json:"-"`
+	Upcoming  flow.Step    `json:"-"` // qué viene si todo sale bien
+	Phases    []flow.Phase `json:"-"` // las del carril, en orden
+	Reported  []string     `json:"-"` // agentes que ya reportaron en esta fase
+	GateSince time.Time    `json:"-"`
 }
 
 // Status devuelve la vista de una tarea, empezada o no.
@@ -177,7 +178,8 @@ func (e *Engine) Status(ctx context.Context, id string) (View, error) {
 func (e *Engine) view(rec store.Record) View {
 	v := View{ID: rec.Flow.ID, Title: rec.Title, URL: rec.URL, Lane: rec.Flow.Lane, Phase: rec.Flow.Phase, Round: rec.Flow.Round,
 		Since: &rec.Since, Branch: rec.Branch, PR: rec.PR, Pending: len(rec.Pending), Started: true,
-		Next: flow.NextFor(e.flowCfg(), rec.Flow), Upcoming: flow.Upcoming(e.flowCfg(), rec.Flow), GateSince: rec.GateSince}
+		Next: flow.NextFor(e.flowCfg(), rec.Flow), Upcoming: flow.Upcoming(e.flowCfg(), rec.Flow), GateSince: rec.GateSince,
+		Phases: e.flowCfg().Lanes[rec.Flow.Lane]}
 	for _, a := range slices.Sorted(maps.Keys(rec.Flow.Reports)) {
 		v.Reported = append(v.Reported, a)
 	}
