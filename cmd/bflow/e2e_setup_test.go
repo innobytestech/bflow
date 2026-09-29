@@ -111,6 +111,31 @@ func TestInitAngularInteractiveWithProfile(t *testing.T) {
 	}
 }
 
+// Qué abrir al empezar una tarea se pregunta una vez por máquina y va a la
+// config global; en CI o sin escritorio no se pregunta.
+func TestInitAsksPanelOnce(t *testing.T) {
+	r := newRepo(t)
+	t.Setenv("CI", "")
+	t.Setenv("DISPLAY", ":0") // Linux sin escritorio no pregunta
+	t.Setenv("SSH_CONNECTION", "")
+	os.WriteFile(filepath.Join(r.dir, "Makefile"), []byte("test:\n\tgo test\n"), 0o644)
+	// tracker local (1), rama base por defecto, usar pasos (s), solo el panel (2).
+	out, code := r.runIn("1\n\ns\n2\n", "init")
+	if code != 0 || !strings.Contains(out, "¿qué abro?") || !strings.Contains(out, "al empezar una tarea: solo el panel") {
+		t.Fatalf("init (exit %d):\n%s", code, out)
+	}
+	g := readFile(t, filepath.Join(os.Getenv("BFLOW_CONFIG_HOME"), "config.yaml"))
+	if !strings.Contains(g, "watch: true") || !strings.Contains(g, "web: false") {
+		t.Errorf("config global:\n%s", g)
+	}
+	// Otro repo en la misma máquina: ya no pregunta.
+	other := &repo{t: t, dir: testutil.TempDir(t)}
+	os.WriteFile(filepath.Join(other.dir, "Makefile"), []byte("test:\n\tgo test\n"), 0o644)
+	if out, code := other.runIn("1\n\ns\n", "init"); code != 0 || strings.Contains(out, "¿qué abro?") {
+		t.Errorf("segundo init (exit %d):\n%s", code, out)
+	}
+}
+
 func TestInitDryRunWritesNothing(t *testing.T) {
 	r := newRepo(t)
 	os.WriteFile(filepath.Join(r.dir, "Makefile"), []byte("test:\n\tgo test\nbuild:\n\tgo build\n"), 0o644)

@@ -255,7 +255,7 @@ La skill tiene unas 30 líneas: no contiene reglas del flujo, solo cómo interpr
 API-12 · implementing · 1h42m · ronda 1 · 145k nuevos · 2.9M caché
 ```
 
-Para seguir la tarea sin leer la conversación, `bflow watch` es un panel en vivo en otra terminal: quién trabaja y desde cuándo, o qué gate espera tu decisión; lo que sigue; tiempos por fase; tokens por agente; fricción, y los últimos eventos. `bflow watch --open` lo abre en otra pestaña o ventana (Windows Terminal, PowerShell, Terminal de macOS o la terminal de Linux) si no hay uno abierto. Con `ui: { watch: true }`, `bflow start` lo abre solo; nunca en CI ni sin escritorio. Como es una preferencia personal, puede ir en la config global en lugar de `bflow.yaml`.
+Para seguir la tarea sin leer la conversación, `bflow watch` es un panel en vivo en otra terminal: quién trabaja y desde cuándo, o qué gate espera tu decisión; lo que sigue; tiempos por fase; tokens por agente; fricción, y los últimos eventos. `bflow watch --open` lo abre en otra pestaña o ventana (Windows Terminal, PowerShell, Terminal de macOS o la terminal de Linux) si no hay uno abierto. Con `ui: { watch: true }`, `bflow start` lo abre solo; nunca en CI ni sin escritorio. Como es una preferencia personal, va en la config global, no en `bflow.yaml`. El primer `bflow init` en cada máquina pregunta qué abrir y guarda la respuesta ahí: panel y navegador, solo el panel o nada. No vuelve a preguntar, pero puedes cambiarla editando `ui:`.
 
 `bflow ui` muestra el panel en el navegador, en una página local de solo lectura.
 - **Tablero.** Arriba, quién tiene la tarea ahora y qué sigue.

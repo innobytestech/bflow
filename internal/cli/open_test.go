@@ -53,6 +53,25 @@ func TestTerminalCmd(t *testing.T) {
 	}
 }
 
+func TestDesktop(t *testing.T) {
+	for _, c := range []struct {
+		goos string
+		env  func(string) string
+		ok   bool
+	}{
+		{"windows", env(), true},
+		{"windows", env("CI", "true"), false},
+		{"darwin", env(), true},
+		{"darwin", env("SSH_CONNECTION", "1 2 3 4"), false},
+		{"linux", env(), false},
+		{"linux", env("WAYLAND_DISPLAY", "wayland-0"), true},
+	} {
+		if err := desktop(c.goos, c.env); (err == nil) != c.ok || (err != nil && !errors.Is(err, errNoDesktop)) {
+			t.Errorf("%s: %v", c.goos, err)
+		}
+	}
+}
+
 func TestWatchHeartbeat(t *testing.T) {
 	dir := testutil.TempDir(t)
 	now := time.Now()

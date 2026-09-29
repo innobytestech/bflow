@@ -118,6 +118,27 @@ func init() {
 	Register(&Command{Name: "doctor", Summary: "valida config, herramientas, conexiones, entorno y hooks", Run: runDoctor})
 }
 
+// panelChoice es la respuesta a qué abrir al empezar una tarea. La página
+// la sirve la ventana del panel, así que no hay navegador sin terminal.
+type panelChoice struct {
+	label, summary string
+	watch, web     bool
+}
+
+var panelChoices = []panelChoice{
+	{"el panel en otra terminal y su página en el navegador", "panel y navegador", true, true},
+	{"solo el panel en otra terminal", "solo el panel", true, false},
+	{"nada: los abro yo (bflow watch --open, bflow ui)", "nada", false, false},
+}
+
+func panelLabels() []string {
+	var out []string
+	for _, p := range panelChoices {
+		out = append(out, p.label)
+	}
+	return out
+}
+
 func runInit(c *Ctx) output.Envelope {
 	ctx := context.Background()
 	root := config.FindRoot(c.Dir)
@@ -235,6 +256,16 @@ func runInit(c *Ctx) output.Envelope {
 		}
 	}
 
+	// Qué se abre al empezar una tarea es de la persona, no del repo: se
+	// pregunta una vez por máquina y va a la config global.
+	var panel *panelChoice
+	if !p.yes && !c.DryRun && desktop(goos, os.Getenv) == nil {
+		if decided, err := config.UIDecided(); err == nil && !decided {
+			pc := panelChoices[p.choose("Al empezar una tarea, ¿qué abro? (es tuya: va a tu config global, no al repo)", panelLabels(), 0)]
+			panel = &pc
+		}
+	}
+
 	y, err := setup.RenderYAML(a, prof)
 	if err != nil {
 		return output.Fail("render", err)
@@ -255,6 +286,15 @@ func runInit(c *Ctx) output.Envelope {
 		return output.Fail("invalid", fmt.Errorf("el bflow.yaml generado no es válido (repórtalo): %w", err))
 	}
 	_ = config.RememberRepo(root)
+	panelText := ""
+	if panel != nil {
+		if err := config.SaveUI(map[string]any{"watch": panel.watch, "web": panel.web}); err != nil {
+			fmt.Fprintln(c.Stderr, "no se pudo guardar qué abrir al empezar una tarea:", err)
+		} else {
+			data["ui"] = map[string]bool{"watch": panel.watch, "web": panel.web}
+			panelText = "\nal empezar una tarea: " + panel.summary + " (ui: en " + config.GlobalPath() + ")"
+		}
+	}
 	var next []string
 	if a.Tracker == "plane" {
 		next = append(next, "bflow connect plane (si aún no hay token)", "bflow tracker setup --dry-run")
@@ -267,8 +307,8 @@ func runInit(c *Ctx) output.Envelope {
 	}
 	next = append(next, "bflow doctor")
 	env := output.OK("initialized", data, nil)
-	env.Text = fmt.Sprintf("bflow.yaml creado · stack %s · tracker %s · base %s · %d pasos de check\nsiguiente:\n  %s",
-		orDash(a.Stack), a.Tracker, orDash(a.BaseBranch), len(a.Steps), strings.Join(next, "\n  "))
+	env.Text = fmt.Sprintf("bflow.yaml creado · stack %s · tracker %s · base %s · %d pasos de check%s\nsiguiente:\n  %s",
+		orDash(a.Stack), a.Tracker, orDash(a.BaseBranch), len(a.Steps), panelText, strings.Join(next, "\n  "))
 	if m := bannerFor(c); m != bannerOff {
 		env.Text = renderBanner(m, c.Version) + "\n" + env.Text
 	}

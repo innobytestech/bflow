@@ -23,6 +23,20 @@ var goos = runtime.GOOS
 
 var errNoDesktop = errors.New("sin escritorio")
 
+// desktop dice por qué no hay escritorio donde abrir ventanas (nil si lo
+// hay): CI, una sesión SSH o Linux sin DISPLAY.
+func desktop(goos string, getenv func(string) string) error {
+	switch {
+	case getenv("CI") != "":
+		return fmt.Errorf("%w: CI", errNoDesktop)
+	case goos != "windows" && getenv("SSH_CONNECTION") != "":
+		return fmt.Errorf("%w: sesión SSH", errNoDesktop)
+	case goos != "windows" && goos != "darwin" && getenv("DISPLAY") == "" && getenv("WAYLAND_DISPLAY") == "":
+		return fmt.Errorf("%w: no hay DISPLAY ni WAYLAND_DISPLAY", errNoDesktop)
+	}
+	return nil
+}
+
 // terminalCmd arma el comando que abre una ventana o pestaña con `bflow
 // watch` (y --web si web) en dir. No abre nada en CI ni sin escritorio (SSH,
 // Linux sin DISPLAY). lookPath dice qué programas hay; wtProfile es el perfil

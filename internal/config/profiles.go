@@ -62,12 +62,43 @@ func SaveProfile(name string, values map[string]any) error {
 	cur, _ := profiles[name].(map[string]any)
 	profiles[name] = deepMerge(cur, values)
 	m["profiles"] = profiles
+	if err := writeGlobal(m); err != nil {
+		return fmt.Errorf("perfil inválido: %w", err)
+	}
+	return nil
+}
+
+// UIDecided dice si la persona ya eligió qué se abre al empezar una tarea
+// (ui.watch o ui.web en la configuración global, aunque sea en false).
+func UIDecided() (bool, error) {
+	m, err := readGlobalMap()
+	if err != nil {
+		return false, err
+	}
+	ui, _ := m["ui"].(map[string]any)
+	_, watch := ui["watch"]
+	_, web := ui["web"]
+	return watch || web, nil
+}
+
+// SaveUI combina values en ui de la configuración global.
+func SaveUI(values map[string]any) error {
+	m, err := readGlobalMap()
+	if err != nil {
+		return err
+	}
+	cur, _ := m["ui"].(map[string]any)
+	m["ui"] = deepMerge(cur, values)
+	return writeGlobal(m)
+}
+
+func writeGlobal(m map[string]any) error {
 	b, err := yaml.Marshal(m)
 	if err != nil {
 		return err
 	}
 	if err := strictDecode(b, &globalFile{}); err != nil {
-		return fmt.Errorf("perfil inválido: %w", err)
+		return err
 	}
 	if err := os.MkdirAll(GlobalDir(), 0o755); err != nil {
 		return err

@@ -31,6 +31,29 @@ func TestSaveAndLoadProfiles(t *testing.T) {
 	}
 }
 
+func TestSaveUI(t *testing.T) {
+	t.Setenv("BFLOW_CONFIG_HOME", t.TempDir())
+	SaveProfile("acme", map[string]any{"agent": "claude"})
+	if d, err := UIDecided(); err != nil || d {
+		t.Fatalf("sin elegir: %v %v", d, err)
+	}
+	// "nada" también es una decisión: no se vuelve a preguntar.
+	if err := SaveUI(map[string]any{"watch": false, "web": false}); err != nil {
+		t.Fatal(err)
+	}
+	if d, _ := UIDecided(); !d {
+		t.Error("ui.watch en false cuenta como decidido")
+	}
+	SaveUI(map[string]any{"watch": true, "web": true})
+	c, err := Load(t.TempDir())
+	if err != nil || !c.UI.Watch || !c.UI.Web {
+		t.Errorf("ui: %+v %v", c.UI, err)
+	}
+	if ps, _ := LoadProfiles(); ps["acme"].Agent != "claude" {
+		t.Error("guardar ui conserva los perfiles")
+	}
+}
+
 func TestSetRepoProfileKeepsComments(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, RepoFile)

@@ -106,7 +106,7 @@ Tus reglas de arquitectura en CLAUDE.md o en los documentos de `read` son bienve
 
 ## Medir
 
-Mientras trabajas, `bflow watch --open` abre en otra ventana un panel en vivo: el paso actual (quién trabaja o qué gate te espera), lo que sigue, tiempos, tokens por agente y los últimos eventos. Para que `bflow start` lo abra solo, pon `ui: { watch: true }` en tu config global (`%AppData%\bflow\config.yaml` en Windows, `~/.config/bflow/config.yaml` en Linux y macOS) o en `bflow.yaml`.
+Mientras trabajas, `bflow watch --open` abre en otra ventana un panel en vivo: el paso actual (quién trabaja o qué gate te espera), lo que sigue, tiempos, tokens por agente y los últimos eventos. Para que `bflow start` lo abra solo, pon `ui: { watch: true }` en tu config global (`%AppData%\bflow\config.yaml` en Windows, `~/.config/bflow/config.yaml` en Linux y macOS) o en `bflow.yaml`. El primer `bflow init` en tu máquina te lo pregunta y lo guarda en la config global.
 
 Si prefieres el navegador, `bflow ui` abre lo mismo en una página local. En ella está la línea del carril: cada fase es una estación y el tren está en la actual. La página también muestra todos los repos donde usaste bflow, agrupados por perfil, así que si trabajas en varios ves en cuál te toca. Con `ui: { web: true }` en la config global, la ventana del panel la abre sola al empezar una tarea, y solo una vez aunque tengas varios paneles abiertos.
 
