@@ -49,7 +49,7 @@ var catalog = map[string]base{
 	"spec-author":      {"Escribe la spec de la tarea (brief, requirements, design, tasks) a partir de la descripción y el discovery.", "", "medium", nil, true},
 	"ui-designer":      {"Diseña el UI blueprint de la spec anclado a las pantallas hermanas del repo.", "", "medium", nil, true},
 	"implementer":      {"Escribe el contrato (pruebas y firmas) y después implementa las tareas de la spec.", "sonnet", "medium", []string{"contract.md", "reports/impl.md"}, false},
-	"reviewer":         {"Revisa trazabilidad, pruebas y arquitectura del diff y escribe el review-map.", "sonnet", "medium", []string{"reports/review-map.md"}, false},
+	"reviewer":         {"Revisa trazabilidad, pruebas, arquitectura y seguridad del diff y escribe el review-map.", "sonnet", "medium", []string{"reports/review-map.md"}, false},
 	"security-auditor": {"Audita seguridad, resiliencia y rendimiento del código nuevo de la rama.", "sonnet", "medium", []string{"reports/security.md"}, false},
 	"ux-auditor":       {"Audita la interfaz nueva contra el UI blueprint y las guías del repo.", "sonnet", "medium", []string{"reports/ux.md"}, false},
 	"documenter":       {"Documenta el cambio y escribe el walkthrough del PR.", "haiku", "low", []string{"walkthrough.md", "consumer-changelog.md"}, false},

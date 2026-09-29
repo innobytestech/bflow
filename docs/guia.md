@@ -63,13 +63,15 @@ Para agregar un agente propio (por ejemplo, un auditor de rendimiento), súmalo 
 ```yaml
 flow:
   agents:
-    quality: [reviewer, security-auditor, perf-auditor]
+    quality: [reviewer, perf-auditor]
 agents:
   perf-auditor:
     extra: docs/bflow/perf-auditor.md
 ```
 
 bflow le antepone el contrato: en quality escribe `reports/perf-auditor.md` y reporta APPROVED o REJECTED.
+
+En quality trabaja por defecto solo el reviewer, que revisa también seguridad, resiliencia y rendimiento. Si quieres una segunda mirada de seguridad con su propio agente, pon `flow: { security_audit: true }`: suma el `security-auditor`, que corre en paralelo con el reviewer y cuesta sus propios tokens.
 
 ## Skills: cuáles convienen y cuáles chocan
 

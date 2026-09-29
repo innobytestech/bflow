@@ -64,7 +64,7 @@ func DefaultConfig() Config {
 			Spec:         {"spec-author"},
 			Contract:     {"implementer"},
 			Implementing: {"implementer"},
-			Quality:      {"reviewer", "security-auditor"},
+			Quality:      {"reviewer"}, // con security_audit: true se suma security-auditor
 			Documenting:  {"documenter"},
 		},
 		MaxQualityRounds: 2,

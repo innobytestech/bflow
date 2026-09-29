@@ -287,3 +287,34 @@ func TestUIWatchIsPersonal(t *testing.T) {
 		t.Errorf("en bflow.yaml: %v", err)
 	}
 }
+
+func TestSecurityAuditAddsSeparateAuditor(t *testing.T) {
+	for _, c := range []struct {
+		yaml string
+		want []string
+	}{
+		{"stack: go\n", []string{"reviewer"}},
+		{"stack: go\nflow: { security_audit: true }\n", []string{"reviewer", "security-auditor"}},
+		{"stack: go\nflow: { security_audit: false }\n", []string{"reviewer"}},
+		{"stack: angular\nflow: { security_audit: true }\n", []string{"reviewer", "ux-auditor", "security-auditor"}},
+	} {
+		cfg, err := Load(fixture(t, "", c.yaml))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if q := cfg.Flow.Core().Agents[flow.Quality]; !slices.Equal(q, c.want) {
+			t.Errorf("%q: %v, want %v", c.yaml, q, c.want)
+		}
+	}
+}
+
+func TestSecurityAuditorConfigAfterFusion(t *testing.T) {
+	// Un repo que ajustó al security-auditor: el error dice cómo seguir.
+	_, err := Load(fixture(t, "", "stack: go\nagents:\n  security-auditor:\n    extra: docs/sec.md\n"))
+	if err == nil || !strings.Contains(err.Error(), "Pasa su read y extra a agents.reviewer, o pon flow.security_audit: true") {
+		t.Errorf("error: %v", err)
+	}
+	if _, err := Load(fixture(t, "", "stack: go\nflow: { security_audit: true }\nagents:\n  security-auditor:\n    extra: docs/sec.md\n")); err != nil {
+		t.Errorf("con security_audit: true sus ajustes valen: %v", err)
+	}
+}

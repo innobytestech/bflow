@@ -147,7 +147,6 @@ func TestGitAndGitHubEndToEnd(t *testing.T) {
 	os.WriteFile(specAbs, []byte(strings.Replace(doc, "- [ ] T2", "- [x] T2", 1)), 0o644)
 	r.ok("report", "--agent", "implementer", "--verdict", "DONE") // tarea activa por rama
 	r.ok("report", "--agent", "reviewer", "--verdict", "APPROVED")
-	r.ok("report", "--agent", "security-auditor", "--verdict", "APPROVED")
 	os.MkdirAll(filepath.Join(r.dir, ".bflow", "tasks", id, "reports"), 0o755)
 	os.WriteFile(filepath.Join(r.dir, ".bflow", "tasks", id, "reports", "review-map.md"), []byte("🔴 internal/b.go: validación nueva\n"), 0o644)
 	r.ok("report", "--agent", "documenter", "--verdict", "DONE")
@@ -195,7 +194,6 @@ func TestPRDegradesWithoutToken(t *testing.T) {
 	r.ok("start", id, "--lane", "hotfix")
 	r.ok("report", "--agent", "implementer", "--verdict", "DONE")
 	r.ok("report", "--agent", "reviewer", "--verdict", "APPROVED")
-	r.ok("report", "--agent", "security-auditor", "--verdict", "APPROVED")
 	r.ok("report", "--agent", "documenter", "--verdict", "DONE")
 	r.ok("approve", "--gate", "questions")
 	env := r.ok("approve", "--gate", "walkthrough")

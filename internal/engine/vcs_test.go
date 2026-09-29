@@ -100,7 +100,6 @@ func toWalkthrough(t *testing.T, v *env, id string) {
 	m(v.e.Start(ctx, id, flow.Hotfix, "", ""))
 	m(v.e.Report(ctx, id, ReportOpts{Agent: "implementer", Verdict: flow.DoneV}))
 	m(v.e.Report(ctx, id, ReportOpts{Agent: "reviewer", Verdict: flow.Approved}))
-	m(v.e.Report(ctx, id, ReportOpts{Agent: "security-auditor", Verdict: flow.Approved}))
 	m(v.e.Report(ctx, id, ReportOpts{Agent: "documenter", Verdict: flow.DoneV}))
 	m(v.e.Approve(ctx, id, ApproveOpts{Gate: "questions"})) // saltar las preguntas de producto
 }

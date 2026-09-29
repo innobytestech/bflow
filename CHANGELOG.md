@@ -25,6 +25,7 @@ Los cambios de bflow que ve quien lo usa. Las versiones siguen [semver](https://
 
 ### Cambiado
 
+- **Quality lleva por defecto solo al reviewer**, que revisa también seguridad, resiliencia y rendimiento y deja sus hallazgos en `reports/security.md`. El `security-auditor` pasa a ser opcional: `flow.security_audit: true` lo suma. Al actualizar, `bflow render` borra `bflow-security-auditor.md` si el repo no lo activa. Si el repo tenía ajustes en `agents.security-auditor`, la config falla con un error que dice qué hacer: pasarlos a `agents.reviewer` o poner `flow.security_audit: true`.
 - `stats` y la barra de estado separan los tokens nuevos de la caché leída ("145k nuevos · 2.9M caché"). El total anterior mezclaba ambos: en la piloto, 2.9M de 3.1M eran caché, que cuesta cerca del 10% de la entrada.
 - `hook tokens` en `Stop` lee solo el transcript de la sesión principal y reparte cada respuesta en la fase en que ocurrió; en `SubagentStop`, solo el del subagente (`agent_transcript_path`).
 - Con UI, la gate de spec muestra también el UI blueprint.

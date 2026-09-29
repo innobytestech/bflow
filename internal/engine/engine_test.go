@@ -149,10 +149,9 @@ func TestFullLaneEndToEnd(t *testing.T) {
 	}
 	mustT(t)(v.e.Approve(ctx, id, ApproveOpts{}))
 	o = mustT(t)(v.e.Report(ctx, id, ReportOpts{Agent: "reviewer", Verdict: flow.Approved}))
-	if o.To != "" || phaseOf(t, v, id) != flow.Quality {
-		t.Fatalf("primer revisor no debe mover la fase: %+v", o)
+	if o.To != flow.Documenting {
+		t.Fatalf("el reviewer solo cierra quality: %+v", o)
 	}
-	mustT(t)(v.e.Report(ctx, id, ReportOpts{Agent: "security-auditor", Verdict: flow.Approved}))
 	o = mustT(t)(v.e.Report(ctx, id, ReportOpts{Agent: "documenter", Verdict: flow.DoneV}))
 	if o.Next.Gate != "questions" {
 		t.Fatalf("primero las preguntas de producto: %+v", o.Next)

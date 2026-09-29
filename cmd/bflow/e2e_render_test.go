@@ -10,7 +10,7 @@ import (
 func TestRenderAgents(t *testing.T) {
 	r := newRepo(t)
 	cfg := filepath.Join(r.dir, "bflow.yaml")
-	os.WriteFile(cfg, []byte("stack: go\nagents:\n  implementer:\n    read: [docs/architecture/]\n"), 0o644)
+	os.WriteFile(cfg, []byte("stack: go\nflow: { security_audit: true }\nagents:\n  implementer:\n    read: [docs/architecture/]\n"), 0o644)
 	agentsDir := filepath.Join(r.dir, ".claude", "agents")
 
 	if n := len(r.ok("render").Data["changed"].([]any)); n != 5 {
@@ -27,8 +27,9 @@ func TestRenderAgents(t *testing.T) {
 	os.WriteFile(mine, []byte("---\nname: bflow-mio\n---\nmío\n"), 0o644)
 	r.ok("render", "--check")
 
-	// Cambia el flujo: el check lo detecta y render quita el agente que sobra.
-	os.WriteFile(cfg, []byte("stack: go\nflow: { security_audit: false }\nagents:\n  implementer:\n    read: [docs/architecture/]\n"), 0o644)
+	// Cambia el flujo (vuelve al default: el reviewer revisa también
+	// seguridad): el check lo detecta y render quita el agente que sobra.
+	os.WriteFile(cfg, []byte("stack: go\nagents:\n  implementer:\n    read: [docs/architecture/]\n"), 0o644)
 	if env := r.run("render", "--check"); env.exit != 1 || env.Code != "render_outdated" {
 		t.Errorf("render --check con agentes desactualizados: exit %d code %s", env.exit, env.Code)
 	}

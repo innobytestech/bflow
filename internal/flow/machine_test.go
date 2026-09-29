@@ -116,7 +116,7 @@ func commonRows(l Lane) []row {
 	}
 	var out []row
 	for _, r := range rs {
-		if DefaultConfig().has(l, r.from) {
+		if testConfig().has(l, r.from) {
 			out = append(out, r)
 		}
 	}
@@ -221,7 +221,7 @@ func stateFor(r row) State {
 }
 
 func TestTransitionTable(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg := testConfig()
 	for _, r := range table() {
 		t.Run(r.name(), func(t *testing.T) {
 			res, err := Apply(cfg, stateFor(r), r.ev)
@@ -325,7 +325,7 @@ func canon(s State) string {
 // desde backlog y exige que cada transición válida tenga una fila en la tabla.
 // Si alguien agrega una transición al núcleo sin probarla, esta prueba falla.
 func TestTableCoversEveryReachableTransition(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg := testConfig()
 	covered := map[transitionKey]bool{}
 	for _, r := range table() {
 		if r.err != "" {
@@ -381,7 +381,7 @@ func TestTableCoversEveryReachableTransition(t *testing.T) {
 // ---------- propiedades ----------
 
 func TestBlockAndUnblockReturnToSamePhase(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg := testConfig()
 	for _, r := range table() {
 		if r.err != "" || r.from == Backlog {
 			continue
@@ -411,7 +411,7 @@ func TestBlockAndUnblockReturnToSamePhase(t *testing.T) {
 }
 
 func TestPhaseAlwaysInLane(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg := testConfig()
 	for _, r := range table() {
 		if r.err != "" {
 			continue
@@ -428,7 +428,7 @@ func TestPhaseAlwaysInLane(t *testing.T) {
 }
 
 func TestBranchCreatedOnce(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg := testConfig()
 	s := New("T-1", "demo")
 	steps := []Event{start(Full), approveWith("d"), rep(sa, Ready), approve(), rep(imp, ContractReady), rejTo(Spec), rep(sa, Ready), approve()}
 	branches := 0
@@ -450,7 +450,7 @@ func TestBranchCreatedOnce(t *testing.T) {
 }
 
 func TestHotfixBranchPrefix(t *testing.T) {
-	res, err := Apply(DefaultConfig(), New("T-9", "arregla"), start(Hotfix))
+	res, err := Apply(testConfig(), New("T-9", "arregla"), start(Hotfix))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -460,7 +460,7 @@ func TestHotfixBranchPrefix(t *testing.T) {
 }
 
 func TestStartStampedOnce(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg := testConfig()
 	s := stateFor(row{lane: Full, from: Walkthrough, gate: GateWalkthrough})
 	res, err := Apply(cfg, s, rej("vuelve"))
 	if err != nil {
@@ -473,14 +473,14 @@ func TestStartStampedOnce(t *testing.T) {
 
 func TestDecisionCarriesChoiceAndResume(t *testing.T) {
 	s := stateFor(row{lane: Full, from: Implementing, gate: GateDecision})
-	res, err := Apply(DefaultConfig(), s, approveChoice(2))
+	res, err := Apply(testConfig(), s, approveChoice(2))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if res.State.Decision != "opción B" || !res.State.Resume {
 		t.Errorf("decision=%q resume=%v", res.State.Decision, res.State.Resume)
 	}
-	free, err := Apply(DefaultConfig(), s, Event{Kind: EvApprove, Note: "haz C"})
+	free, err := Apply(testConfig(), s, Event{Kind: EvApprove, Note: "haz C"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -491,7 +491,7 @@ func TestDecisionCarriesChoiceAndResume(t *testing.T) {
 
 func TestQualityReportsResetOnPhaseChange(t *testing.T) {
 	s := stateFor(row{lane: Full, from: Quality, reports: ko})
-	res, err := Apply(DefaultConfig(), s, rep(sec, Approved))
+	res, err := Apply(testConfig(), s, rep(sec, Approved))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -514,7 +514,7 @@ func TestConfigValidation(t *testing.T) {
 		func(c *Config) { c.Agents[Quality] = nil },
 	}
 	for i, mut := range bad {
-		c := DefaultConfig()
+		c := testConfig()
 		mut(&c)
 		if err := c.Validate(); err == nil {
 			t.Errorf("caso %d: esperaba error de validación", i)
@@ -526,7 +526,7 @@ func TestConfigValidation(t *testing.T) {
 }
 
 func TestPausedConfigurablePerLane(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg := testConfig()
 	cfg.Lanes[Light] = []Phase{Spec, Implementing, Paused, Quality, Documenting, Walkthrough, InReview, Done}
 	s := stateFor(row{lane: Light, from: Implementing})
 	res, err := Apply(cfg, s, rep(imp, DoneV))
@@ -541,7 +541,7 @@ func TestPausedConfigurablePerLane(t *testing.T) {
 // Una nota de rechazo es para el agente de esa fase: no debe llegar al de la
 // fase siguiente.
 func TestNoteDoesNotLeakToNextPhase(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg := testConfig()
 	s := stateFor(row{lane: Full, from: Spec, gate: GateSpec})
 	res, err := Apply(cfg, s, rej("falta el caso de concurrencia"))
 	if err != nil {
@@ -563,11 +563,38 @@ func TestNoteDoesNotLeakToNextPhase(t *testing.T) {
 // Las respuestas a las preguntas de producto se guardan para el recorrido.
 func TestQuestionsKeepAnswers(t *testing.T) {
 	s := stateFor(row{lane: Light, from: Walkthrough, gate: GateQuestions})
-	res, err := Apply(DefaultConfig(), s, Event{Kind: EvApprove, Note: " rechaza el RFC genérico "})
+	res, err := Apply(testConfig(), s, Event{Kind: EvApprove, Note: " rechaza el RFC genérico "})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if res.State.Note != "rechaza el RFC genérico" || res.State.Gate.Name != GateWalkthrough {
 		t.Errorf("estado: %+v", res.State)
+	}
+}
+
+// testConfig es el flujo por defecto con dos agentes de calidad, para probar
+// los reportes en paralelo (con security_audit: true el repo queda así).
+func testConfig() Config {
+	c := DefaultConfig()
+	c.Agents[Quality] = []string{rv, sec}
+	return c
+}
+
+func TestDefaultQualityIsReviewerAlone(t *testing.T) {
+	cfg := DefaultConfig()
+	if q := cfg.Agents[Quality]; len(q) != 1 || q[0] != rv {
+		t.Fatalf("quality por defecto: %v", q)
+	}
+	s := stateFor(row{lane: Light, from: Quality})
+	if n := NextFor(cfg, s); n.Parallel || len(n.Agents) != 1 || n.Agents[0].Agent != rv {
+		t.Errorf("next: %+v", n)
+	}
+	res, err := Apply(cfg, s, rep(rv, Approved))
+	if err != nil || res.State.Phase != Documenting {
+		t.Errorf("el reviewer solo cierra quality: %v %v", res.State.Phase, err)
+	}
+	res, err = Apply(cfg, s, rep(rv, RejectedV))
+	if err != nil || res.State.Phase != Implementing || res.State.Round != 1 {
+		t.Errorf("rechazo del reviewer: %v ronda %d %v", res.State.Phase, res.State.Round, err)
 	}
 }

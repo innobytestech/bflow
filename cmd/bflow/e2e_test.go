@@ -162,6 +162,8 @@ func spawned(t *testing.T, env envelope, agents ...string) {
 // usando solo lo que dice next, como lo hará la skill del leader.
 func TestFullFeatureWithLocalTracker(t *testing.T) {
 	r := newRepo(t)
+	// Con el auditor de seguridad aparte: quality con dos revisores en paralelo.
+	os.WriteFile(filepath.Join(r.dir, "bflow.yaml"), []byte("flow: { security_audit: true }\n"), 0o644)
 	env := r.ok("task", "add", "Borrador pre-folio de cotización")
 	id := env.Data["id"].(string)
 	if id != "LOCAL-1" {
@@ -290,9 +292,9 @@ func TestHotfixWithLocalTracker(t *testing.T) {
 		t.Errorf("rama: %v", env.Data["branch"])
 	}
 	env = r.ok("report", "--agent", "implementer", "--verdict", "DONE") // sin ID: tarea activa
-	spawned(t, env, "reviewer", "security-auditor")
-	r.ok("report", "--agent", "reviewer", "--verdict", "APPROVED")
-	env = r.ok("report", "--agent", "security-auditor", "--verdict", "APPROVED")
+	// Solo el reviewer: revisa también la seguridad.
+	spawned(t, env, "reviewer")
+	env = r.ok("report", "--agent", "reviewer", "--verdict", "APPROVED")
 	spawned(t, env, "documenter")
 	env = r.ok("report", "--agent", "documenter", "--verdict", "DONE")
 	expectNext(t, env, "ask", "questions")

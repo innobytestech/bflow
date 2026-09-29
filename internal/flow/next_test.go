@@ -16,7 +16,7 @@ func optIDs(n output.Next) []string {
 }
 
 func TestNextByState(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg := testConfig()
 	cases := []struct {
 		name    string
 		s       State
@@ -92,7 +92,7 @@ func TestNextByState(t *testing.T) {
 // Cada comando que Next ofrece tiene que ser aceptado por Apply: si la skill
 // ejecuta la opción tal cual (con la nota rellenada), el flujo avanza.
 func TestNextOptionsAreExecutable(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg := testConfig()
 	states := []State{
 		stateFor(row{lane: Full, from: Spec, gate: GateSpec}),
 		stateFor(row{lane: Full, from: Spec, gate: GateSplit}),
@@ -164,7 +164,7 @@ func eventFromCommand(c string) (Event, bool) {
 
 func TestSpawnArgs(t *testing.T) {
 	s := stateFor(row{lane: Full, from: Implementing, gate: GateDecision})
-	res, err := Apply(DefaultConfig(), s, approveChoice(1))
+	res, err := Apply(testConfig(), s, approveChoice(1))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +187,7 @@ func TestSpawnArgs(t *testing.T) {
 
 func TestSpecGateShowsUIBlueprint(t *testing.T) {
 	s := stateFor(row{lane: Full, from: Spec, gate: GateSpec})
-	cfg := DefaultConfig()
+	cfg := testConfig()
 	if n := NextFor(cfg, s); len(n.Show) != 1 {
 		t.Errorf("sin UI solo el brief: %v", n.Show)
 	}
@@ -199,7 +199,7 @@ func TestSpecGateShowsUIBlueprint(t *testing.T) {
 }
 
 func TestUpcoming(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg := testConfig()
 	st := func(lane Lane, p Phase, g Gate) State {
 		s := State{ID: "T-1", Lane: lane, Phase: p}
 		if g != "" {

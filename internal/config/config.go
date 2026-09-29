@@ -112,8 +112,8 @@ type Flow struct {
 	Agents           map[string][]string `yaml:"agents,omitempty"`
 	MaxQualityRounds int                 `yaml:"max_quality_rounds,omitempty"`
 	SLAHours         int                 `yaml:"sla_hours,omitempty"`
-	SecurityAudit    *bool               `yaml:"security_audit,omitempty"`
-	UI               *bool               `yaml:"ui,omitempty"` // por defecto lo decide el stack
+	SecurityAudit    *bool               `yaml:"security_audit,omitempty"` // true: security-auditor aparte, además del reviewer
+	UI               *bool               `yaml:"ui,omitempty"`             // por defecto lo decide el stack
 }
 
 type Step struct {
@@ -502,7 +502,11 @@ func (c *Config) Validate() error {
 		}
 		for _, name := range sortedKeys(c.Agents) {
 			a := c.Agents[name]
-			if len(core.PhasesOf(name)) == 0 {
+			switch {
+			case len(core.PhasesOf(name)) > 0:
+			case name == "security-auditor": // desde que el reviewer revisa la seguridad
+				add("agents.security-auditor: ya no trabaja por defecto, el reviewer revisa también la seguridad. Pasa su read y extra a agents.reviewer, o pon flow.security_audit: true para conservarlo aparte")
+			default:
 				add("agents.%s no trabaja en ninguna fase (revisa flow.agents)", name)
 			}
 			if a.Effort != "" && !slices.Contains(Efforts, a.Effort) {
@@ -539,8 +543,15 @@ func (f Flow) Core() flow.Config {
 		core.Agents[flow.Spec] = []string{"ui-designer", "spec-author"}
 		core.Agents[flow.Quality] = append(slices.Clone(core.Agents[flow.Quality]), "ux-auditor")
 	}
-	if f.SecurityAudit != nil && !*f.SecurityAudit {
-		core.Agents[flow.Quality] = slices.DeleteFunc(slices.Clone(core.Agents[flow.Quality]), func(a string) bool { return a == "security-auditor" })
+	// El reviewer revisa también seguridad; security_audit: true suma un
+	// auditor aparte (más tokens, una segunda mirada).
+	const sec = "security-auditor"
+	switch q := core.Agents[flow.Quality]; {
+	case f.SecurityAudit == nil:
+	case *f.SecurityAudit && !slices.Contains(q, sec):
+		core.Agents[flow.Quality] = append(slices.Clone(q), sec)
+	case !*f.SecurityAudit:
+		core.Agents[flow.Quality] = slices.DeleteFunc(slices.Clone(q), func(a string) bool { return a == sec })
 	}
 	for phase, agents := range f.Agents {
 		core.Agents[flow.Phase(phase)] = slices.Clone(agents)

@@ -26,8 +26,8 @@ func TestBuildDefaultFlow(t *testing.T) {
 		t.Fatal(err)
 	}
 	m := byName(t, specs)
-	if len(m) != 5 {
-		t.Fatalf("agentes del flujo por defecto: %v", m)
+	if len(m) != 4 || m["security-auditor"].Name != "" {
+		t.Fatalf("agentes del flujo por defecto (el reviewer revisa también seguridad): %v", m)
 	}
 	imp := m["implementer"]
 	if imp.Subagent != "bflow-implementer" || imp.Model != "sonnet" || imp.Effort != "medium" || imp.OmitClaudeMd {
@@ -47,6 +47,9 @@ func TestBuildDefaultFlow(t *testing.T) {
 		}
 	}
 	rv := m["reviewer"].Body
+	if !strings.Contains(rv, "**Seguridad**") || !strings.Contains(rv, "reports/security.md") {
+		t.Errorf("el oficio del reviewer incluye la revisión de seguridad:\n%s", rv)
+	}
 	if !strings.Contains(rv, "--verdict APPROVED|REJECTED") || strings.Contains(rv, "NEEDS_DECISION") || strings.Contains(rv, "DONE exige") {
 		t.Errorf("el contrato del reviewer sale de la fase quality:\n%s", rv)
 	}
