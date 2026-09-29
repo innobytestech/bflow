@@ -2,7 +2,7 @@
 
 Los cambios de bflow que ve quien lo usa. Las versiones siguen [semver](https://semver.org/lang/es/) desde la v0.1.0; antes de la 1.0, la API de comandos puede cambiar entre versiones menores.
 
-## Sin publicar
+## v0.1.0
 
 ### Agregado
 

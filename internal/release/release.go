@@ -195,8 +195,21 @@ func ParseChecksums(s string) map[string]string {
 }
 
 // Notes es la sección de la versión en CHANGELOG.md ("## v0.1.0 …" hasta la
-// siguiente "## "). Sin sección no se publica: las notas se escriben antes.
+// siguiente "## "). Una pre-release sin sección propia (v0.1.0-rc.1) usa la
+// de su versión. Sin sección no se publica: las notas se escriben antes.
 func Notes(changelog, version string) (string, error) {
+	if n := section(changelog, version); n != "" {
+		return n, nil
+	}
+	if base, _, pre := strings.Cut(version, "-"); pre {
+		if n := section(changelog, base); n != "" {
+			return n, nil
+		}
+	}
+	return "", fmt.Errorf("CHANGELOG.md no tiene la sección «## %s»: escríbela antes de publicar", version)
+}
+
+func section(changelog, version string) string {
 	var out []string
 	in := false
 	for _, l := range strings.Split(strings.ReplaceAll(changelog, "\r\n", "\n"), "\n") {
@@ -212,11 +225,10 @@ func Notes(changelog, version string) (string, error) {
 			out = append(out, l)
 		}
 	}
-	notes := strings.TrimSpace(strings.Join(out, "\n"))
-	if notes == "" {
-		return "", fmt.Errorf("CHANGELOG.md no tiene la sección «## %s»: escríbela antes de publicar", version)
+	if notes := strings.TrimSpace(strings.Join(out, "\n")); notes != "" {
+		return notes + "\n"
 	}
-	return notes + "\n", nil
+	return ""
 }
 
 // ErrNotRelease es una versión que no sale de una publicación (dev o una

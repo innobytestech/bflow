@@ -41,6 +41,12 @@ func TestNotes(t *testing.T) {
 	if _, err := Notes(cl, "v0.2.0"); err == nil {
 		t.Error("sin sección no hay notas")
 	}
+	if n, err := Notes(cl, "v0.1.0-rc.1"); err != nil || n != "### Agregado\n\n- panel\n" {
+		t.Errorf("la pre-release usa la sección de su versión: %q %v", n, err)
+	}
+	if _, err := Notes(cl, "v0.3.0-rc.1"); err == nil {
+		t.Error("pre-release sin sección de su versión")
+	}
 }
 
 func TestArchiveRoundTripAndChecksums(t *testing.T) {
