@@ -564,11 +564,21 @@ func runDoctor(c *Ctx) output.Envelope {
 		}
 		switch {
 		case err != nil:
-			add("agente", "warn", "claude: falta .claude/settings.json con los hooks de bflow (copia adapters/claude/settings.json)")
+			add("agente", "warn", "claude: falta .claude/settings.json con los hooks de bflow (corre bflow install claude)")
 		case len(missing) > 0:
-			add("agente", "warn", "claude: .claude/settings.json no llama a %s (compáralo con adapters/claude/settings.json)", strings.Join(missing, ", "))
+			add("agente", "warn", "claude: .claude/settings.json no llama a %s (corre bflow install claude)", strings.Join(missing, ", "))
 		default:
 			add("agente", "ok", "claude: hooks de bflow instalados")
+		}
+		if home, err := os.UserHomeDir(); err == nil {
+			switch path, state := c.Agent.SkillState(home); state {
+			case "ok":
+				add("skill", "ok", "claude: skill de bflow al día (%s)", path)
+			case "missing":
+				add("skill", "warn", "claude: falta la skill de bflow (%s); corre bflow install claude", path)
+			default:
+				add("skill", "warn", "claude: la skill instalada (%s) difiere de la de este bflow; corre bflow install claude", path)
+			}
 		}
 		switch have, min, ok, err := c.Agent.Version(); {
 		case err != nil:
@@ -603,7 +613,17 @@ func runDoctor(c *Ctx) output.Envelope {
 		status, detail := startupCheck(c.Agent.StartupContext(cfg.Root))
 		add("contexto", status, "%s", detail)
 		if cfg.Guard.ForbidCoauthor && !c.Agent.CoauthorOff(cfg.Root) {
-			add("agente", "warn", `claude agrega Co-Authored-By a sus commits y guard.forbid_coauthor los bloquea: cada commit se rechaza y se repite. Pon "attribution": { "commit": "", "pr": "" } en .claude/settings.json`)
+			add("agente", "warn", `claude agrega Co-Authored-By a sus commits y guard.forbid_coauthor los bloquea: cada commit se rechaza y se repite. Corre bflow install claude, o pon "attribution": { "commit": "", "pr": "" } en .claude/settings.json`)
+		}
+	}
+
+	if cfg.Tracker.Adapter == "local" {
+		seen := map[string]bool{}
+		for _, e := range strings.Fields(gitOut(cfg.Root, "log", "--since=90.days", "--format=%ae")) {
+			seen[strings.ToLower(e)] = true
+		}
+		if len(seen) >= 2 {
+			add("tracker", "warn", ".bflow/ no se comparte entre personas y hay %d autores en los últimos 90 días: usa tracker github o plane para que todos vean las mismas tareas", len(seen))
 		}
 	}
 

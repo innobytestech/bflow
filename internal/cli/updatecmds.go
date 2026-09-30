@@ -6,6 +6,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
+	"time"
 
 	"innobytes.tech/bflow/internal/output"
 	"innobytes.tech/bflow/internal/release"
@@ -55,9 +57,30 @@ func runUpdate(c *Ctx) output.Envelope {
 	if err != nil {
 		return output.Fail("update", err)
 	}
+	home, herr := os.UserHomeDir()
+	hadSkill := false
+	if herr == nil && c.Agent != nil {
+		_, st := c.Agent.SkillState(home)
+		hadSkill = st != "missing"
+	}
 	if err := release.Replace(exe, bin); err != nil {
 		return output.Fail("update", errors.New("no se pudo reemplazar el binario: "+err.Error()))
 	}
 	data["path"] = exe
-	return env("updated", fmt.Sprintf("bflow %s → %s (%s)", c.Version, rel.Tag, exe))
+	text := fmt.Sprintf("bflow %s → %s (%s)", c.Version, rel.Tag, exe)
+	switch {
+	case !hadSkill:
+		data["skill"] = "skipped"
+	default:
+		cctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+		if err := exec.CommandContext(cctx, exe, "install", "claude", "--skill-only", "--json").Run(); err != nil {
+			data["skill"] = "failed"
+			text += "\nno se pudo refrescar la skill de claude; corre bflow install claude para refrescarla"
+		} else {
+			data["skill"] = "updated"
+			text += "\nskill de claude actualizada"
+		}
+	}
+	return env("updated", text)
 }

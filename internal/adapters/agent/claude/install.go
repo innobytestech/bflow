@@ -329,4 +329,3 @@ func mergeSettings(cur, ours []byte) (out []byte, changed bool, warnings []strin
 	changed = !bytes.Equal(out, lf(cur))
 	return out, changed, warnings, nil
 }
-
