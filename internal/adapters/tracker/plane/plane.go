@@ -24,34 +24,6 @@ import (
 	"innobytes.tech/bflow/internal/tracker"
 )
 
-// StateDef es el estado de Plane que representa una fase.
-type StateDef struct {
-	Names []string // por preferencia: se escribe en el primero que exista
-	Group string   // grupo de Plane al crearlo
-	Color string
-}
-
-// DefaultStates son compatibles con los estados que ya usa acme (lib.mjs):
-// tanto los nombres en español como los literales del harness (inProgress,
-// specReady…), que es lo que tiene hoy API. Ejemplo: // si un proyecto tiene "Implementado" pero no "En revisión", quality escribe en
-// "Implementado". tracker setup crea el primer nombre si no existe ninguno.
-var DefaultStates = map[flow.Phase]StateDef{
-	flow.Backlog:      {[]string{"Backlog", "Todo", "pending"}, "backlog", "#A3A3A3"},
-	flow.Discovery:    {[]string{"Discovery"}, "unstarted", "#60A5FA"},
-	flow.Spec:         {[]string{"Spec pendiente", "Spec por aprobar", "Spec", "readyForSpec", "specReady"}, "unstarted", "#818CF8"},
-	flow.Contract:     {[]string{"Contrato", "In Progress", "En progreso", "inProgress"}, "started", "#6366F1"},
-	flow.Implementing: {[]string{"In Progress", "En progreso", "inProgress"}, "started", "#3B82F6"},
-	flow.Paused:       {[]string{"En pausa", "Implementado", "implemented"}, "started", "#8B5CF6"},
-	flow.Quality:      {[]string{"En revisión", "Implementado", "implemented", "reviewed"}, "started", "#A855F7"},
-	flow.Documenting:  {[]string{"Documentando", "Auditado", "audited"}, "started", "#14B8A6"},
-	flow.Walkthrough:  {[]string{"Walkthrough", "Por PR", "documented"}, "started", "#F97316"},
-	flow.InReview:     {[]string{"PR abierto", "Por PR", "documented"}, "started", "#FB923C"},
-	flow.Done:         {[]string{"Done", "Hecho"}, "completed", "#22C55E"},
-	flow.Blocked:      {[]string{"Bloqueado", "blocked"}, "started", "#EF4444"},
-}
-
-var phaseOrder = append(append([]flow.Phase{flow.Backlog}, flow.Order...), flow.Blocked)
-
 // Options configura el cliente.
 type Options struct {
 	URL, Workspace, Project, Token string
@@ -64,7 +36,7 @@ type Client struct {
 	URL, Workspace, Project string
 	Token                   string
 	HTTP                    *http.Client
-	States                  map[flow.Phase]StateDef
+	States                  tracker.StateTable
 	cachePath               string
 	sleep                   func(time.Duration)
 
@@ -89,15 +61,7 @@ type planeState struct {
 // New crea el cliente.
 func New(o Options) *Client {
 	c := &Client{URL: strings.TrimRight(o.URL, "/"), Workspace: o.Workspace, Project: strings.ToUpper(o.Project), Token: o.Token,
-		HTTP: &http.Client{Timeout: 15 * time.Second}, States: map[flow.Phase]StateDef{}, cachePath: o.CachePath, sleep: time.Sleep}
-	for p, d := range DefaultStates {
-		c.States[p] = d
-	}
-	for p, names := range o.States {
-		d := c.States[flow.Phase(p)]
-		d.Names = names
-		c.States[flow.Phase(p)] = d
-	}
+		HTTP: &http.Client{Timeout: 15 * time.Second}, States: tracker.NewStateTable(o.States), cachePath: o.CachePath, sleep: time.Sleep}
 	return c
 }
 
@@ -293,31 +257,23 @@ func norm(s string) string { return strings.ToLower(strings.TrimSpace(s)) }
 
 // writeState es el estado donde se escribe una fase: su primer nombre existente.
 func (c *Client) writeState(sts []planeState, p flow.Phase) (planeState, bool) {
-	for _, n := range append([]string{string(p)}, c.States[p].Names...) {
-		for _, s := range sts {
-			if norm(s.Name) == norm(n) {
-				return s, true
-			}
+	names := make([]string, len(sts))
+	for i, s := range sts {
+		names[i] = s.Name
+	}
+	n, ok := c.States.Write(names, p)
+	if !ok {
+		return planeState{}, false
+	}
+	for _, s := range sts {
+		if s.Name == n {
+			return s, true
 		}
 	}
 	return planeState{}, false
 }
 
-// phaseOf traduce un estado de Plane a fase: gana la fase donde ese nombre
-// aparece antes en su lista de preferencia (el nombre literal de la fase cuenta
-// como el primero); en empate, el orden de las fases.
-func (c *Client) phaseOf(name string) flow.Phase {
-	best, bestIdx := flow.Phase(""), 1<<30
-	for _, p := range phaseOrder {
-		for i, n := range append([]string{string(p)}, c.States[p].Names...) {
-			if norm(n) == norm(name) && i < bestIdx {
-				best, bestIdx = p, i
-				break
-			}
-		}
-	}
-	return best
-}
+func (c *Client) phaseOf(name string) flow.Phase { return c.States.PhaseOf(name) }
 
 // SameState indica si dos fases escriben en el mismo estado de Plane.
 func (c *Client) SameState(a, b flow.Phase) bool {
@@ -571,7 +527,7 @@ func (c *Client) EnsureStates(ctx context.Context, dryRun bool) ([]string, error
 		return nil, err
 	}
 	var created []string
-	for _, ph := range phaseOrder {
+	for _, ph := range tracker.PhaseOrder {
 		if _, ok := c.writeState(sts, ph); ok {
 			continue
 		}
@@ -618,7 +574,7 @@ func (c *Client) StateMap(ctx context.Context) ([]tracker.StateInfo, error) {
 	out := make([]tracker.StateInfo, 0, len(sts))
 	for _, s := range sts {
 		info := tracker.StateInfo{Name: s.Name, Group: s.Group, Phase: c.phaseOf(s.Name)}
-		for _, p := range phaseOrder {
+		for _, p := range tracker.PhaseOrder {
 			if w, ok := c.writeState(sts, p); ok && w.ID == s.ID {
 				info.Writes = append(info.Writes, string(p))
 			}

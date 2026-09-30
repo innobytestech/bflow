@@ -57,12 +57,14 @@ type Project struct {
 }
 
 type Tracker struct {
-	Adapter   string              `yaml:"adapter,omitempty"`
-	URL       string              `yaml:"url,omitempty"`
-	Workspace string              `yaml:"workspace,omitempty"`
-	Project   string              `yaml:"project,omitempty"` // identificador legible (API), nunca UUID
-	Path      string              `yaml:"path,omitempty"`    // tracker local: carpeta de las tareas (.bflow/local por defecto)
-	States    map[string][]string `yaml:"states,omitempty"`  // fase bflow → nombres en el tracker (el primero se usa al escribir)
+	Adapter    string              `yaml:"adapter,omitempty"`
+	URL        string              `yaml:"url,omitempty"`
+	Workspace  string              `yaml:"workspace,omitempty"`
+	Project    string              `yaml:"project,omitempty"`     // identificador legible (API), nunca UUID
+	Path       string              `yaml:"path,omitempty"`        // tracker local: carpeta de las tareas (.bflow/local por defecto)
+	Prefix     string              `yaml:"prefix,omitempty"`      // github: prefijo de los IDs (GH-42); GH por defecto
+	StartField string              `yaml:"start_field,omitempty"` // github: campo de fecha del project donde se sella el inicio
+	States     map[string][]string `yaml:"states,omitempty"`      // fase bflow → nombres en el tracker (el primero se usa al escribir)
 }
 
 type BranchPrefix struct {
@@ -167,7 +169,7 @@ type globalFile struct {
 
 // Known son los adaptadores que este binario sabe construir.
 var Known = struct{ Trackers, Hosts, Agents []string }{
-	Trackers: []string{"local", "plane"},
+	Trackers: []string{"local", "plane", "github"},
 	Hosts:    []string{"", "github"},
 	Agents:   []string{"", "claude"},
 }
@@ -450,6 +452,11 @@ func (e *ValidationError) Error() string {
 	return fmt.Sprintf("%s tiene %d problema(s):\n  - %s", where, len(e.Problems), strings.Join(e.Problems, "\n  - "))
 }
 
+var (
+	ghProjectRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9-]*/[1-9][0-9]*$`)
+	ghPrefixRe  = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]*$`)
+)
+
 var uuidRe = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 // Validate revisa la configuración efectiva y reporta todos los problemas juntos.
@@ -469,6 +476,17 @@ func (c *Config) Validate() error {
 		}
 		if c.Tracker.Project == "" {
 			add("tracker.project es obligatorio con plane (identificador legible, p. ej. API)")
+		}
+	}
+	if c.Tracker.Adapter == "github" {
+		if c.VCS.Host != "github" {
+			add("tracker.adapter github exige vcs.host github (de ahí salen el repo y el token)")
+		}
+		if c.Tracker.Project != "" && !ghProjectRe.MatchString(c.Tracker.Project) {
+			add("tracker.project %q no es owner/número (p. ej. acme/7)", c.Tracker.Project)
+		}
+		if c.Tracker.Prefix != "" && !ghPrefixRe.MatchString(c.Tracker.Prefix) {
+			add("tracker.prefix %q debe empezar con letra y llevar solo letras y números", c.Tracker.Prefix)
 		}
 	}
 	if uuidRe.MatchString(c.Tracker.Project) {

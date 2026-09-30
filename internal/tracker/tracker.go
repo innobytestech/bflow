@@ -7,6 +7,7 @@ package tracker
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"innobytes.tech/bflow/internal/flow"
@@ -92,4 +93,20 @@ type StateInfo struct {
 // StateLister es una capacidad opcional: mostrar los estados y su traducción.
 type StateLister interface {
 	StateMap(ctx context.Context) ([]StateInfo, error)
+}
+
+// PRLinker es una capacidad opcional: la línea que cierra la tarea al mergear
+// el PR ("Closes #42"), o "" si no aplica.
+type PRLinker interface{ CloseRef(id string) string }
+
+// ManualSetupError indica que el tracker no puede crear estados sin riesgo:
+// Missing lista qué crear a mano en Where.
+type ManualSetupError struct {
+	Where   string
+	Missing []string
+	Reason  string
+}
+
+func (e *ManualSetupError) Error() string {
+	return "crea a mano en " + e.Where + ": " + strings.Join(e.Missing, ", ") + " (" + e.Reason + ")"
 }

@@ -96,7 +96,7 @@ func gitOut(dir string, args ...string) string {
 }
 
 func init() {
-	Register(&Command{Name: "init", Summary: "crea bflow.yaml detectando stack, remoto, rama base y pasos de check: init [--yes] [--profile p] [--tracker local|plane] [--project P]",
+	Register(&Command{Name: "init", Summary: "crea bflow.yaml detectando stack, remoto, rama base y pasos de check: init [--yes] [--profile p] [--tracker local|plane|github] [--project P (github: owner/N)]|plane] [--project P]",
 		Setup: func(fs *flag.FlagSet) {
 			for _, f := range []string{"stack", "tracker", "project", "url", "workspace", "profile", "host", "base", "agent"} {
 				fs.String(f, "", "")
@@ -179,10 +179,25 @@ func runInit(c *Ctx) output.Envelope {
 		prof = setup.Profile{Tracker: pc.Tracker.Adapter, URL: pc.Tracker.URL, Workspace: pc.Tracker.Workspace, Host: pc.VCS.Host, BaseBranch: pc.VCS.BaseBranch, Agent: pc.Agent}
 	}
 
+	// Host desde el remoto (el tracker github depende de él)
+	remote := gitOut(root, "remote", "get-url", "origin")
+	detHost, repo := setup.HostFromRemote(remote)
+	a.Host = firstNonEmpty(str(c.Flags, "host"), prof.Host, detHost)
+	if a.Host == "none" {
+		a.Host = ""
+	}
+
 	// Tracker
 	a.Tracker = firstNonEmpty(str(c.Flags, "tracker"), prof.Tracker)
 	if a.Tracker == "" {
-		a.Tracker = []string{"local", "plane"}[p.choose("¿Qué tracker usa?", []string{"local (archivos en .bflow, sin cuenta)", "plane"}, 0)]
+		names, labels := []string{"local", "plane"}, []string{"local (archivos en .bflow, sin cuenta)", "plane"}
+		if a.Host == "github" {
+			names, labels = append(names, "github"), append(labels, "github (issues del repo y, si quieres, un Project)")
+		}
+		a.Tracker = names[p.choose("¿Qué tracker usa?", labels, 0)]
+	}
+	if a.Tracker == "github" && a.Host != "github" {
+		return output.Fail("incomplete", errors.New("el tracker github exige host github (--host github, o un remoto de GitHub)"))
 	}
 	if a.Tracker == "plane" {
 		a.TrackerURL = firstNonEmpty(str(c.Flags, "url"), prof.URL)
@@ -214,17 +229,28 @@ func runInit(c *Ctx) output.Envelope {
 		if a.TrackerURL == "" || a.Workspace == "" || a.Project == "" {
 			return output.Fail("incomplete", errors.New("plane necesita --url, --workspace y --project (o un perfil que los tenga)"))
 		}
+	} else if a.Tracker == "github" {
+		a.Project = str(c.Flags, "project")
+		if a.Project == "" && c.Projects != nil {
+			ps, err := c.Projects(ctx, "github", "", repo)
+			if err != nil {
+				fmt.Fprintln(c.Stderr, "no se pudieron listar los Projects:", err)
+			}
+			if len(ps) > 0 && !p.yes {
+				ids := []string{"sin project (la fase es una etiqueta bflow:*)"}
+				for _, pr := range ps {
+					ids = append(ids, pr.ID+" · "+pr.Name)
+				}
+				if i := p.choose("¿Qué Project de GitHub?", ids, 0); i > 0 {
+					a.Project = strings.Fields(ids[i])[0]
+				}
+			}
+		}
 	} else if a.Tracker == "local" {
 		a.Project = strings.ToUpper(str(c.Flags, "project"))
 	}
 
-	// Host y rama base desde el remoto
-	remote := gitOut(root, "remote", "get-url", "origin")
-	detHost, repo := setup.HostFromRemote(remote)
-	a.Host = firstNonEmpty(str(c.Flags, "host"), prof.Host, detHost)
-	if a.Host == "none" {
-		a.Host = ""
-	}
+	// Rama base desde el remoto
 	head := strings.TrimPrefix(gitOut(root, "symbolic-ref", "--short", "refs/remotes/origin/HEAD"), "origin/")
 	var branches []string
 	for _, b := range strings.Split(gitOut(root, "branch", "-r", "--format=%(refname:short)"), "\n") {
@@ -299,7 +325,9 @@ func runInit(c *Ctx) output.Envelope {
 	if a.Tracker == "plane" {
 		next = append(next, "bflow connect plane (si aún no hay token)", "bflow tracker setup --dry-run")
 	}
-	if a.Host == "github" {
+	if a.Tracker == "github" {
+		next = append(next, "bflow connect github (token del tracker y de los PR)", "bflow tracker setup --dry-run")
+	} else if a.Host == "github" {
 		next = append(next, "bflow connect github (para abrir PR solo)")
 	}
 	if a.Agent == "claude" {
@@ -602,18 +630,29 @@ func doctorTracker(ctx context.Context, t tracker.Tracker, cfg *config.Config, a
 		add("tracker", "ok", "local")
 		return
 	}
-	if pl, ok := t.(tracker.ProjectLister); ok {
+	gh := cfg.Tracker.Adapter == "github"
+	if pl, ok := t.(tracker.ProjectLister); ok && (!gh || cfg.Tracker.Project != "") {
 		ps, err := pl.Projects(ctx)
 		if err != nil {
 			add("tracker", "fail", "%v", err)
 			return
 		}
 		if !slices.ContainsFunc(ps, func(p tracker.Project) bool { return strings.EqualFold(p.ID, cfg.Tracker.Project) }) {
-			add("tracker", "fail", "el proyecto %s no está en %s", cfg.Tracker.Project, cfg.Tracker.Workspace)
+			if gh {
+				add("tracker", "fail", "el project %s no aparece entre los que ve el token (¿falta el permiso de Projects? bflow connect github)", cfg.Tracker.Project)
+			} else {
+				add("tracker", "fail", "el proyecto %s no está en %s", cfg.Tracker.Project, cfg.Tracker.Workspace)
+			}
 			return
 		}
 	}
 	msg := fmt.Sprintf("%s · proyecto %s", cfg.Tracker.Adapter, cfg.Tracker.Project)
+	if gh {
+		msg = "github · etiquetas bflow:* (sin project)"
+		if cfg.Tracker.Project != "" {
+			msg = "github · project " + cfg.Tracker.Project + " (campo Status)"
+		}
+	}
 	if sl, ok := t.(tracker.StateLister); ok {
 		sts, err := sl.StateMap(ctx)
 		if err != nil {

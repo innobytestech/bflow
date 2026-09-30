@@ -91,7 +91,7 @@ flowchart LR
 
 | Eje | Hoy | Previsto |
 |---|---|---|
-| Tracker | `local` (archivos en el repo, sin cuenta), Plane | Jira, Linear, GitHub Issues, Notion |
+| Tracker | `local` (archivos en el repo, sin cuenta), Plane, GitHub Issues y Projects | Jira, Linear, Notion |
 | Repositorio y PR | GitHub (sin token, deja la URL de compare y la descripción lista) | GitLab, Gitea |
 | Agente | Claude Code | Codex, OpenCode |
 | Stack | Go, Angular, Node (defaults de check y rutas de código) | otros |
@@ -239,6 +239,25 @@ bflow tracker setup --dry-run       # qué estados faltarían crear
 ```
 
 Los tokens se validan antes de guardarse en el llavero del sistema (Credential Manager, Keychain o Secret Service) y nunca se escriben en YAML. En CI se usan variables de entorno: `BFLOW_PLANE_TOKEN`, `GH_TOKEN`.
+
+#### Tracker de GitHub Issues y Projects
+
+Las tareas pueden vivir en los issues del repo (`GH-42` es el issue #42), con o sin un Project v2. Exige `vcs.host: github`; de ahí salen el repo, la API (`vcs.api_url`) y el token de `bflow connect github`.
+
+```yaml
+vcs: { host: github }
+tracker:
+  adapter: github
+  project: mi-org/7        # opcional; sin él, la fase es una etiqueta bflow:<fase>
+  # prefix: GH             # prefijo de los IDs (GH por defecto)
+  # start_field: Start date  # campo de fecha del project donde se sella el inicio
+```
+
+- **Sin project:** la fase es la etiqueta `bflow:<fase>`. `bflow tracker setup` crea las que falten. Un issue abierto sin etiqueta es backlog; uno cerrado, done. No hay fecha de inicio.
+- **Con project:** la fase es una opción del campo de selección única Status, con los mismos nombres que Plane (`tracker.states` los cambia). `bflow tracker setup` agrega las opciones que falten si la API conserva los ids de las existentes; si no, no escribe nada y lista qué crear a mano (`crea a mano en el project mi-org/7, campo Status:`). Al empezar, el issue entra al project y se sella la fecha de inicio si existe el campo.
+- Al llegar a done se cierra el issue (bflow nunca reabre uno cerrado) y el PR lleva `Closes #N`.
+- **Token:** el mismo de `bflow connect github`. Para Projects de una organización hace falta un token fine-grained con el permiso de organización Projects; para Projects de un usuario, un token clásico con el scope `project`. `bflow doctor` lo revisa.
+- `bflow init` ofrece `github` cuando el remoto es de GitHub y deja elegir el project (o ninguno).
 
 ### 4. Usarlo con Claude Code
 
