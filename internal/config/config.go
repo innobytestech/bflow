@@ -228,11 +228,21 @@ type Tools []string
 
 // UnmarshalYAML acepta `agent: claude` o `agent: [claude, opencode]`.
 func (t *Tools) UnmarshalYAML(n *yaml.Node) error {
+	*t = nil
+	if n.Kind == yaml.SequenceNode {
+		var l []string
+		if err := n.Decode(&l); err != nil {
+			return err
+		}
+		if len(l) > 0 {
+			*t = Tools(l)
+		}
+		return nil
+	}
 	var s string
 	if err := n.Decode(&s); err != nil {
 		return err
 	}
-	*t = nil
 	if s != "" {
 		*t = Tools{s}
 	}
@@ -244,7 +254,12 @@ func (t Tools) Has(name string) bool { return slices.Contains(t, name) }
 
 // Rendered son las herramientas para las que render genera agentes; sin
 // lista, solo claude.
-func (t Tools) Rendered() []string { return nil }
+func (t Tools) Rendered() []string {
+	if len(t) == 0 {
+		return []string{"claude"}
+	}
+	return t
+}
 
 // Load carga la configuración efectiva para el repo que contiene dir.
 func Load(dir string) (*Config, error) {
@@ -275,6 +290,9 @@ func Load(dir string) (*Config, error) {
 	merged := map[string]any{}
 	if ui, ok := globalMap["ui"].(map[string]any); ok { // preferencias personales: el repo o el perfil las pisan
 		merged["ui"] = ui
+	}
+	if models, ok := globalMap["models"].(map[string]any); ok { // tabla de alias global: perfil y repo la pisan por alias
+		merged["models"] = models
 	}
 	if profile != "" {
 		pm, ok := globalProfiles[profile]
@@ -523,9 +541,24 @@ func (c *Config) Validate() error {
 	if !slices.Contains(Known.Hosts, c.VCS.Host) {
 		add("vcs.host %q no existe (disponibles: github, o vacío para solo git local)", c.VCS.Host)
 	}
+	seenAgent := map[string]bool{}
 	for _, a := range c.Agent {
 		if !slices.Contains(Known.Agents, a) {
-			add("agent %q no existe (disponibles: claude)", a)
+			add("agent %q no existe (disponibles: %s)", a, strings.Join(Known.Agents, ", "))
+		} else if seenAgent[a] {
+			add("agent repite %q", a)
+		}
+		seenAgent[a] = true
+	}
+	for _, table := range sortedKeys(c.Models) {
+		if !slices.Contains(Known.ModelTables, table) {
+			add("models.%s no existe (disponible: %s)", table, strings.Join(Known.ModelTables, ", "))
+			continue
+		}
+		for _, alias := range sortedKeys(c.Models[table]) {
+			if strings.TrimSpace(c.Models[table][alias]) == "" {
+				add("models.%s.%s está vacío", table, alias)
+			}
 		}
 	}
 	for i, s := range c.Check.Steps {
