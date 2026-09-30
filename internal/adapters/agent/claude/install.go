@@ -157,14 +157,23 @@ func parseNode(dec *json.Decoder) (*node, error) {
 		_, err := dec.Token()
 		return n, err
 	case string:
-		b, _ := json.Marshal(t)
-		return &node{kind: 's', raw: string(b)}, nil
+		return &node{kind: 's', raw: quote(t)}, nil
 	case json.Number:
 		return &node{kind: 's', raw: t.String()}, nil
 	case bool:
 		return &node{kind: 's', raw: fmt.Sprint(t)}, nil
 	}
 	return &node{kind: 's', raw: "null"}, nil
+}
+
+// quote codifica s como cadena JSON sin escapar &, < ni >: json.Marshal los
+// cambia por secuencias \uXXXX y ensuciaría los comandos del usuario.
+func quote(s string) string {
+	var b bytes.Buffer
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(s)
+	return strings.TrimSuffix(b.String(), "\n")
 }
 
 func parseDoc(b []byte) (*node, error) {
@@ -191,8 +200,7 @@ func (n *node) write(b *strings.Builder, depth int) {
 		}
 		b.WriteString("{\n")
 		for i, m := range n.mem {
-			k, _ := json.Marshal(m.key)
-			b.WriteString(pad + string(k) + ": ")
+			b.WriteString(pad + quote(m.key) + ": ")
 			m.val.write(b, depth+1)
 			if i < len(n.mem)-1 {
 				b.WriteString(",")

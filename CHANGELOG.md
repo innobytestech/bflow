@@ -6,6 +6,9 @@ Los cambios de bflow que ve quien lo usa. Las versiones siguen [semver](https://
 
 ### Agregado
 
+- **Instalación en un paso (`bflow install claude`).** Escribe la skill en `~/.claude/skills/bflow` y, dentro de un repo con `bflow.yaml`, fusiona en `.claude/settings.json` los hooks, el permiso `Bash(bflow *)`, la barra de estado y `attribution` sin tocar lo tuyo: las entradas de bflow se reemplazan, las demás se conservan con su orden; una `statusLine` ajena se deja y avisa. Correrlo dos veces no cambia nada. Con `agent: claude` también corre `render`. `--skill-only` instala solo la skill. `bflow install opencode` avisa que aún no hay adaptador.
+- **`bflow update` refresca la skill** con el binario nuevo si ya la tenías instalada.
+- **`doctor`** avisa si la skill instalada no coincide con la del binario, sugiere `bflow install claude` cuando faltan hooks, y avisa si el tracker es local en un repo con dos o más autores en 90 días (`.bflow/` no se comparte).
 - **Idea sin tarea.** `bflow status` sin tareas en curso pregunta (`gate intake`) si la idea va a una tarea nueva o a una existente. `bflow new --lane --title [--file idea.md]` crea la tarea en el tracker y la arranca en un paso (Plane y los demás trackers que permiten crear); `bflow task list` lista las abiertas para no duplicar.
 - **Agentes generados (`bflow render`).** Escribe `.claude/agents/bflow-<agente>.md` con el contrato de bflow (argumentos, archivos, veredictos por fase, `report`) y el oficio: uno por defecto más lo que el repo agrega en `agents:` de `bflow.yaml` (`model`, `effort`, `read`, `extra`, `omit_claude_md`). `render --check` falla si no coinciden con la configuración; `render` nunca pisa un archivo que no generó. Si el repo tiene `AGENTS.md`, mantiene en él un bloque para retomar la tarea con otras herramientas.
 - **`spawn` trae `subagent`** con el nombre del agente generado.
