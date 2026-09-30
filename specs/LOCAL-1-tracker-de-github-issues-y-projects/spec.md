@@ -153,7 +153,7 @@ Archivos: `github.go` (cliente, REST y GraphQL, errores), `issues.go` (Get, List
 
 ## Tasks
 
-- [ ] **T1 · Contrato.** Tabla compartida y firmas públicas: `internal/tracker/states.go` (con `plane` migrado, sin cambiar su comportamiento), `PRLinker`, `ManualSetupError`, `Harness.NoStartDate`, `config.Tracker.Prefix/StartField`, y el esqueleto del paquete `internal/adapters/tracker/github` con `Options`, `New` y los métodos que devuelven "no implementado". Pruebas nuevas (fallan hasta su tarea):
+- [x] **T1 · Contrato.** Tabla compartida y firmas públicas: `internal/tracker/states.go` (con `plane` migrado, sin cambiar su comportamiento), `PRLinker`, `ManualSetupError`, `Harness.NoStartDate`, `config.Tracker.Prefix/StartField`, y el esqueleto del paquete `internal/adapters/tracker/github` con `Options`, `New` y los métodos que devuelven "no implementado". Pruebas nuevas (fallan hasta su tarea):
   - `internal/tracker/states_test.go`: `TestStateTablePhaseOf` (incluye Todo, In Progress y Done) y `TestStateTableOverrides`.
   - `internal/adapters/tracker/github/github_test.go`, sobre el fake `fake_test.go` (httptest con REST y GraphQL):
     - contrato: `TestContractLabels`, `TestContractProject`
@@ -165,10 +165,18 @@ Archivos: `github.go` (cliente, REST y GraphQL, errores), `issues.go` (Get, List
   - `internal/config`: `TestValidateGithubTracker`.
   - `internal/cli`: `TestTrackerSetupManual`, `TestDoctorGithubTracker`.
   - Cubre R2, R3, R16, R18 y R19 (firmas).
-- [ ] **T2 · Cliente e identificadores.** `do` (REST), `graphql`, paginación por `Link`, mapa de errores y reintentos, `graphqlURL`, `parseKey` y `Get` sin project. R4, R9, R22, R23, R24.
-- [ ] **T3 · Modo etiquetas.** List, Transition (etiquetas y cierre en done), Comment, Comments, Create, CloseRef y SameState; `TestContractLabels` en verde. R5, R7, R10, R12, R14, R15.
-- [ ] **T4 · Modo project.** Resolución org/usuario, caché con reintento, item del issue, Status, add-to-project, fecha de inicio, List del project; `TestContractProject` en verde. R6, R8, R11, R13, R21.
-- [ ] **T5 · Setup, estados y projects.** EnsureStates (etiquetas; opciones con introspección, verificación de ids y `ManualSetupError`), StateMap y Projects. Antes de escribir `updateProjectV2Field`, confirma en la documentación de la API la forma de `singleSelectOptions` y anótalo en decisions. R17, R18, R19, R20.
-- [ ] **T6 · Wiring y núcleo.** `Known.Trackers`, `Validate` (R2), `buildTracker` case `github` (repo y token compartidos con `buildHost` mediante un helper), `connect`/`projects` para github, `PRBody` con `PRLinker`, y `tracker setup` con `ManualSetupError`. R1, R2, R3, R16, R25.
-- [ ] **T7 · doctor e init.** `doctorTracker` para github (token, repo, project, Status, faltantes) y `init` con tracker github y elección de project. R26, R27.
+- [x] **T2 · Cliente e identificadores.** `do` (REST), `graphql`, paginación por `Link`, mapa de errores y reintentos, `graphqlURL`, `parseKey` y `Get` sin project. R4, R9, R22, R23, R24.
+- [x] **T3 · Modo etiquetas.** List, Transition (etiquetas y cierre en done), Comment, Comments, Create, CloseRef y SameState; `TestContractLabels` en verde. R5, R7, R10, R12, R14, R15.
+- [x] **T4 · Modo project.** Resolución org/usuario, caché con reintento, item del issue, Status, add-to-project, fecha de inicio, List del project; `TestContractProject` en verde. R6, R8, R11, R13, R21.
+- [x] **T5 · Setup, estados y projects.** EnsureStates (etiquetas; opciones con introspección, verificación de ids y `ManualSetupError`), StateMap y Projects. Antes de escribir `updateProjectV2Field`, confirma en la documentación de la API la forma de `singleSelectOptions` y anótalo en decisions. R17, R18, R19, R20.
+- [x] **T6 · Wiring y núcleo.** `Known.Trackers`, `Validate` (R2), `buildTracker` case `github` (repo y token compartidos con `buildHost` mediante un helper), `connect`/`projects` para github, `PRBody` con `PRLinker`, y `tracker setup` con `ManualSetupError`. R1, R2, R3, R16, R25.
+- [x] **T7 · doctor e init.** `doctorTracker` para github (token, repo, project, Status, faltantes) y `init` con tracker github y elección de project. R26, R27.
 - [ ] **T8 · Documentación y prueba manual.** README: sección del tracker github (config, tokens por tipo de owner, setup manual). Prueba manual en un repo de prueba contra GitHub real, sin project y con project (setup, start, transición, done, `Closes #N`), anotada en el walkthrough. R1-R27.
+
+### Decisiones de implementación
+- `updateProjectV2Field` recibe `singleSelectOptions` como `[ProjectV2SingleSelectFieldOptionInput!]` con `name`, `color` (enum), `description` y, si la introspección lo permite, `id`. Así está escrito por conocimiento de la API y contra el fake; no se pudo confirmar en la documentación desde este entorno: queda para la prueba manual de T8.
+- `githubAccess` (wire.go) comparte repo, API y token entre `buildHost` y `buildTracker`. El token sale siempre de `Key("github", host de vcs.api_url)` (el mismo que escribe `connect`), no de la URL completa.
+- `build` crea el cliente git antes que el tracker, porque el tracker github deduce el repo del remoto.
+- `init` detecta el host antes de preguntar el tracker, para ofrecer `github` solo con host github.
+- Con project, `Transition` no vuelve a escribir Status si el item ya tiene la opción.
+- Cuando el Status de un item no traduce a ninguna fase, `Phase` queda vacía y `State` lleva el nombre; sin item o sin Status es backlog con `State` vacío.
