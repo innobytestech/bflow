@@ -504,6 +504,18 @@ func runDoctor(c *Ctx) output.Envelope {
 		add("host", "ok", "sin host remoto configurado: push y PR a mano")
 	}
 
+	var runs []string
+	for _, st := range cfg.Check.Steps {
+		runs = append(runs, st.Run)
+	}
+	if n, gaps := setup.CIGaps(cfg.Root, runs); len(gaps) > 0 {
+		for _, g := range gaps {
+			add("ci", "warn", "%s: agrégalo a check.steps para verlo antes del PR", g)
+		}
+	} else if n > 0 {
+		add("ci", "ok", "el check cubre los %d comandos de verificación de CI", n)
+	}
+
 	ec := cfg.Env
 	if len(ec.HealthPaths)+len(ec.TCP)+len(ec.RequireEnv) > 0 {
 		res := envcheck.Run(ctx, ec, os.Getenv)

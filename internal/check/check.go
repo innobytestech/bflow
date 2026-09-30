@@ -67,6 +67,7 @@ type Result struct {
 	Date     time.Time    `json:"date"`
 	Result   string       `json:"result"` // PASS | FAIL
 	Degraded []string     `json:"degraded,omitempty"`
+	Warnings []string     `json:"warnings,omitempty"` // pasos que pasaron sospechosamente rápido
 	Steps    []StepResult `json:"steps"`
 }
 
@@ -432,6 +433,12 @@ func (res Result) Markdown() string {
 			b.WriteString("- " + d + "\n")
 		}
 	}
+	if len(res.Warnings) > 0 {
+		b.WriteString("\n## ⚠️ Avisos\n")
+		for _, w := range res.Warnings {
+			b.WriteString("- " + w + "\n")
+		}
+	}
 	for _, s := range res.Steps {
 		if s.Status == "fail" {
 			fmt.Fprintf(&b, "\n## ❌ %s\n`%s`\n```\n%s\n```\n", s.Name, s.Cmd, s.Tail)
@@ -457,6 +464,9 @@ func (res Result) Summary() string {
 	}
 	if len(res.Degraded) > 0 {
 		line += fmt.Sprintf(" · %d degradado(s)", len(res.Degraded))
+	}
+	if len(res.Warnings) > 0 {
+		line += fmt.Sprintf(" · %d aviso(s)", len(res.Warnings))
 	}
 	return line
 }
