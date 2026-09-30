@@ -68,11 +68,7 @@ func TestSettings(t *testing.T) {
 }
 
 func TestSkill(t *testing.T) {
-	b, err := os.ReadFile("skills/bflow/SKILL.md")
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := string(b)
+	s := string(files.Skill)
 	if !strings.HasPrefix(s, "---\nname: bflow\ndescription: ") {
 		t.Error("frontmatter con name y description")
 	}

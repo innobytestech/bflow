@@ -5,8 +5,14 @@ package leader
 
 import (
 	_ "embed"
-	"errors"
+	"fmt"
+	"regexp"
+	"slices"
+	"sort"
+	"strings"
 )
+
+var marker = regexp.MustCompile(`\{\{[a-z_]+\}\}`)
 
 // body es el cuerpo común; lleva marcadores {{nombre}} que Render reemplaza.
 //
@@ -16,5 +22,29 @@ var body []byte
 // Render concatena head y el cuerpo común y reemplaza cada {{nombre}} por
 // vars[nombre]. Falla si queda un marcador sin reemplazar o sobra una variable.
 func Render(head []byte, vars map[string]string) ([]byte, error) {
-	return nil, errors.New("leader.Render: sin implementar")
+	out := string(head) + string(body)
+	used := map[string]bool{}
+	for name, v := range vars {
+		k := "{{" + name + "}}"
+		if strings.Contains(out, k) {
+			used[name] = true
+			out = strings.ReplaceAll(out, k, v)
+		}
+	}
+	var extra []string
+	for name := range vars {
+		if !used[name] {
+			extra = append(extra, name)
+		}
+	}
+	if len(extra) > 0 {
+		sort.Strings(extra)
+		return nil, fmt.Errorf("la variable %s no la usa ningún marcador", strings.Join(extra, ", "))
+	}
+	// Un valor podría traer otro marcador; se busca en el resultado completo.
+	if m := marker.FindAllString(out, -1); len(m) > 0 {
+		slices.Sort(m)
+		return nil, fmt.Errorf("marcador sin valor: %s", strings.Join(slices.Compact(m), ", "))
+	}
+	return []byte(out), nil
 }

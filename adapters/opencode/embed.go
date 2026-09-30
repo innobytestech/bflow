@@ -2,14 +2,25 @@
 // instala con bflow install opencode.
 package opencode
 
-import _ "embed"
+import (
+	_ "embed"
+
+	"innobytes.tech/bflow/adapters/leader"
+)
 
 // Command es el comando /bflow: command_head.md más el cuerpo común de
 // adapters/leader, con la herramienta de preguntas de OpenCode. Fuente única
 // de bflow install opencode.
-var Command []byte
+var Command = must(leader.Render(head, map[string]string{"ask_tool": "la herramienta `question`"}))
 
 // head es el encabezado (frontmatter) del comando.
 //
 //go:embed command_head.md
 var head []byte
+
+func must(b []byte, err error) []byte {
+	if err != nil {
+		panic("adapters/opencode: " + err.Error())
+	}
+	return b
+}
