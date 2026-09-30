@@ -236,7 +236,7 @@ func (f *fake) serve(w http.ResponseWriter, r *http.Request) {
 	defer f.mu.Unlock()
 	if r.Header.Get("Authorization") != "Bearer "+f.token {
 		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, `{"message":"Bad credentials"}`)
+		_, _ = io.WriteString(w, `{"message":"Bad credentials"}`)
 		return
 	}
 	if r.URL.Path == "/graphql" || r.URL.Path == "/api/graphql" {
@@ -255,12 +255,12 @@ func (f *fake) rest(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set(k, v)
 		}
 		w.WriteHeader(f.rateStatus)
-		io.WriteString(w, `{"message":"rate limit"}`)
+		_, _ = io.WriteString(w, `{"message":"rate limit"}`)
 		return
 	}
 	if f.status != 0 {
 		w.WriteHeader(f.status)
-		io.WriteString(w, f.errBody)
+		_, _ = io.WriteString(w, f.errBody)
 		return
 	}
 	if r.Header.Get("X-GitHub-Api-Version") == "" || !strings.Contains(r.Header.Get("Accept"), "github+json") {
@@ -274,7 +274,7 @@ func (f *fake) rest(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(rest, "/")
 	var in map[string]any
 	if r.Method == "POST" || r.Method == "PATCH" {
-		json.NewDecoder(r.Body).Decode(&in)
+		_ = json.NewDecoder(r.Body).Decode(&in)
 	}
 	switch {
 	case rest == "issues" && r.Method == "GET":
@@ -293,7 +293,7 @@ func (f *fake) rest(w http.ResponseWriter, r *http.Request) {
 			is.Labels = append(is.Labels, fmt.Sprint(l))
 		}
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(f.issueJSON(is))
+		_ = json.NewEncoder(w).Encode(f.issueJSON(is))
 	case rest == "labels" && r.Method == "GET":
 		var all []any
 		names := make([]string, 0, len(f.labels))
@@ -333,7 +333,7 @@ func (f *fake) issueRoute(w http.ResponseWriter, r *http.Request, is *fIssue, su
 	enc := json.NewEncoder(w)
 	switch {
 	case len(sub) == 0 && r.Method == "GET":
-		enc.Encode(f.issueJSON(is))
+		_ = enc.Encode(f.issueJSON(is))
 	case len(sub) == 0 && r.Method == "PATCH":
 		f.patches++
 		if s, ok := in["state"].(string); ok {
@@ -342,7 +342,7 @@ func (f *fake) issueRoute(w http.ResponseWriter, r *http.Request, is *fIssue, su
 		if s, ok := in["state_reason"].(string); ok {
 			is.Reason = s
 		}
-		enc.Encode(f.issueJSON(is))
+		_ = enc.Encode(f.issueJSON(is))
 	case sub[0] == "comments" && r.Method == "GET":
 		var all []any
 		for i, c := range is.Comments {
@@ -360,7 +360,7 @@ func (f *fake) issueRoute(w http.ResponseWriter, r *http.Request, is *fIssue, su
 				is.Labels = append(is.Labels, name)
 			}
 		}
-		enc.Encode(f.issueJSON(is)["labels"])
+		_ = enc.Encode(f.issueJSON(is)["labels"])
 	case sub[0] == "labels" && r.Method == "DELETE" && len(sub) == 2:
 		name, _ := url.PathUnescape(sub[1])
 		f.deleteSeen = append(f.deleteSeen, name)
@@ -424,7 +424,7 @@ func (f *fake) page(w http.ResponseWriter, r *http.Request, all []any) {
 	if out == nil {
 		out = []any{}
 	}
-	json.NewEncoder(w).Encode(out)
+	_ = json.NewEncoder(w).Encode(out)
 }
 
 // ---- GraphQL
@@ -440,7 +440,7 @@ func (f *fake) graphql(w http.ResponseWriter, r *http.Request) {
 		Query string         `json:"query"`
 		Vars  map[string]any `json:"variables"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
+	_ = json.NewDecoder(r.Body).Decode(&req)
 	q, v := req.Query, req.Vars
 	str := func(k string) string { s, _ := v[k].(string); return s }
 	data := func(m map[string]any) { json.NewEncoder(w).Encode(map[string]any{"data": m}) }
