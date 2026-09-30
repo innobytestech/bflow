@@ -370,10 +370,10 @@ func renderWatch(m bannerMode, version string, d watchData, now time.Time, rows 
 			label("", strings.Join(phases, " · "))
 		}
 		if st.TokensAvailable {
-			label("tokens", metrics.Tokens(st.Tokens.New(), st.Tokens.CacheRead))
+			label("tokens", metrics.Summary(st.Tokens))
 			for _, a := range byNew(st.Agents) {
 				u := st.Agents[a]
-				label("", fmt.Sprintf("%-18s %s", agentName(a), metrics.Tokens(u.New(), u.CacheRead)))
+				label("", fmt.Sprintf("%-18s %s", agentName(a), metrics.Detail(u)))
 			}
 		}
 		if n := st.Refused + st.Guarded + st.Nudged; n > 0 {

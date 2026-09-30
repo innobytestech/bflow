@@ -272,10 +272,10 @@ dl { margin: 0; }
 .sw.b, .stack i.b { background: repeating-linear-gradient(135deg, var(--amber) 0 3px, var(--led-face) 3px 6px); }
 .stack { display: flex; gap: 2px; margin: 4px 0 12px; }
 .stack i { flex: 1; height: 16px; background: var(--rule-soft); }
-.bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 6px 0; }
-.bar .n { color: var(--ink-2); overflow-wrap: anywhere; }
-.bar .v { text-align: right; color: var(--ink); }
-.bar .blocks { grid-column: 1 / -1; display: flex; gap: 2px; }
+.bar { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 6px 0; } /* si no caben, la cifra baja a su renglón */
+.bar .n { color: var(--ink-2); }
+.bar .v { margin-left: auto; text-align: right; color: var(--ink); }
+.bar .blocks { flex-basis: 100%; display: flex; gap: 2px; }
 .bar .blocks i { flex: 1; height: 8px; background: var(--rule-soft); }
 .bar .blocks i.on { background: var(--agent); }
 .total-line { color: var(--ink); margin: 0 0 8px; }

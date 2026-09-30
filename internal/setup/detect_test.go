@@ -108,6 +108,26 @@ func TestParseRemoteAndBase(t *testing.T) {
 	}
 }
 
+func TestDetectDBEnvFromExamples(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module x\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, ".env.example"), []byte("PORT=8080\nDB_URI=postgres://localhost/app\nexport REDIS_URL=x\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, ".env"), []byte("SECRET_DATABASE_URL=prod\n"), 0o644)
+	d := Detect(dir, Tools{})
+	if len(d.DBEnv) != 1 || d.DBEnv[0] != "DB_URI" {
+		t.Errorf("DBEnv = %v: solo DB_URI, y nunca de .env", d.DBEnv)
+	}
+	y, err := RenderYAML(Answers{Stack: "go", RequireEnv: d.DBEnv}, Profile{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"require_env:", `DB_URI: ""`, "env_first: true"} {
+		if !strings.Contains(y, want) {
+			t.Errorf("falta %q:\n%s", want, y)
+		}
+	}
+}
+
 func TestRenderYAMLIsShortAndValid(t *testing.T) {
 	a := Answers{Stack: "go", Tracker: "plane", Project: "API", Profile: "acme", BaseBranch: "dev", Host: "github",
 		Steps: []StepProposal{{Name: "vet", Run: "go vet ./..."}, {Name: "vulns", Run: "govulncheck ./...", Needs: "govulncheck", Optional: true}}}

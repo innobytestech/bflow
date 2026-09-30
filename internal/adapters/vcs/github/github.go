@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -93,7 +94,7 @@ func (c *Client) do(ctx context.Context, method, path string, in, out any) error
 		if resp.StatusCode == 401 || resp.StatusCode == 403 {
 			hint = " (revisa el token: bflow connect github)"
 		}
-		return fmt.Errorf("github %s %s → %d: %s%s", method, path, resp.StatusCode, msg, hint)
+		return &apiError{status: resp.StatusCode, text: fmt.Sprintf("github %s %s → %d: %s%s", method, path, resp.StatusCode, msg, hint)}
 	}
 	if out != nil {
 		return json.Unmarshal(raw, out)
@@ -101,12 +102,34 @@ func (c *Client) do(ctx context.Context, method, path string, in, out any) error
 	return nil
 }
 
+type apiError struct {
+	status int
+	text   string
+}
+
+func (e *apiError) Error() string { return e.text }
+
+// noAccess traduce un 404 sobre el repositorio: GitHub lo responde cuando el
+// token no ve el repo, para no revelar que existe.
+func (c *Client) noAccess(err error) error {
+	var ae *apiError
+	if errors.As(err, &ae) && ae.status == http.StatusNotFound {
+		return fmt.Errorf("%w %s: GitHub responde 404 cuando el token no lo ve (bflow connect github con un token que tenga acceso)", vcs.ErrNoAccess, c.Repo)
+	}
+	return err
+}
+
 func (c *Client) pulls() string { return "/repos/" + c.Repo + "/pulls" }
+
+// CheckRepo confirma que el token ve el repositorio.
+func (c *Client) CheckRepo(ctx context.Context) error {
+	return c.noAccess(c.do(ctx, "GET", "/repos/"+c.Repo, nil, nil))
+}
 
 func (c *Client) OpenPR(ctx context.Context, s vcs.PRSpec) (vcs.PR, error) {
 	var p apiPR
 	err := c.do(ctx, "POST", c.pulls(), map[string]string{"title": s.Title, "head": s.Head, "base": s.Base, "body": s.Body}, &p)
-	return p.pr(), err
+	return p.pr(), c.noAccess(err)
 }
 
 // FindPR busca un PR abierto cuya rama origen sea head.
@@ -115,7 +138,7 @@ func (c *Client) FindPR(ctx context.Context, head string) (vcs.PR, error) {
 	q := url.Values{"head": {owner + ":" + head}, "state": {"open"}}
 	var ps []apiPR
 	if err := c.do(ctx, "GET", c.pulls()+"?"+q.Encode(), nil, &ps); err != nil {
-		return vcs.PR{}, err
+		return vcs.PR{}, c.noAccess(err)
 	}
 	if len(ps) == 0 {
 		return vcs.PR{}, vcs.ErrNoPR

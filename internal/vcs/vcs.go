@@ -14,6 +14,9 @@ var (
 	ErrNoPR = errors.New("no hay PR para la rama")
 	// ErrNoCredentials lo devuelve un Host sin token; el engine degrada a URL de compare.
 	ErrNoCredentials = errors.New("sin credenciales para el host remoto")
+	// ErrNoAccess lo devuelve un Host cuyo token no ve el repositorio; el
+	// engine también degrada a URL de compare.
+	ErrNoAccess = errors.New("el token no tiene acceso al repositorio")
 )
 
 // Git son las operaciones locales.

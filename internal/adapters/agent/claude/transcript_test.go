@@ -57,7 +57,8 @@ func TestReadUsageIncrementalWithDuplicates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]metrics.Usage{opus: {Input: 3, Output: 45, CacheRead: 3000, CacheWrite: 300}}
+	// Dos llamadas (m1 y m2, aunque m1 venga en dos líneas); la más grande leyó 2001.
+	want := map[string]metrics.Usage{opus: {Input: 3, Output: 45, CacheRead: 3000, CacheWrite: 300, Calls: 2, MaxContext: 2001}}
 	if got := sum(u); !reflect.DeepEqual(got, want) {
 		t.Fatalf("primera lectura %+v, want %+v", got, want)
 	}
@@ -73,7 +74,7 @@ func TestReadUsageIncrementalWithDuplicates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(u) != 1 || u[0].Usage != (metrics.Usage{Input: 1, Output: 7}) || !u[0].TS.Equal(time.Date(2026, 9, 28, 22, 40, 0, 0, time.UTC)) {
+	if len(u) != 1 || u[0].Usage != (metrics.Usage{Input: 1, Output: 7, Calls: 1, MaxContext: 1}) || !u[0].TS.Equal(time.Date(2026, 9, 28, 22, 40, 0, 0, time.UTC)) {
 		t.Fatalf("segunda lectura %+v: solo m3 completo, con su hora", u)
 	}
 	if u, _ := a.ReadUsage(main, cur); len(u) != 0 {

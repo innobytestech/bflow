@@ -120,6 +120,9 @@ func runCheck(c *Ctx) output.Envelope {
 		return fail(err)
 	}
 	if quick == "" {
+		if err := check.CompareTimes(e.Store, &res); err != nil {
+			return fail(err)
+		}
 		if err := check.Save(e.Store, id, res); err != nil {
 			return fail(err)
 		}
@@ -138,8 +141,17 @@ func runCheck(c *Ctx) output.Envelope {
 			lines = all[max(0, len(all)-10):]
 		}
 		short := strings.Join(lines[:min(len(lines), 10)], "\n")
-		failed = append(failed, map[string]any{"step": s.Name, "tail": short})
-		fmt.Fprintf(&b, "\n❌ %s\n%s", s.Name, short)
+		f := map[string]any{"step": s.Name, "tail": short}
+		fmt.Fprintf(&b, "\n❌ %s\n", s.Name)
+		if s.Preexisting {
+			f["preexisting"] = true
+			b.WriteString(s.PreexistingHint() + "\n")
+		}
+		b.WriteString(short)
+		failed = append(failed, f)
+	}
+	for _, w := range res.Warnings {
+		b.WriteString("\n⚠ " + w)
 	}
 	if res.SHA == "DIRTY" && quick == "" {
 		b.WriteString("\n⚠ código sin commitear: commitea y vuelve a correr para que --verify pase")
@@ -156,6 +168,9 @@ func runCheck(c *Ctx) output.Envelope {
 	}
 	if len(res.Degraded) > 0 {
 		data["degraded"] = res.Degraded
+	}
+	if len(res.Warnings) > 0 {
+		data["warnings"] = res.Warnings
 	}
 	env := output.OK("check", data, nil)
 	env.Text = b.String()

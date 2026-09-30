@@ -184,7 +184,10 @@ func init() {
 			return e.Unblock(ctx, id)
 		})})
 
-	Register(&Command{Name: "freeze", Summary: "vuelve a congelar las pruebas del contrato tal como están (solo una persona): freeze [ID]",
+	Register(&Command{Name: "freeze", Summary: "vuelve a congelar las pruebas del contrato tal como están, o con --allow deja cambiar una una vez (solo una persona): freeze [ID] [--allow <archivo>]",
+		Setup: func(fs *flag.FlagSet) {
+			fs.String("allow", "", "prueba congelada que el implementer puede cambiar una vez")
+		},
 		Run: func(c *Ctx) output.Envelope {
 			ctx := context.Background()
 			e, err := engineFor(c)
@@ -194,6 +197,14 @@ func init() {
 			id, _, err := resolveID(ctx, e, c.Args)
 			if err != nil {
 				return fail(err)
+			}
+			if f := str(c.Flags, "allow"); f != "" {
+				if err := e.AllowFrozen(id, f); err != nil {
+					return fail(err)
+				}
+				env := output.OK("freeze_allowed", map[string]any{"id": id, "file": f}, nil)
+				env.Text = fmt.Sprintf("%s: %s se puede cambiar una vez; se vuelve a congelar cuando el implementer reporte DONE", id, f)
+				return env
 			}
 			n, err := e.Refreeze(id)
 			if err != nil {

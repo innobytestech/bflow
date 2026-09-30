@@ -213,6 +213,36 @@ func TestBaselineNewOnly(t *testing.T) {
 	}
 }
 
+// Como en BE-05: govulncheck falla por el stdlib y la tarea no tocó go.mod.
+func TestVulnsPreexisting(t *testing.T) {
+	fx := &fakeExec{results: map[string]struct {
+		out  string
+		exit int
+	}{"govulncheck": {"Vulnerability #1: GO-2026-4001\n  Standard library", 3}}}
+	g := &fakeGit{sha: "a", diff: []string{"internal/user/handler.go"}}
+	r := runner(t, []config.Step{{Name: "vulns", Run: "govulncheck ./...", Accept: "security/vulns.json"}, {Name: "test", Run: "go test ./..."}}, fx, g)
+	res, _ := r.Run(context.Background())
+	s := res.Steps[0]
+	if s.Status != "fail" || !s.Preexisting || !strings.Contains(s.PreexistingHint(), "security/vulns.json") {
+		t.Fatalf("vulns sin tocar dependencias: %+v", s)
+	}
+	if !strings.Contains(res.Summary(), "vulns (preexistente)") || !strings.Contains(res.Markdown(), "NEEDS_DECISION") {
+		t.Errorf("resumen y reporte:\n%s\n%s", res.Summary(), res.Markdown())
+	}
+	g.diff = append(g.diff, "go.mod")
+	if res, _ := r.Run(context.Background()); res.Steps[0].Preexisting {
+		t.Error("si la tarea tocó go.mod, las vulnerabilidades pueden ser suyas")
+	}
+	fx.results["go test"] = struct {
+		out  string
+		exit int
+	}{"--- FAIL: TestOtraTarea", 1}
+	g.diff = []string{"internal/user/handler.go"}
+	if res, _ := r.Run(context.Background()); res.Steps[1].Preexisting {
+		t.Error("una prueba que falla nunca es preexistente: puede ser una regresión de la tarea en otro archivo")
+	}
+}
+
 func TestQuick(t *testing.T) {
 	fx := &fakeExec{}
 	r := runner(t, nil, fx, &fakeGit{sha: "a"})

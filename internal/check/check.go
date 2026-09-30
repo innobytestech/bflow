@@ -59,6 +59,10 @@ type StepResult struct {
 	Tail   string   `json:"tail,omitempty"`
 	Detail string   `json:"detail,omitempty"` // p. ej. "5 paq."
 	Fails  []string `json:"fails,omitempty"`  // líneas de fallo sin repetir (lo que lee el agente)
+	// Preexisting: vulnerabilidades en dependencias que la tarea no tocó. No
+	// las arregla el agente por su cuenta: decide una persona.
+	Preexisting bool   `json:"preexisting,omitempty"`
+	Accept      string `json:"accept_file,omitempty"`
 }
 
 // Result es una corrida de check.
@@ -67,6 +71,7 @@ type Result struct {
 	Date     time.Time    `json:"date"`
 	Result   string       `json:"result"` // PASS | FAIL
 	Degraded []string     `json:"degraded,omitempty"`
+	Warnings []string     `json:"warnings,omitempty"` // pasos que pasaron sospechosamente rápido
 	Steps    []StepResult `json:"steps"`
 }
 
@@ -173,6 +178,9 @@ func (r *Runner) step(ctx context.Context, st config.Step, res *Result) StepResu
 		} else if msg != "" {
 			out = msg + "\n" + out
 		}
+	}
+	if isVulnStep(st) && !r.depsTouched(ctx) {
+		sr.Preexisting, sr.Accept = true, st.Accept
 	}
 	if st.Baseline == "new-only" {
 		mine := r.onlyTouched(ctx, out)
@@ -309,6 +317,42 @@ func (r *Runner) tail(out string) (string, []string) {
 	return strings.Join(last, "\n"), nil
 }
 
+var vulnToolRe = regexp.MustCompile(`\b(govulncheck|npm audit|pnpm audit|yarn audit|pip-audit|osv-scanner)\b|dotnet list .*--vulnerable`)
+
+// isVulnStep: el paso busca vulnerabilidades en dependencias.
+func isVulnStep(st config.Step) bool {
+	return st.Accept != "" || vulnToolRe.MatchString(st.Run)
+}
+
+// depManifests son los archivos que fijan versiones de dependencias o del
+// toolchain. Si la tarea no tocó ninguno, sus vulnerabilidades ya estaban.
+var depManifests = []string{"go.mod", "go.sum", "package.json", "package-lock.json", "pnpm-lock.yaml", "yarn.lock",
+	"pyproject.toml", "poetry.lock", "Pipfile.lock", "pom.xml", "build.gradle", "build.gradle.kts",
+	"packages.lock.json", "Directory.Packages.props"}
+
+func (r *Runner) depsTouched(ctx context.Context) bool {
+	files, _ := r.Git.DiffNames(ctx, r.Base)
+	dirty, _ := r.Git.Dirty(ctx, nil)
+	for _, f := range append(files, dirty...) {
+		base := filepath.Base(strings.ReplaceAll(f, `\`, "/"))
+		if slices.Contains(depManifests, base) || strings.HasSuffix(base, ".csproj") || strings.HasPrefix(base, "requirements") {
+			return true
+		}
+	}
+	return false
+}
+
+// PreexistingHint le dice al agente qué hacer con un paso de vulnerabilidades
+// que falla por dependencias que la tarea no tocó.
+func (s StepResult) PreexistingHint() string {
+	accept := "`" + s.Accept + "`"
+	if s.Accept == "" {
+		accept = "un `accept_file` del paso (JSON: {\"accepted\": [{\"id\", \"revisar\": \"AAAA-MM-DD\", \"seguimiento\"}]})"
+	}
+	return "vulnerabilidades en dependencias que esta tarea no tocó: no las arregles por tu cuenta. Reporta NEEDS_DECISION con dos opciones: " +
+		"que una persona las acepte en " + accept + " con fecha de revisión y se abra otra tarea, o actualizar la dependencia en esta tarea."
+}
+
 func (r *Runner) onlyTouched(ctx context.Context, out string) string {
 	files, _ := r.Git.DiffNames(ctx, r.Base)
 	dirty, _ := r.Git.Dirty(ctx, nil)
@@ -432,9 +476,19 @@ func (res Result) Markdown() string {
 			b.WriteString("- " + d + "\n")
 		}
 	}
+	if len(res.Warnings) > 0 {
+		b.WriteString("\n## ⚠️ Avisos\n")
+		for _, w := range res.Warnings {
+			b.WriteString("- " + w + "\n")
+		}
+	}
 	for _, s := range res.Steps {
 		if s.Status == "fail" {
-			fmt.Fprintf(&b, "\n## ❌ %s\n`%s`\n```\n%s\n```\n", s.Name, s.Cmd, s.Tail)
+			fmt.Fprintf(&b, "\n## ❌ %s\n`%s`\n", s.Name, s.Cmd)
+			if s.Preexisting {
+				b.WriteString("\n" + s.PreexistingHint() + "\n")
+			}
+			fmt.Fprintf(&b, "```\n%s\n```\n", s.Tail)
 		}
 	}
 	return b.String()
@@ -446,7 +500,11 @@ func (res Result) Summary() string {
 	for _, s := range res.Steps {
 		switch s.Status {
 		case "fail":
-			failed = append(failed, s.Name)
+			if s.Preexisting {
+				failed = append(failed, s.Name+" (preexistente)")
+			} else {
+				failed = append(failed, s.Name)
+			}
 		case "skip":
 			skipped = append(skipped, s.Name)
 		}
@@ -457,6 +515,9 @@ func (res Result) Summary() string {
 	}
 	if len(res.Degraded) > 0 {
 		line += fmt.Sprintf(" · %d degradado(s)", len(res.Degraded))
+	}
+	if len(res.Warnings) > 0 {
+		line += fmt.Sprintf(" · %d aviso(s)", len(res.Warnings))
 	}
 	return line
 }

@@ -1,0 +1,30 @@
+# bflow.yaml — generado por bflow init. Solo lo propio de este repo; lo compartido va en el perfil.
+stack: go
+agent: claude
+vcs:
+  host: github
+  base_branch: main
+  commit_style: "{type}({id}): {summary}"
+check:
+  steps:
+    - name: vet
+      run: go vet ./...
+    - name: test
+      run: go test -count=1 {race} ./...
+    - name: build
+      run: go build ./...
+    - name: lint
+      run: golangci-lint run --new-from-rev={base}
+      needs: golangci-lint
+    - name: vulns
+      run: govulncheck ./...
+      needs: govulncheck
+    - name: secrets
+      run: gitleaks detect --no-banner --redact
+      needs: gitleaks
+      optional: true
+  quick:
+    - go vet {pkg}
+    - go test -count=1 {pkg}
+guard:
+  forbid_coauthor: true # en este repo los commits van sin coautor

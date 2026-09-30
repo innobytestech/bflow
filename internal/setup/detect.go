@@ -33,6 +33,7 @@ type Detection struct {
 	Stack string
 	Steps []StepProposal
 	Quick []string
+	DBEnv []string // variables de conexión a la base de datos, de los .env de ejemplo
 }
 
 func exists(dir, f string) bool {
@@ -59,7 +60,28 @@ func Detect(dir string, tools Tools) Detection {
 	case exists(dir, "Makefile"):
 		d.Steps = makeSteps(dir)
 	}
+	d.DBEnv = dbEnv(dir)
 	return d
+}
+
+var dbEnvRe = regexp.MustCompile(`(?m)^\s*(?:export\s+)?([A-Z0-9_]*(?:DB|DATABASE|POSTGRES|PG|MYSQL|MONGO)[A-Z0-9_]*(?:URI|URL|DSN))\s*=`)
+
+// dbEnv busca en los .env de ejemplo las variables con la conexión a la base
+// de datos. Nunca lee .env: puede tener secretos.
+func dbEnv(dir string) []string {
+	var out []string
+	for _, f := range []string{".env.example", ".env.sample", ".env.template", ".env.dist"} {
+		b, err := os.ReadFile(filepath.Join(dir, f))
+		if err != nil {
+			continue
+		}
+		for _, m := range dbEnvRe.FindAllStringSubmatch(string(b), -1) {
+			if !slices.Contains(out, m[1]) {
+				out = append(out, m[1])
+			}
+		}
+	}
+	return out
 }
 
 func goSteps(t Tools) []StepProposal {
@@ -187,6 +209,7 @@ type Answers struct {
 	Host, BaseBranch               string
 	Steps                          []StepProposal
 	Quick                          []string
+	RequireEnv                     []string // variables que el check necesita definidas
 }
 
 type yamlTracker struct {
@@ -206,6 +229,10 @@ type yamlCheck struct {
 	Quick []string       `yaml:"quick,omitempty"`
 }
 
+type yamlEnv struct {
+	RequireEnv map[string]string `yaml:"require_env,omitempty"`
+}
+
 type yamlRepo struct {
 	Profile string       `yaml:"profile,omitempty"`
 	Stack   string       `yaml:"stack,omitempty"`
@@ -213,6 +240,7 @@ type yamlRepo struct {
 	Tracker *yamlTracker `yaml:"tracker,omitempty"`
 	VCS     *yamlVCS     `yaml:"vcs,omitempty"`
 	Check   *yamlCheck   `yaml:"check,omitempty"`
+	Env     *yamlEnv     `yaml:"env,omitempty"`
 }
 
 func unless(v, inProfile string) string {
@@ -239,11 +267,23 @@ func RenderYAML(a Answers, p Profile) (string, error) {
 	if len(a.Steps)+len(a.Quick) > 0 {
 		r.Check = &yamlCheck{Steps: a.Steps, Quick: a.Quick}
 	}
+	if len(a.RequireEnv) > 0 {
+		r.Env = &yamlEnv{RequireEnv: map[string]string{}}
+		for _, v := range a.RequireEnv {
+			r.Env.RequireEnv[v] = ""
+		}
+	}
 	var buf bytes.Buffer
 	enc := yaml.NewEncoder(&buf)
 	enc.SetIndent(2)
 	if err := enc.Encode(r); err != nil {
 		return "", err
 	}
-	return "# bflow.yaml — generado por bflow init. Solo lo propio de este repo; lo compartido va en el perfil.\n" + buf.String(), nil
+	out := "# bflow.yaml — generado por bflow init. Solo lo propio de este repo; lo compartido va en el perfil.\n" + buf.String()
+	if len(a.RequireEnv) > 0 {
+		out += "# La base de datos de las pruebas sale de " + strings.Join(a.RequireEnv, ", ") + ": doctor y el inicio de sesión avisan si falta.\n" +
+			"# Para que tampoco apunte a producción, pon en require_env un fragmento que deba contener (por ejemplo localhost),\n" +
+			"# y en check, env_first: true para que el check no corra sin ella.\n"
+	}
+	return out, nil
 }

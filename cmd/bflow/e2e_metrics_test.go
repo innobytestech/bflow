@@ -103,7 +103,7 @@ func TestStatsTokensAndStatusline(t *testing.T) {
 		t.Errorf("statusline: %q", line)
 	}
 	text, _, _ := r.hook("", "stats", id)
-	for _, want := range []string{"11k nuevos · 88k caché", "sesión principal", "implementer", "caché escrita 8k"} {
+	for _, want := range []string{"11k nuevos · 88k releídos de caché en 4 llamadas", "sesión principal", "implementer", "caché escrita 8k", "ctx máx"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("stats texto sin %q:\n%s", want, text)
 		}

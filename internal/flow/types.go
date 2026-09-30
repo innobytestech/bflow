@@ -154,7 +154,7 @@ type Event struct {
 
 // AgentArtifacts son los archivos de .bflow/tasks/<ID>/ que escriben los
 // agentes (los que terminan en "/" son carpetas). El resto es estado de bflow.
-var AgentArtifacts = []string{"contract.md", "walkthrough.md", "consumer-changelog.md", "reports/"}
+var AgentArtifacts = []string{"contract.md", "walkthrough.md", "reports/"}
 
 // IsAgentArtifact dice si rel (relativa a la carpeta de la tarea) es un
 // artefacto que escribe un agente.

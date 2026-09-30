@@ -8,6 +8,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -112,6 +114,7 @@ func (e *Engine) apply(ctx context.Context, id string, ev flow.Event, slug strin
 			if changed := e.FrozenChanged(id); len(changed) > 0 {
 				return frozenRejection(changed)
 			}
+			e.refreezeAllowed(id)
 			if open := openTasks(e, *rec); len(open) > 0 {
 				return &flow.Rejection{Code: "tasks_open", Reason: "DONE exige todas las tareas de la spec marcadas [x]; faltan:\n" + strings.Join(open, "\n") +
 					"\nMárcalas al terminarlas; si una ya no aplica, anótalo en Design y márcala con el motivo."}
@@ -333,15 +336,26 @@ func (e *Engine) commitSpec(ctx context.Context, s flow.State, summary string) [
 	if e.Git == nil || !slices.Contains(e.flowCfg().Lanes[s.Lane], flow.Spec) {
 		return nil
 	}
-	path := flow.SpecPath(s.ID, s.Slug)
-	done, err := e.Git.Commit(ctx, []string{path}, e.commitMessage("docs", s.ID, summary))
+	paths := e.specFiles(s)
+	done, err := e.Git.Commit(ctx, paths, e.commitMessage("docs", s.ID, summary))
 	switch {
 	case err != nil:
-		return []string{"no se pudo hacer commit de la spec (" + err.Error() + "); commitéala a mano: " + path}
+		return []string{"no se pudo hacer commit de la spec (" + err.Error() + "); commitéala a mano: " + strings.Join(paths, " ")}
 	case done:
-		return []string{"commit de la spec: " + path}
+		return []string{"commit de la spec: " + strings.Join(paths, " ")}
 	}
 	return nil
+}
+
+// specFiles son los archivos versionados que bflow commitea por la tarea: la
+// spec y, si ya existe, el changelog para consumidores.
+func (e *Engine) specFiles(s flow.State) []string {
+	paths := []string{flow.SpecPath(s.ID, s.Slug)}
+	cl := e.flowCfg().ChangelogPath(s.ID, s.Slug)
+	if _, err := os.Stat(filepath.Join(e.Cfg.Root, filepath.FromSlash(cl))); err == nil {
+		paths = append(paths, cl)
+	}
+	return paths
 }
 
 // commitMessage aplica vcs.commit_style a un commit que hace bflow.

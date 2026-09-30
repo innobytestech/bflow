@@ -42,17 +42,18 @@ type base struct {
 	effort      string
 	writes      []string // artefactos en .bflow/tasks/<id>/
 	writesSpec  bool
+	changelog   bool // escribe el único changelog para consumidores (ruta en `changelog`)
 }
 
 // catalog son los agentes que bflow trae con un oficio por defecto.
 var catalog = map[string]base{
-	"spec-author":      {"Escribe la spec de la tarea (brief, requirements, design, tasks) a partir de la descripción y el discovery.", "", "medium", nil, true},
-	"ui-designer":      {"Diseña el UI blueprint de la spec anclado a las pantallas hermanas del repo.", "", "medium", nil, true},
-	"implementer":      {"Escribe el contrato (pruebas y firmas) y después implementa las tareas de la spec.", "sonnet", "medium", []string{"contract.md", "reports/impl.md"}, false},
-	"reviewer":         {"Revisa trazabilidad, pruebas, arquitectura y seguridad del diff y escribe el review-map.", "sonnet", "medium", []string{"reports/review-map.md"}, false},
-	"security-auditor": {"Audita seguridad, resiliencia y rendimiento del código nuevo de la rama.", "sonnet", "medium", []string{"reports/security.md"}, false},
-	"ux-auditor":       {"Audita la interfaz nueva contra el UI blueprint y las guías del repo.", "sonnet", "medium", []string{"reports/ux.md"}, false},
-	"documenter":       {"Documenta el cambio y escribe el walkthrough del PR.", "haiku", "low", []string{"walkthrough.md", "consumer-changelog.md"}, false},
+	"spec-author":      {"Escribe la spec de la tarea (brief, requirements, design, tasks) a partir de la descripción y el discovery.", "", "medium", nil, true, false},
+	"ui-designer":      {"Diseña el UI blueprint de la spec anclado a las pantallas hermanas del repo.", "", "medium", nil, true, false},
+	"implementer":      {"Escribe el contrato (pruebas y firmas) y después implementa las tareas de la spec.", "sonnet", "medium", []string{"contract.md", "reports/impl.md"}, false, false},
+	"reviewer":         {"Revisa trazabilidad, pruebas, arquitectura y seguridad del diff y escribe el review-map.", "sonnet", "medium", []string{"reports/review-map.md"}, false, false},
+	"security-auditor": {"Audita seguridad, resiliencia y rendimiento del código nuevo de la rama.", "sonnet", "medium", []string{"reports/security.md"}, false, false},
+	"ux-auditor":       {"Audita la interfaz nueva contra el UI blueprint y las guías del repo.", "sonnet", "medium", []string{"reports/ux.md"}, false, false},
+	"documenter":       {"Documenta el cambio y escribe el walkthrough del PR.", "haiku", "low", []string{"walkthrough.md"}, false, true},
 }
 
 //go:embed craft/*.md
@@ -173,11 +174,16 @@ func contract(name string, phases []flow.Phase, b base) string {
 	} else {
 		w.WriteString("- En `.bflow/` no escribes nada.\n")
 	}
+	if b.changelog {
+		w.WriteString("- Si cambia lo que consumen otros equipos, escribes el changelog para consumidores en la ruta que recibes en `changelog` y lo commiteas. Es el único de la tarea: no escribas otro en ninguna parte.\n")
+	} else if slices.Contains(phases, flow.Implementing) {
+		w.WriteString("- No escribes changelogs ni documentación para otros equipos, aunque las reglas del repo lo pidan: los escribe el documenter, en un solo archivo.\n")
+	}
 	if slices.Contains(phases, flow.Contract) {
-		w.WriteString("- Las pruebas del contrato quedan congeladas al aprobarse: después no se cambian. Si una está mal, reporta NEEDS_DECISION.\n")
+		w.WriteString("- Las pruebas del contrato quedan congeladas al aprobarse: después no se cambian. Si una está mal, reporta NEEDS_DECISION con el cambio exacto; si una persona lo aprueba y corre `bflow freeze --allow <archivo>`, puedes cambiarla una vez.\n")
 	}
 	if slices.Contains(phases, flow.Implementing) {
-		w.WriteString("- DONE exige `bflow check <id>` en verde sobre tu último commit y todas las tareas de la spec marcadas `[x]`. Mientras iteras, `bflow check <id> --quick <paquete>`.\n")
+		w.WriteString("- DONE exige `bflow check <id>` en verde sobre tu último commit y todas las tareas de la spec marcadas `[x]`. Mientras iteras, `bflow check <id> --quick <paquete>`. Un paso marcado preexistente no lo arreglas por tu cuenta: reporta NEEDS_DECISION.\n")
 	}
 
 	w.WriteString("- Al terminar, reporta:\n")

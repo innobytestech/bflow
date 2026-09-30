@@ -4,7 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -19,7 +20,6 @@ var prSections = []struct{ title, file string }{
 	{"Review-map", "reports/review-map.md"},
 	{"Walkthrough", "walkthrough.md"},
 	{"Decisiones en vuelo", "decisions.md"},
-	{"Contrato para consumidores", "consumer-changelog.md"},
 }
 
 // PRBody arma la descripción del PR.
@@ -39,12 +39,25 @@ func (e *Engine) PRBody(rec store.Record) string {
 		}
 		fmt.Fprintf(&b, "\n## %s\n\n%s\n", s.title, strings.TrimSpace(demoteHeadings(string(body))))
 	}
+	if body := e.changelog(rec.Flow); body != "" {
+		fmt.Fprintf(&b, "\n## Contrato para consumidores\n\n%s\n", demoteHeadings(body))
+	}
 	b.WriteString("\n---\n")
 	if slices.Contains(e.flowCfg().Lanes[rec.Flow.Lane], flow.Spec) {
 		fmt.Fprintf(&b, "Spec: `%s` · ", flow.SpecPath(rec.Flow.ID, rec.Flow.Slug))
 	}
 	b.WriteString("generado por bflow\n")
 	return b.String()
+}
+
+// changelog lee el changelog para consumidores de la tarea, versionado en el
+// repo. Las tareas empezadas antes lo tienen en .bflow/tasks/<ID>/.
+func (e *Engine) changelog(s flow.State) string {
+	body, err := os.ReadFile(filepath.Join(e.Cfg.Root, filepath.FromSlash(e.flowCfg().ChangelogPath(s.ID, s.Slug))))
+	if err != nil {
+		body, _ = e.Store.ReadFile(s.ID, "consumer-changelog.md")
+	}
+	return strings.TrimSpace(string(body))
 }
 
 // demoteHeadings baja dos niveles los encabezados de un artefacto para que
@@ -87,13 +100,13 @@ func (e *Engine) openPR(ctx context.Context, rec *store.Record) ([]string, error
 		rec.PR = &store.PR{Number: pr.Number, URL: pr.URL}
 		return append(warns, fmt.Sprintf("PR #%d ya existía; descripción actualizada: %s", pr.Number, pr.URL)), nil
 	} else if !errors.Is(err, vcs.ErrNoPR) {
-		if errors.Is(err, vcs.ErrNoCredentials) {
+		if degradable(err) {
 			return append(warns, e.degradePR(rec, base, err)...), nil
 		}
 		return nil, fmt.Errorf("buscar PR: %w", err)
 	}
 	pr, err := e.Host.OpenPR(ctx, vcs.PRSpec{Base: base, Head: rec.Branch, Title: fmt.Sprintf("%s · %s", rec.Flow.ID, rec.Title), Body: body})
-	if errors.Is(err, vcs.ErrNoCredentials) {
+	if degradable(err) {
 		return append(warns, e.degradePR(rec, base, err)...), nil
 	}
 	if err != nil {
@@ -101,6 +114,12 @@ func (e *Engine) openPR(ctx context.Context, rec *store.Record) ([]string, error
 	}
 	rec.PR = &store.PR{Number: pr.Number, URL: pr.URL}
 	return append(warns, fmt.Sprintf("PR #%d abierto: %s", pr.Number, pr.URL)), nil
+}
+
+// degradable: sin token o con un token que no ve el repo, el PR se deja listo
+// para abrirlo a mano en lugar de fallar.
+func degradable(err error) bool {
+	return errors.Is(err, vcs.ErrNoCredentials) || errors.Is(err, vcs.ErrNoAccess)
 }
 
 func (e *Engine) degradePR(rec *store.Record, base string, cause error) []string {
@@ -113,7 +132,8 @@ func (e *Engine) degradePR(rec *store.Record, base string, cause error) []string
 }
 
 // uncommitted son los cambios de código sin commitear: no entrarían al PR.
-// La spec no cuenta (bflow la commitea solo) ni .bflow/ (git la ignora).
+// No cuentan .bflow/ (git la ignora) ni, en los carriles con spec, la spec y
+// el changelog: bflow los commitea solo.
 func (e *Engine) uncommitted(ctx context.Context, s flow.State) []string {
 	if e.Git == nil {
 		return nil
@@ -122,11 +142,14 @@ func (e *Engine) uncommitted(ctx context.Context, s flow.State) []string {
 	if err != nil {
 		return nil
 	}
-	specDir := path.Dir(flow.SpecPath(s.ID, s.Slug)) + "/"
+	var own []string
+	if slices.Contains(e.flowCfg().Lanes[s.Lane], flow.Spec) {
+		own = e.specFiles(s)
+	}
 	var out []string
 	for _, f := range dirty {
 		f = strings.ReplaceAll(f, `\`, "/")
-		if !strings.HasPrefix(f, specDir) && !strings.HasPrefix(f, ".bflow/") {
+		if !slices.Contains(own, f) && !strings.HasPrefix(f, ".bflow/") {
 			out = append(out, f)
 		}
 	}

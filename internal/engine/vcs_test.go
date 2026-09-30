@@ -3,11 +3,15 @@ package engine
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"innobytes.tech/bflow/internal/flow"
+	"innobytes.tech/bflow/internal/store"
 	"innobytes.tech/bflow/internal/vcs"
 )
 
@@ -42,18 +46,18 @@ func (g *fakeGit) RemoteURL(context.Context) (string, error) {
 }
 
 type fakeHost struct {
-	prs     map[string]vcs.PR // por rama
-	bodies  map[int]string
-	noCreds bool
-	opened  int
+	prs    map[string]vcs.PR // por rama
+	bodies map[int]string
+	deny   error // si no es nil, OpenPR y FindPR fallan con él
+	opened int
 }
 
 func newHost() *fakeHost { return &fakeHost{prs: map[string]vcs.PR{}, bodies: map[int]string{}} }
 
 func (h *fakeHost) Name() string { return "fake" }
 func (h *fakeHost) OpenPR(_ context.Context, s vcs.PRSpec) (vcs.PR, error) {
-	if h.noCreds {
-		return vcs.PR{}, vcs.ErrNoCredentials
+	if h.deny != nil {
+		return vcs.PR{}, h.deny
 	}
 	h.opened++
 	pr := vcs.PR{Number: 100 + h.opened, URL: "https://host/pr/" + s.Head, State: "open"}
@@ -62,8 +66,8 @@ func (h *fakeHost) OpenPR(_ context.Context, s vcs.PRSpec) (vcs.PR, error) {
 	return pr, nil
 }
 func (h *fakeHost) FindPR(_ context.Context, head string) (vcs.PR, error) {
-	if h.noCreds {
-		return vcs.PR{}, vcs.ErrNoCredentials
+	if h.deny != nil {
+		return vcs.PR{}, h.deny
 	}
 	if pr, ok := h.prs[head]; ok && pr.State == "open" {
 		return pr, nil
@@ -139,6 +143,27 @@ func TestBranchCreatedOnSpecApproval(t *testing.T) {
 	}
 }
 
+func TestPRBodyReadsVersionedChangelog(t *testing.T) {
+	v := newEnv(t, "flow: { consumer_changelog: \"docs/consumers/{id}.md\" }\n")
+	id := "T-9"
+	rec := store.Record{Flow: flow.State{ID: id, Slug: "demo", Lane: flow.Full}, Title: "Demo"}
+	_ = v.e.Store.WriteFile(id, "consumer-changelog.md", []byte("de una tarea vieja"))
+	if body := v.e.PRBody(rec); !strings.Contains(body, "de una tarea vieja") {
+		t.Errorf("sin changelog versionado, usa el de .bflow/ de las tareas empezadas antes:\n%s", body)
+	}
+	p := filepath.Join(v.e.Cfg.Root, "docs", "consumers", id+".md")
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte("# Cambios\n- nuevo error 403"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	body := v.e.PRBody(rec)
+	if !strings.Contains(body, "## Contrato para consumidores") || !strings.Contains(body, "### Cambios") || strings.Contains(body, "de una tarea vieja") {
+		t.Errorf("el PR lleva el changelog versionado:\n%s", body)
+	}
+}
+
 func TestPROpenedOnWalkthroughAndIdempotent(t *testing.T) {
 	v := newEnv(t, "vcs: { base_branch: dev }\n")
 	g, h := &fakeGit{branch: "dev"}, newHost()
@@ -172,22 +197,26 @@ func TestPROpenedOnWalkthroughAndIdempotent(t *testing.T) {
 	}
 }
 
-func TestPRDegradesWithoutCredentials(t *testing.T) {
-	v := newEnv(t, "vcs: { base_branch: dev }\n")
-	h := newHost()
-	h.noCreds = true
-	v.e.Git, v.e.Host = &fakeGit{branch: "dev"}, h
-	id := v.task(t, "Demo")
-	toWalkthrough(t, v, id)
-	o := mustT(t)(v.e.Approve(context.Background(), id, ApproveOpts{}))
-	if o.To != flow.InReview || o.PR == nil || !strings.Contains(o.PR.URL, "compare/dev...hotfix/") {
-		t.Fatalf("degradado: %+v", o)
-	}
-	if !hasWarning(o, "pr-body.md") {
-		t.Errorf("debe decir dónde quedó la descripción: %v", o.Warnings)
-	}
-	if b, err := v.e.Store.ReadFile(id, "pr-body.md"); err != nil || len(b) == 0 {
-		t.Error("pr-body.md debe existir")
+func TestPRDegradesWithoutAccess(t *testing.T) {
+	for name, deny := range map[string]error{"sin token": vcs.ErrNoCredentials, "token sin acceso al repo": fmt.Errorf("%w o/r", vcs.ErrNoAccess)} {
+		t.Run(name, func(t *testing.T) {
+			v := newEnv(t, "vcs: { base_branch: dev }\n")
+			h := newHost()
+			h.deny = deny
+			v.e.Git, v.e.Host = &fakeGit{branch: "dev"}, h
+			id := v.task(t, "Demo")
+			toWalkthrough(t, v, id)
+			o := mustT(t)(v.e.Approve(context.Background(), id, ApproveOpts{}))
+			if o.To != flow.InReview || o.PR == nil || !strings.Contains(o.PR.URL, "compare/dev...hotfix/") {
+				t.Fatalf("degradado: %+v", o)
+			}
+			if !hasWarning(o, "pr-body.md") {
+				t.Errorf("debe decir dónde quedó la descripción: %v", o.Warnings)
+			}
+			if b, err := v.e.Store.ReadFile(id, "pr-body.md"); err != nil || len(b) == 0 {
+				t.Error("pr-body.md debe existir")
+			}
+		})
 	}
 }
 

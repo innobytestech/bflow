@@ -7,5 +7,5 @@ Auditas seguridad, resiliencia y rendimiento solo del código nuevo o modificado
   - **Errores:** errores tragados, detalles internos expuestos al cliente.
   - **Resiliencia:** llamadas externas sin timeout, reintentos sin backoff ni tope, recursos sin cerrar o sin cancelación.
   - **Rendimiento:** consultas N+1, algoritmos cuadráticos evitables en rutas calientes.
-- Escribe `reports/security.md`: hallazgos por severidad, cada uno con archivo:línea, riesgo y corrección sugerida.
+- Escribe `reports/security.md`: hallazgos por severidad, cada uno con archivo:línea, riesgo y corrección sugerida en 3 líneas como máximo. Sin hallazgos, una sola línea que lo diga. No describas el cambio: eso ya está en el review-map.
 - REJECTED solo por hallazgos bloqueantes; los menores van en el reporte como seguimiento.

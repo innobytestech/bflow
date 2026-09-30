@@ -149,7 +149,7 @@ func runInit(c *Ctx) output.Envelope {
 	p := newPrompter(c, str(c.Flags, "yes") == "true")
 	det := setup.Detect(root, setup.Tools{Has: func(n string) bool { _, err := exec.LookPath(n); return err == nil }})
 
-	a := setup.Answers{Stack: det.Stack, Steps: det.Steps, Quick: det.Quick}
+	a := setup.Answers{Stack: det.Stack, Steps: det.Steps, Quick: det.Quick, RequireEnv: det.DBEnv}
 	if s := str(c.Flags, "stack"); s != "" {
 		a.Stack = s
 	}
@@ -494,12 +494,26 @@ func runDoctor(c *Ctx) output.Envelope {
 				add("host", "warn", "%s sin token: el PR se deja listo con URL de compare (bflow connect %s)", e.Host.Name(), e.Host.Name())
 			} else if err != nil {
 				add("host", "fail", "%v", err)
+			} else if err := checkRepo(ctx, e.Host); err != nil {
+				add("host", "fail", "%v", err)
 			} else {
 				add("host", "ok", "%s como %s", e.Host.Name(), login)
 			}
 		}
 	} else if cfg.VCS.Host == "" {
 		add("host", "ok", "sin host remoto configurado: push y PR a mano")
+	}
+
+	var runs []string
+	for _, st := range cfg.Check.Steps {
+		runs = append(runs, st.Run)
+	}
+	if n, gaps := setup.CIGaps(cfg.Root, runs); len(gaps) > 0 {
+		for _, g := range gaps {
+			add("ci", "warn", "%s: agrégalo a check.steps para verlo antes del PR", g)
+		}
+	} else if n > 0 {
+		add("ci", "ok", "el check cubre los %d comandos de verificación de CI", n)
 	}
 
 	ec := cfg.Env
@@ -696,4 +710,13 @@ func startupCheck(srcs []agents.ContextSource) (status, detail string) {
 		return "ok", detail
 	}
 	return "warn", detail + ". " + strings.Join(notes, "; ") + ". Poda lo que ya no aplica o muévelo a archivos que se lean al necesitarlos"
+}
+
+// checkRepo confirma que el token ve el repositorio, en los hosts que saben
+// comprobarlo: un token válido sin acceso al repo falla recién al abrir el PR.
+func checkRepo(ctx context.Context, h vcs.Host) error {
+	if r, ok := h.(interface{ CheckRepo(context.Context) error }); ok {
+		return r.CheckRepo(ctx)
+	}
+	return nil
 }

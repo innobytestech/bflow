@@ -40,6 +40,10 @@ type Context struct {
 	MaxDiffLines   int
 	DiffLines      func() (int, error) // se llama solo al commitear
 
+	// HumanFiles: archivos que solo edita una persona (las vulnerabilidades
+	// aceptadas en accept_file de check.steps).
+	HumanFiles []string
+
 	Phase  flow.Phase // fase de la tarea activa ("" si no hay)
 	Frozen []string   // pruebas congeladas al aprobar el contrato
 }
@@ -162,8 +166,11 @@ func edit(a Action, c Context) Decision {
 		return deny("bflow_state", "%s es estado de bflow: cámbialo con sus comandos (report, approve, block…), no a mano. Los agentes solo escriben %s en .bflow/tasks/<ID>/.",
 			p, strings.Join(flow.AgentArtifacts, ", "))
 	}
+	if slices.Contains(c.HumanFiles, p) {
+		return deny("human_file", "%s guarda las vulnerabilidades aceptadas: lo edita una persona. Si hace falta aceptar una, reporta NEEDS_DECISION.", p)
+	}
 	if isFrozenPhase(c) && slices.Contains(c.Frozen, p) {
-		return deny("frozen_test", "%s quedó congelada al aprobar el contrato. Si la prueba está mal, reporta NEEDS_DECISION en vez de cambiarla.", p)
+		return deny("frozen_test", "%s quedó congelada al aprobar el contrato. Si la prueba está mal, reporta NEEDS_DECISION con el cambio que necesitas; si una persona lo aprueba y corre `bflow freeze --allow %s`, podrás cambiarla una vez.", p, p)
 	}
 	if c.StrictLeader && !a.Subagent && underAny(p, c.ProtectedPaths) {
 		return deny("leader_code", "la sesión principal no edita %s: eso lo hace el implementer.", p)
