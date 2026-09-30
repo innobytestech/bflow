@@ -182,6 +182,27 @@ func TestTokensNewVersusCache(t *testing.T) {
 	}
 }
 
+// La caché leída se entiende con las llamadas: cada una vuelve a leer el
+// contexto. Los datos viejos, sin llamadas, se muestran como antes.
+func TestSummaryAndDetailExplainCache(t *testing.T) {
+	var impl Usage
+	impl.Add(Usage{Output: 4_000, CacheRead: 60_000, CacheWrite: 2_000, Calls: 1, MaxContext: 62_000})
+	impl.Add(Usage{Output: 5_000, CacheRead: 130_000, CacheWrite: 3_000, Calls: 1, MaxContext: 140_000})
+	if impl.Calls != 2 || impl.MaxContext != 140_000 {
+		t.Fatalf("Add suma llamadas y se queda con el contexto mayor: %+v", impl)
+	}
+	if s := Detail(impl); s != "14k nuevos · 2 llamadas de hasta 140k" {
+		t.Errorf("agente: %q", s)
+	}
+	if s := Summary(impl); s != "14k nuevos · 190k releídos de caché en 2 llamadas" {
+		t.Errorf("total: %q", s)
+	}
+	old := Usage{Output: 1_000, CacheRead: 50_000}
+	if Detail(old) != "1k nuevos · 50k caché" || Summary(old) != "1k nuevos · 50k caché" {
+		t.Errorf("sin llamadas: %q %q", Detail(old), Summary(old))
+	}
+}
+
 // Una tarea light como la piloto: el implementer reporta DONE y la tarea pasa
 // a quality antes de que termine su hook.
 func pilotLog() []store.Entry {

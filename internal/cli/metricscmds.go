@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -92,7 +93,7 @@ func statsLine(st metrics.TaskStats) string {
 		l += " · " + strings.Join(it, ", ")
 	}
 	if st.TokensAvailable {
-		l += " · " + metrics.Tokens(st.Tokens.New(), st.Tokens.CacheRead)
+		l += " · " + metrics.Summary(st.Tokens)
 	}
 	return l
 }
@@ -100,10 +101,10 @@ func statsLine(st metrics.TaskStats) string {
 func renderStats(st metrics.TaskStats) string {
 	var b strings.Builder
 	b.WriteString(statsLine(st) + "\n")
-	row := "  %-13s %8s %8s %8s %8s %8s\n"
-	fmt.Fprintf(&b, row, "fase", "agente", "humano", "bloq.", "nuevos", "caché")
+	row := "  %-13s %8s %8s %8s %8s %8s %8s\n"
+	fmt.Fprintf(&b, row, "fase", "agente", "humano", "bloq.", "nuevos", "caché", "llamadas")
 	for _, p := range st.Phases {
-		fmt.Fprintf(&b, row, p.Phase, dur(p.Agent), dur(p.Human), dur(p.Blocked), tok(p.Tokens.New()), tok(p.Tokens.CacheRead))
+		fmt.Fprintf(&b, row, p.Phase, dur(p.Agent), dur(p.Human), dur(p.Blocked), tok(p.Tokens.New()), tok(p.Tokens.CacheRead), calls(p.Tokens.Calls))
 	}
 	if len(st.RejectionsByGate) > 0 {
 		var gs []string
@@ -122,12 +123,19 @@ func renderStats(st metrics.TaskStats) string {
 	usageTable(&b, "por modelo", st.Models, map[string]string{"": "sin modelo"})
 	if st.TokensAvailable {
 		t := st.Tokens
-		fmt.Fprintf(&b, "  tokens: %s (entrada %s · salida %s · caché escrita %s)", metrics.Tokens(t.New(), t.CacheRead),
+		fmt.Fprintf(&b, "  tokens: %s (entrada %s · salida %s · caché escrita %s)", metrics.Summary(t),
 			metrics.Human(t.Input), metrics.Human(t.Output), metrics.Human(t.CacheWrite))
 	} else {
 		b.WriteString("  tokens: no disponibles (se registran con el hook de tokens del agente)")
 	}
 	return b.String()
+}
+
+func calls(n int64) string {
+	if n <= 0 {
+		return "-"
+	}
+	return strconv.FormatInt(n, 10)
 }
 
 func tok(n int64) string {
@@ -143,14 +151,14 @@ func usageTable(b *strings.Builder, title string, m map[string]metrics.Usage, na
 	if _, legacy := m[""]; len(m) == 0 || (len(m) == 1 && legacy) {
 		return
 	}
-	row := "  %-22s %8s %8s\n"
-	fmt.Fprintf(b, row, title, "nuevos", "caché")
+	row := "  %-22s %8s %8s %8s %8s\n"
+	fmt.Fprintf(b, row, title, "nuevos", "caché", "llamadas", "ctx máx")
 	for _, k := range byNew(m) {
 		name := k
 		if n, ok := names[k]; ok {
 			name = n
 		}
-		fmt.Fprintf(b, row, name, tok(m[k].New()), tok(m[k].CacheRead))
+		fmt.Fprintf(b, row, name, tok(m[k].New()), tok(m[k].CacheRead), calls(m[k].Calls), tok(m[k].MaxContext))
 	}
 }
 
@@ -284,6 +292,9 @@ func runHookTokens(c *Ctx) output.Envelope {
 	for _, s := range shares {
 		d := map[string]any{"phase": string(s.Phase), "tool": c.Agent.Name(),
 			"input": s.Input, "output": s.Output, "cache_read": s.CacheRead, "cache_write": s.CacheWrite}
+		if s.Calls > 0 {
+			d["calls"], d["max_context"] = s.Calls, s.MaxContext
+		}
 		if s.Model != "" {
 			d["model"] = s.Model
 		}

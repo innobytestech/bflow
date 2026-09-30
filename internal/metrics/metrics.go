@@ -19,6 +19,12 @@ type Usage struct {
 	Output     int64 `json:"output"`
 	CacheRead  int64 `json:"cache_read"`
 	CacheWrite int64 `json:"cache_write"`
+	// Calls son las respuestas del modelo. Cada una vuelve a leer el contexto
+	// entero, así que CacheRead ≈ Calls × contexto promedio: los millones de
+	// caché no son un contexto de millones.
+	Calls int64 `json:"calls,omitempty"`
+	// MaxContext es el contexto más grande de una sola llamada (entrada y caché).
+	MaxContext int64 `json:"max_context,omitempty"`
 }
 
 // Total suma todo lo que se procesó.
@@ -45,6 +51,8 @@ func (u *Usage) Add(o Usage) {
 	u.Output += o.Output
 	u.CacheRead += o.CacheRead
 	u.CacheWrite += o.CacheWrite
+	u.Calls += o.Calls
+	u.MaxContext = max(u.MaxContext, o.MaxContext)
 }
 
 // PhaseStats son los tiempos de una fase.
@@ -308,7 +316,8 @@ func Allot(entries []store.Entry, id, agent string, samples []Sample) []Share {
 }
 
 func usageOf(d map[string]any) Usage {
-	return Usage{Input: num(d["input"]), Output: num(d["output"]), CacheRead: num(d["cache_read"]), CacheWrite: num(d["cache_write"])}
+	return Usage{Input: num(d["input"]), Output: num(d["output"]), CacheRead: num(d["cache_read"]), CacheWrite: num(d["cache_write"]),
+		Calls: num(d["calls"]), MaxContext: num(d["max_context"])}
 }
 
 func num(v any) int64 {
@@ -321,6 +330,29 @@ func num(v any) int64 {
 		return int64(x)
 	}
 	return 0
+}
+
+// Summary es el total de una tarea: "954k nuevos · 28.6M releídos de caché en
+// 410 llamadas". Sin llamadas registradas (datos viejos), como Tokens.
+func Summary(u Usage) string {
+	if u.Calls == 0 {
+		return Tokens(u.New(), u.CacheRead)
+	}
+	s := Human(u.New()) + " nuevos"
+	if u.CacheRead > 0 {
+		s += " · " + Human(u.CacheRead) + " releídos de caché"
+	}
+	return s + fmt.Sprintf(" en %d llamadas", u.Calls)
+}
+
+// Detail es el gasto de un agente: "508k nuevos · 160 llamadas de hasta 140k".
+// Las llamadas y el contexto máximo explican su caché leída. Sin llamadas
+// registradas (datos viejos), como Tokens.
+func Detail(u Usage) string {
+	if u.Calls == 0 {
+		return Tokens(u.New(), u.CacheRead)
+	}
+	return fmt.Sprintf("%s nuevos · %d llamadas de hasta %s", Human(u.New()), u.Calls, Human(u.MaxContext))
 }
 
 // Tokens separa lo nuevo de lo leído de caché: "145k nuevos · 2.9M caché".

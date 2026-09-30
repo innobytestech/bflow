@@ -51,8 +51,8 @@ func (Agent) TokenSource(raw []byte) (path, agent string) {
 
 // ReadUsage devuelve las respuestas nuevas del transcript, con su hora y
 // modelo. Claude Code escribe cada respuesta en varias líneas con el mismo id
-// de mensaje: se cuenta una vez, con el uso más alto visto. Solo se leen
-// líneas completas.
+// de mensaje: se cuenta una vez (una llamada), con el uso más alto visto. Solo
+// se leen líneas completas.
 func (Agent) ReadUsage(path string, cur *metrics.Cursor) ([]metrics.Sample, error) {
 	if cur.Offsets == nil {
 		cur.Offsets = map[string]int64{}
@@ -112,9 +112,13 @@ func readFile(path string, cur *metrics.Cursor) ([]metrics.Sample, error) {
 		}
 		u := metrics.Usage{Input: e.Message.Usage.Input, Output: e.Message.Usage.Output,
 			CacheRead: e.Message.Usage.CacheRead, CacheWrite: e.Message.Usage.CacheWrite}
-		prev := cur.Seen[e.Message.ID]
+		prev, seen := cur.Seen[e.Message.ID]
 		delta := metrics.Usage{Input: max(0, u.Input-prev.Input), Output: max(0, u.Output-prev.Output),
-			CacheRead: max(0, u.CacheRead-prev.CacheRead), CacheWrite: max(0, u.CacheWrite-prev.CacheWrite)}
+			CacheRead: max(0, u.CacheRead-prev.CacheRead), CacheWrite: max(0, u.CacheWrite-prev.CacheWrite),
+			MaxContext: u.Input + u.CacheRead + u.CacheWrite}
+		if !seen {
+			delta.Calls = 1
+		}
 		if delta.Total() > 0 {
 			ts := e.Timestamp
 			if ts.IsZero() {

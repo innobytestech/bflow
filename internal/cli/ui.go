@@ -184,7 +184,7 @@ func buildPanel(version string, d watchData, now time.Time) panelState {
 		}
 	}
 	if st.TokensAvailable {
-		t.Tokens = metrics.Tokens(st.Tokens.New(), st.Tokens.CacheRead)
+		t.Tokens = metrics.Summary(st.Tokens)
 		total := st.Tokens.New()
 		for _, a := range byNew(st.Agents) {
 			u := st.Agents[a]
@@ -192,7 +192,7 @@ func buildPanel(version string, d watchData, now time.Time) panelState {
 			if total > 0 {
 				share = int(u.New() * 100 / total)
 			}
-			t.Agents = append(t.Agents, map[string]string{"name": agentName(a), "tokens": metrics.Tokens(u.New(), u.CacheRead), "share": strconv.Itoa(share)})
+			t.Agents = append(t.Agents, map[string]string{"name": agentName(a), "tokens": metrics.Detail(u), "share": strconv.Itoa(share)})
 		}
 	}
 	if n := st.Refused + st.Guarded + st.Nudged; n > 0 {
