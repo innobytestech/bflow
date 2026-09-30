@@ -211,6 +211,9 @@ func spawnNext(cfg Config, s State) output.Next {
 		if s.Decision != "" {
 			args["decision"] = s.Decision
 		}
+		if s.Phase == Documenting {
+			args["changelog"] = cfg.ChangelogPath(s.ID, s.Slug)
+		}
 		if s.Resume && !parallel {
 			args["resume"] = "true"
 		}

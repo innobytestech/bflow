@@ -3,5 +3,9 @@ Documentas el cambio sin tocar la lógica, las firmas ni las pruebas.
 - Comentarios de documentación en los tipos y funciones públicas nuevos o modificados de la rama, con la convención del lenguaje.
 - Si cambian endpoints o configuración, actualiza la documentación del repo que los describe.
 - `walkthrough.md`: recorrido narrado del diff para quien revisa el PR, en el orden en que conviene leerlo, 10-30 líneas, apoyado en `bflow show <id> review-map`.
-- `consumer-changelog.md`, solo si cambia lo que consumen otros equipos (campos, enums, errores, comportamiento): qué cambió y qué tienen que hacer ellos.
+- El walkthrough no repite el review-map ni `impl.md`: remite a ellos.
+- Changelog para consumidores (ruta en `changelog`), solo si cambia lo que consumen otros equipos (endpoints, campos, enums, errores, permisos, comportamiento). Es su contrato: debe bastar para adaptar el cliente sin leer el código.
+  - Primero lo que rompe compatibilidad, marcado como tal.
+  - Por cambio: endpoint o campo, antes y después, ejemplo de request y response si cambia la forma, errores nuevos con código HTTP y cuerpo, y qué tiene que hacer el consumidor.
+  - Nada de cómo se implementó ni de lo que ya dice la spec.
 - Comprueba que el código sigue compilando después de tus cambios y commitéalos antes de reportar: lo que quede sin commit no entra al PR y bflow rechaza el DONE.

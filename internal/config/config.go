@@ -120,6 +120,9 @@ type Flow struct {
 	SLAHours         int                 `yaml:"sla_hours,omitempty"`
 	SecurityAudit    *bool               `yaml:"security_audit,omitempty"` // true: security-auditor aparte, además del reviewer
 	UI               *bool               `yaml:"ui,omitempty"`             // por defecto lo decide el stack
+	// ConsumerChangelog: dónde va el único changelog para consumidores, con
+	// {id} y {slug}. Por defecto, junto a la spec.
+	ConsumerChangelog string `yaml:"consumer_changelog,omitempty"`
 }
 
 type Step struct {
@@ -488,6 +491,9 @@ func (c *Config) Validate() error {
 			add("check.steps[%d].baseline solo admite new-only", i)
 		}
 	}
+	if p := c.Flow.ConsumerChangelog; p != "" && (filepath.IsAbs(p) || strings.HasPrefix(filepath.ToSlash(filepath.Clean(p)), ".bflow/") || strings.HasPrefix(filepath.Clean(p), "..")) {
+		add("flow.consumer_changelog debe ser una ruta del repo fuera de .bflow/ (se versiona)")
+	}
 	if c.Check.DBTestPattern != "" {
 		if _, err := regexp.Compile(c.Check.DBTestPattern); err != nil {
 			add("check.db_test_pattern no es una regex válida: %v", err)
@@ -544,6 +550,7 @@ func (f Flow) Core() flow.Config {
 	if f.MaxQualityRounds > 0 {
 		core.MaxQualityRounds = f.MaxQualityRounds
 	}
+	core.Changelog = f.ConsumerChangelog
 	if f.UI != nil && *f.UI {
 		core.UI = true
 		core.Agents[flow.Spec] = []string{"ui-designer", "spec-author"}

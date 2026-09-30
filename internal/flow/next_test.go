@@ -186,6 +186,21 @@ func TestSpawnArgs(t *testing.T) {
 	}
 }
 
+func TestChangelogPath(t *testing.T) {
+	c := testConfig()
+	if got := c.ChangelogPath("T-1", "demo"); got != "specs/T-1-demo/consumer-changelog.md" {
+		t.Errorf("por defecto va junto a la spec: %s", got)
+	}
+	c.Changelog = "harness/frontend/{id}-{slug}-changelog.md"
+	if got := c.ChangelogPath("T-1", "demo"); got != "harness/frontend/T-1-demo-changelog.md" {
+		t.Errorf("plantilla del repo: %s", got)
+	}
+	n := NextFor(c, State{ID: "T-1", Slug: "demo", Lane: Full, Phase: Documenting})
+	if len(n.Agents) == 0 || n.Agents[0].Args["changelog"] != "harness/frontend/T-1-demo-changelog.md" {
+		t.Errorf("el documenter recibe la ruta del changelog: %+v", n.Agents)
+	}
+}
+
 func TestSpecGateShowsUIBlueprint(t *testing.T) {
 	s := stateFor(row{lane: Full, from: Spec, gate: GateSpec})
 	cfg := testConfig()

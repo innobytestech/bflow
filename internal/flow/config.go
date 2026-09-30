@@ -2,7 +2,9 @@ package flow
 
 import (
 	"fmt"
+	"path"
 	"slices"
+	"strings"
 )
 
 // Config es lo que el núcleo necesita saber del proyecto.
@@ -18,6 +20,18 @@ type Config struct {
 	// UI: el proyecto tiene interfaz; la spec lleva UI blueprint y el humano
 	// lo ve al aprobarla.
 	UI bool
+	// Changelog: plantilla de la ruta del changelog para consumidores, con
+	// {id} y {slug}; vacía, va junto a la spec.
+	Changelog string
+}
+
+// ChangelogPath es la ruta, versionada, del único changelog para consumidores
+// de la tarea.
+func (c Config) ChangelogPath(id, slug string) string {
+	if c.Changelog == "" {
+		return path.Dir(SpecPath(id, slug)) + "/consumer-changelog.md"
+	}
+	return strings.NewReplacer("{id}", id, "{slug}", slug).Replace(c.Changelog)
 }
 
 // PhasesOf devuelve, en el orden del flujo, las fases en las que trabaja el agente.

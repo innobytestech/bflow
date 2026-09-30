@@ -318,3 +318,15 @@ func TestSecurityAuditorConfigAfterFusion(t *testing.T) {
 		t.Errorf("con security_audit: true sus ajustes valen: %v", err)
 	}
 }
+
+func TestConsumerChangelogIsVersioned(t *testing.T) {
+	for _, p := range []string{".bflow/x.md", "../fuera.md"} {
+		if _, err := Load(fixture(t, "", "stack: go\nflow: { consumer_changelog: \""+p+"\" }\n")); err == nil || !strings.Contains(err.Error(), "consumer_changelog") {
+			t.Errorf("%s debe rechazarse: %v", p, err)
+		}
+	}
+	c, err := Load(fixture(t, "", "stack: go\nflow: { consumer_changelog: \"docs/{id}.md\" }\n"))
+	if err != nil || c.Flow.Core().ChangelogPath("A-1", "x") != "docs/A-1.md" {
+		t.Errorf("ruta del repo: %v", err)
+	}
+}

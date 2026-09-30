@@ -73,6 +73,8 @@ bflow le antepone el contrato: en quality escribe `reports/perf-auditor.md` y re
 
 En quality trabaja por defecto solo el reviewer, que revisa también seguridad, resiliencia y rendimiento. Si quieres una segunda mirada de seguridad con su propio agente, pon `flow: { security_audit: true }`: suma el `security-auditor`, que corre en paralelo con el reviewer y cuesta sus propios tokens.
 
+Si la tarea cambia lo que consumen otros equipos, el documenter escribe un solo changelog para ellos, versionado y en el PR. Por defecto va junto a la spec; si tu repo ya tiene un lugar para eso, dilo con `flow: { consumer_changelog: "docs/consumers/{id}-{slug}.md" }`.
+
 ## Skills: cuáles convienen y cuáles chocan
 
 bflow no depende de lo que tengas instalado: el estado, las gates y las reglas viven en el CLI y ninguna skill las salta. Pero una skill puede confundir al agente si le pide hacer a mano lo que ya hace bflow.

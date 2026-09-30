@@ -37,6 +37,8 @@ func (f *fakeGitHub) handler() http.Handler {
 		}
 		const base = "/repos/acme/acme-api/pulls"
 		switch {
+		case r.Method == "GET" && r.URL.Path == "/repos/acme/acme-api":
+			io.WriteString(w, `{"full_name":"acme/acme-api"}`)
 		case r.Method == "POST" && r.URL.Path == base:
 			var in map[string]any
 			json.NewDecoder(r.Body).Decode(&in)
@@ -147,6 +149,25 @@ func TestErrors(t *testing.T) {
 	}
 	if len(f.calls) != 1 {
 		t.Errorf("sin token no debe llamar a la API: %v", f.calls)
+	}
+}
+
+func TestNoAccess(t *testing.T) {
+	c, f := setup(t)
+	f.status = 404
+	ctx := context.Background()
+	for name, err := range map[string]error{
+		"OpenPR":    func() error { _, err := c.OpenPR(ctx, vcs.PRSpec{Base: "dev", Head: "h", Title: "t"}); return err }(),
+		"FindPR":    func() error { _, err := c.FindPR(ctx, "h"); return err }(),
+		"CheckRepo": c.CheckRepo(ctx),
+	} {
+		if !errors.Is(err, vcs.ErrNoAccess) || !strings.Contains(err.Error(), "acme/acme-api") {
+			t.Errorf("%s con 404 debe decir que el token no ve el repo: %v", name, err)
+		}
+	}
+	f.status = 0
+	if err := c.CheckRepo(ctx); err != nil {
+		t.Errorf("con acceso: %v", err)
 	}
 }
 

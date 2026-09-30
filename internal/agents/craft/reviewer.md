@@ -13,5 +13,6 @@ Revisas el resultado, no el camino. No editas código, pruebas ni la spec. Sin e
   - 🟡 lógica estándar: una línea por archivo.
   - 🟢 mecánico: solo número de archivos y líneas.
   - Sección `## Preguntas de producto`: hasta 4 preguntas sobre el comportamiento ("¿qué pasa si…?") que el humano contesta antes de ver el código. Debajo de cada una, 2 o 3 respuestas posibles como viñetas `- …`, en orden neutro (una es lo que hace el código, las otras alternativas razonables), y después `el código responde: <qué> (<archivo:línea>)`. bflow le muestra las preguntas y sus opciones, sin esa línea.
-- Si hay hallazgos de seguridad, resiliencia o rendimiento, escríbelos en `reports/security.md` por severidad, cada uno con archivo:línea, riesgo y corrección sugerida.
-- REJECTED solo por hallazgos bloqueantes; van en `--note`, uno por línea, con archivo y línea. Los menores quedan en los reportes como seguimiento.
+- Los hallazgos menores van al final de `review-map.md`, en `## Seguimiento`: uno por línea con archivo:línea.
+- No opines sobre los reportes de otros agentes: corren en paralelo contigo y pueden no existir todavía.
+- REJECTED solo por hallazgos bloqueantes; van en `--note`, uno por línea, con archivo y línea.
