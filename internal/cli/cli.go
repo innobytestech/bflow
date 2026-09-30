@@ -41,6 +41,9 @@ type Env struct {
 	// Agent es el adaptador de la herramienta de agente (Claude Code): traduce
 	// sus hooks y lee sus transcripts. Lo provee cmd/bflow.
 	Agent AgentAdapter
+	// Tools son todas las herramientas de agente registradas (claude, opencode).
+	// nil equivale a [Agent] si Agent no es nil. Lo provee cmd/bflow.
+	Tools []ToolAdapter
 }
 
 // Ctx es lo que recibe cada comando.
@@ -178,19 +181,54 @@ func emit(env *Env, asJSON bool, e output.Envelope) int {
 	return e.ExitCode()
 }
 
-// AgentAdapter es lo que la CLI necesita de la herramienta de agente.
-type AgentAdapter interface {
+// ToolAdapter es lo que render, install, update, init y doctor necesitan de
+// cualquier herramienta de agente.
+type ToolAdapter interface {
 	Name() string
+	// RenderAgents da formato a los agentes: ruta relativa → contenido.
+	RenderAgents(specs []agents.Spec) (map[string][]byte, error)
+	// GeneratedAgents lista los agentes que ya generó bflow render.
+	GeneratedAgents(root string) []string
+	// InstallSkill escribe la skill (Claude) o el comando /bflow (OpenCode)
+	// embebido en home y devuelve su ruta.
+	InstallSkill(home string) (path string, err error)
+	// SkillState compara lo instalado con lo embebido: "ok", "missing" o "stale".
+	SkillState(home string) (path, state string)
+	// Version compara la versión instalada con la mínima ("" = sin mínimo).
+	Version() (have, min string, ok bool, err error)
+	// ResolvesModels dice que el modelo de un agente debe ser proveedor/modelo
+	// y se traduce con models.<Name()>; false: el alias va directo.
+	ResolvesModels() bool
+}
+
+// tools devuelve las herramientas registradas.
+func (c *Ctx) tools() []ToolAdapter {
+	if c.Tools == nil && c.Agent != nil {
+		return []ToolAdapter{c.Agent}
+	}
+	return c.Tools
+}
+
+// tool devuelve la herramienta registrada con ese nombre, o nil.
+func (c *Ctx) tool(name string) ToolAdapter {
+	for _, t := range c.tools() {
+		if t.Name() == name {
+			return t
+		}
+	}
+	return nil
+}
+
+// AgentAdapter es la herramienta de agente con la que bflow se integra por
+// completo (hooks, guard, tokens): hoy Claude Code.
+type AgentAdapter interface {
+	ToolAdapter
 	ParsePreToolUse(raw []byte) (a guard.Action, cwd string, ok bool)
 	// TokenSource dice qué transcript leer en un hook de fin de turno o de
 	// subagente y de quién es (agent vacío = sesión principal).
 	TokenSource(raw []byte) (path, agent string)
 	// ReadUsage devuelve las respuestas nuevas del transcript con su hora.
 	ReadUsage(path string, cur *metrics.Cursor) ([]metrics.Sample, error)
-	// RenderAgents da formato a los agentes: ruta relativa → contenido.
-	RenderAgents(specs []agents.Spec) (map[string][]byte, error)
-	// GeneratedAgents lista los agentes que ya generó bflow render.
-	GeneratedAgents(root string) []string
 	// Skills lista las skills instaladas (proyecto y usuario).
 	Skills(root string) []agents.Skill
 	// SubagentStopped lee la entrada del hook de fin de subagente.
@@ -201,12 +239,6 @@ type AgentAdapter interface {
 	CoauthorOff(root string) bool
 	// StartupContext lista lo que la herramienta carga al iniciar cada sesión.
 	StartupContext(root string) []agents.ContextSource
-	// Version compara la versión instalada de la herramienta con la mínima.
-	Version() (have, min string, ok bool, err error)
-	// InstallSkill escribe la skill embebida en home y devuelve su ruta.
-	InstallSkill(home string) (path string, err error)
-	// SkillState compara la skill instalada en home con la embebida: "ok", "missing" o "stale".
-	SkillState(home string) (path, state string)
 	// InstallSettings fusiona los ajustes de bflow en la configuración del repo.
 	InstallSettings(root string) (agents.SettingsResult, error)
 }

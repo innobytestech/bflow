@@ -263,9 +263,12 @@ func runInit(c *Ctx) output.Envelope {
 	if a.BaseBranch == "" {
 		a.BaseBranch = p.ask("Rama base de los PR", setup.PickBase(head, branches))
 	}
-	a.Agent = firstNonEmpty(str(c.Flags, "agent"), prof.Agent)
-	if a.Agent == "" && usesClaude(root) {
-		a.Agent = "claude"
+	a.Agent = prof.Agent
+	if f := str(c.Flags, "agent"); f != "" {
+		a.Agent = []string{f}
+	}
+	if len(a.Agent) == 0 && usesClaude(root) {
+		a.Agent = []string{"claude"}
 	}
 
 	if len(a.Steps) > 0 && !p.yes {
@@ -330,7 +333,7 @@ func runInit(c *Ctx) output.Envelope {
 	} else if a.Host == "github" {
 		next = append(next, "bflow connect github (para abrir PR solo)")
 	}
-	if a.Agent == "claude" {
+	if slices.Contains(a.Agent, "claude") {
 		next = append(next, "bflow render (genera los agentes en .claude/agents; commitéalos)")
 	}
 	next = append(next, "bflow doctor")
@@ -554,7 +557,7 @@ func runDoctor(c *Ctx) output.Envelope {
 		}
 	}
 
-	if cfg.Agent == "claude" {
+	if cfg.Agent.Has("claude") {
 		b, err := os.ReadFile(filepath.Join(cfg.Root, ".claude", "settings.json"))
 		var missing []string
 		for _, h := range []string{"bflow guard", "bflow hook session-start", "bflow hook subagent-stop"} {

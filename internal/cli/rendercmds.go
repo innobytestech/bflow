@@ -29,6 +29,8 @@ type renderPlan struct {
 	Changed   []string          // nuevo o distinto
 	Stale     []string          // generado antes, ya no pertenece al flujo
 	Conflicts []string          // existe con ese nombre pero no lo generó bflow
+	// Unresolved son los alias de modelo sin equivalente, por herramienta.
+	Unresolved map[string][]agents.Unresolved
 }
 
 // agentsMD es el archivo que leen otras herramientas (Codex, OpenCode). Si el

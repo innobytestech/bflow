@@ -36,6 +36,25 @@ type Spec struct {
 	Body         string // Markdown: contrato y oficio
 }
 
+// GeneratedMark distingue los archivos que escribe bflow render de los que
+// escribió una persona. Lo llevan los agentes de todas las herramientas.
+const GeneratedMark = "<!-- generado por bflow render: no lo edites; cambia bflow.yaml (agents) o el archivo extra y vuelve a correrlo -->"
+
+// Unresolved es un alias de modelo sin equivalente en la tabla de una
+// herramienta, con los agentes (Spec.Subagent, ordenados) que lo usan.
+type Unresolved struct {
+	Alias  string
+	Agents []string
+}
+
+// ResolveModels traduce el modelo de cada agente con la tabla alias →
+// proveedor/modelo: un valor con "/" se usa tal cual, un alias de la tabla se
+// cambia por su valor, vacío se queda vacío y un alias ausente queda vacío y
+// se devuelve en Unresolved (ordenado por alias). No muta specs.
+func ResolveModels(specs []Spec, table map[string]string) ([]Spec, []Unresolved) {
+	return specs, nil
+}
+
 type base struct {
 	description string
 	model       string

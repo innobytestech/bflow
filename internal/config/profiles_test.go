@@ -23,7 +23,7 @@ func TestSaveAndLoadProfiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := ps["acme"]
-	if p.Tracker.URL != "https://p" || p.VCS.BaseBranch != "dev" || p.Agent != "claude" || ps["otro"].VCS.BaseBranch != "main" {
+	if p.Tracker.URL != "https://p" || p.VCS.BaseBranch != "dev" || !p.Agent.Has("claude") || ps["otro"].VCS.BaseBranch != "main" {
 		t.Errorf("perfiles: %+v", ps)
 	}
 	if err := SaveProfile("x", map[string]any{"tracker": map[string]any{"token": "s"}}); err == nil {
@@ -49,7 +49,7 @@ func TestSaveUI(t *testing.T) {
 	if err != nil || !c.UI.Watch || !c.UI.Web {
 		t.Errorf("ui: %+v %v", c.UI, err)
 	}
-	if ps, _ := LoadProfiles(); ps["acme"].Agent != "claude" {
+	if ps, _ := LoadProfiles(); !ps["acme"].Agent.Has("claude") {
 		t.Error("guardar ui conserva los perfiles")
 	}
 }

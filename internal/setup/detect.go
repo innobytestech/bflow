@@ -198,12 +198,14 @@ func PickBase(head string, branches []string) string {
 
 // Profile son los valores que ya da el perfil (no se repiten en el repo).
 type Profile struct {
-	Tracker, URL, Workspace, Host, BaseBranch, Agent string
+	Tracker, URL, Workspace, Host, BaseBranch string
+	Agent                                     []string
 }
 
 // Answers son las respuestas de init.
 type Answers struct {
-	Profile, Stack, Agent          string
+	Profile, Stack                 string
+	Agent                          []string // herramientas de agente: claude, opencode
 	Tracker, TrackerURL, Workspace string
 	Project                        string
 	Host, BaseBranch               string
@@ -252,7 +254,7 @@ func unless(v, inProfile string) string {
 
 // RenderYAML arma un bflow.yaml con solo lo propio del repo.
 func RenderYAML(a Answers, p Profile) (string, error) {
-	r := yamlRepo{Profile: a.Profile, Stack: a.Stack, Agent: unless(a.Agent, p.Agent)}
+	r := yamlRepo{Profile: a.Profile, Stack: a.Stack, Agent: unless(strings.Join(a.Agent, ","), strings.Join(p.Agent, ","))}
 	t := yamlTracker{Adapter: unless(a.Tracker, p.Tracker), URL: unless(a.TrackerURL, p.URL), Workspace: unless(a.Workspace, p.Workspace), Project: a.Project}
 	if t.Adapter == "local" && p.Tracker == "" {
 		t.Adapter = "" // local es el default

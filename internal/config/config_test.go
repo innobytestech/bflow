@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"gopkg.in/yaml.v3"
+
 	"innobytes.tech/bflow/internal/flow"
 )
 
@@ -94,7 +96,7 @@ check:
 		"vcs.base_branch":   c.VCS.BaseBranch,
 		"vcs.repo":          c.VCS.Repo,
 		"vcs.remote":        c.VCS.Remote, // default que sobrevive al merge
-		"agent":             c.Agent,
+		"agent":             strings.Join(c.Agent, ","),
 	}
 	expect := map[string]string{
 		"tracker.adapter": "plane", "tracker.url": "https://plane.example.com", "tracker.workspace": "acme-dev",
@@ -375,5 +377,126 @@ func TestValidateGithubTracker(t *testing.T) {
 	// Las reglas son solo de github: plane sigue aceptando su identificador.
 	if _, err := Load(fixture(t, "", "tracker: { adapter: plane, url: https://x, workspace: w, project: API, prefix: a-b }\n")); err != nil {
 		t.Errorf("prefix solo se valida con github: %v", err)
+	}
+}
+
+func TestToolsYAML(t *testing.T) {
+	type doc struct {
+		Agent Tools `yaml:"agent,omitempty"`
+	}
+	ok := []struct {
+		in   string
+		want []string
+	}{
+		{"agent: claude\n", []string{"claude"}},
+		{"agent: opencode\n", []string{"opencode"}},
+		{"agent: [claude, opencode]\n", []string{"claude", "opencode"}},
+		{"agent:\n  - opencode\n  - claude\n", []string{"opencode", "claude"}},
+		{"agent: \"\"\n", nil},
+		{"agent: []\n", nil},
+		{"{}\n", nil},
+	}
+	for _, c := range ok {
+		var d doc
+		if err := yaml.Unmarshal([]byte(c.in), &d); err != nil {
+			t.Errorf("%q: %v", c.in, err)
+			continue
+		}
+		if !slices.Equal(d.Agent, Tools(c.want)) {
+			t.Errorf("%q = %v, quiero %v", c.in, d.Agent, c.want)
+		}
+	}
+	for _, in := range []string{"agent: { a: b }\n", "agent: [[claude]]\n", "agent: [{ a: b }]\n"} {
+		var d doc
+		if err := yaml.Unmarshal([]byte(in), &d); err == nil {
+			t.Errorf("%q debería fallar: %v", in, d.Agent)
+		}
+	}
+
+	if got := Tools(nil).Rendered(); !slices.Equal(got, []string{"claude"}) {
+		t.Errorf("sin agent: solo claude (R9): %v", got)
+	}
+	if got := (Tools{"opencode"}).Rendered(); !slices.Equal(got, []string{"opencode"}) {
+		t.Errorf("Rendered respeta la lista: %v", got)
+	}
+	if !(Tools{"claude", "opencode"}).Has("opencode") || (Tools{"claude"}).Has("opencode") || Tools(nil).Has("claude") {
+		t.Error("Has")
+	}
+}
+
+func TestAgentListValidate(t *testing.T) {
+	for _, repo := range []string{"agent: claude\n", "agent: [claude, opencode]\n", "agent: [opencode]\n", "agent: \"\"\n", "stack: go\n"} {
+		if _, err := Load(fixture(t, "", repo)); err != nil {
+			t.Errorf("%q debe ser válido: %v", repo, err)
+		}
+	}
+	c, err := Load(fixture(t, "profiles:\n  dos:\n    agent: [claude, opencode]\n", "profile: dos\n"))
+	if err != nil || !slices.Equal(c.Agent, Tools{"claude", "opencode"}) {
+		t.Errorf("el perfil trae la lista: %v %v", c, err)
+	}
+	c, err = Load(fixture(t, "profiles:\n  dos:\n    agent: [claude, opencode]\n", "profile: dos\nagent: opencode\n"))
+	if err != nil || !slices.Equal(c.Agent, Tools{"opencode"}) {
+		t.Errorf("el repo reemplaza la lista del perfil: %v %v", c, err)
+	}
+
+	bad := []struct{ repo, want string }{
+		{"agent: vim\n", `agent "vim" no existe (disponibles: claude, opencode)`},
+		{"agent: [claude, vim]\n", `"vim"`},
+		{"agent: [claude, claude]\n", `agent repite "claude"`},
+	}
+	for _, b := range bad {
+		_, err := Load(fixture(t, "", b.repo))
+		if err == nil || !strings.Contains(err.Error(), b.want) {
+			t.Errorf("%q: quiero un error con %q: %v", b.repo, b.want, err)
+		}
+	}
+}
+
+func TestModelsMerge(t *testing.T) {
+	const global = "models:\n  opencode: { sonnet: g/sonnet, haiku: g/haiku, opus: g/opus }\nprofiles:\n  p:\n    models:\n      opencode: { sonnet: p/sonnet, haiku: p/haiku }\n"
+	got := func(t *testing.T, global, repo string) map[string]string {
+		t.Helper()
+		c, err := Load(fixture(t, global, repo))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c.Models["opencode"]
+	}
+	if m := got(t, global, ""); m["sonnet"] != "g/sonnet" || m["haiku"] != "g/haiku" {
+		t.Errorf("la tabla global se usa sin perfil ni repo: %v", m)
+	}
+	m := got(t, global, "profile: p\nmodels:\n  opencode: { haiku: r/haiku }\n")
+	if m["haiku"] != "r/haiku" || m["sonnet"] != "p/sonnet" || m["opus"] != "g/opus" {
+		t.Errorf("gana por alias: repo > perfil > global: %v", m)
+	}
+	if m := got(t, "", "models:\n  opencode: { sonnet: r/sonnet }\n"); m["sonnet"] != "r/sonnet" || len(m) != 1 {
+		t.Errorf("solo repo: %v", m)
+	}
+}
+
+func TestModelsValidate(t *testing.T) {
+	cases := []struct {
+		name, global, repo string
+		want               []string
+	}{
+		{"tabla desconocida", "", "models:\n  claude: { sonnet: x/y }\n", []string{"models.claude", "opencode", "bflow.yaml"}},
+		{"alias vacío", "", "models:\n  opencode: { sonnet: \"\" }\n", []string{"models.opencode.sonnet está vacío"}},
+		{"valor que no es texto", "", "models:\n  opencode: { sonnet: [a, b] }\n", []string{"bflow.yaml"}},
+		{"valor que no es texto en la global", "models:\n  opencode: { sonnet: [a] }\n", "", []string{"config.yaml"}},
+		{"tabla desconocida en la global", "models:\n  codex: { sonnet: x/y }\n", "", []string{"models.codex"}},
+		{"alias vacío en un perfil", "profiles:\n  p:\n    models:\n      opencode: { haiku: \"\" }\n", "profile: p\n", []string{"models.opencode.haiku está vacío"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, err := Load(fixture(t, c.global, c.repo))
+			if err == nil {
+				t.Fatal("esperaba error")
+			}
+			for _, w := range c.want {
+				if !strings.Contains(err.Error(), w) {
+					t.Errorf("el error no menciona %q:\n%v", w, err)
+				}
+			}
+		})
 	}
 }

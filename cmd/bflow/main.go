@@ -9,6 +9,7 @@ import (
 	"runtime/debug"
 
 	"innobytes.tech/bflow/internal/adapters/agent/claude"
+	"innobytes.tech/bflow/internal/adapters/agent/opencode"
 	"innobytes.tech/bflow/internal/cli"
 )
 
@@ -27,6 +28,7 @@ func main() {
 		Connect:  connect,
 		Secrets:  secretStore(),
 		Agent:    claude.Agent{},
+		Tools:    []cli.ToolAdapter{claude.Agent{}, opencode.Agent{}},
 		Projects: projects,
 	}))
 }

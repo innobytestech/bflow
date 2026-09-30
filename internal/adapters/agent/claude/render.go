@@ -21,10 +21,6 @@ import (
 // agentsDir es donde Claude Code busca los subagentes del proyecto.
 const agentsDir = ".claude/agents"
 
-// generatedMark distingue los archivos que escribe bflow render de los que
-// escribió una persona.
-const generatedMark = "<!-- generado por bflow render: no lo edites; cambia bflow.yaml (agents) o el archivo extra y vuelve a correrlo -->"
-
 var tools = map[string][]string{
 	agents.Read:  {"Read", "Grep", "Glob"},
 	agents.Write: {"Edit", "Write"},
@@ -57,12 +53,15 @@ func (Agent) RenderAgents(specs []agents.Spec) (map[string][]byte, error) {
 		var b bytes.Buffer
 		b.WriteString("---\n")
 		b.Write(fm)
-		b.WriteString("---\n" + generatedMark + "\n\n")
+		b.WriteString("---\n" + agents.GeneratedMark + "\n\n")
 		b.WriteString(strings.TrimSpace(s.Body) + "\n")
 		out[agentsDir+"/"+s.Subagent+".md"] = b.Bytes()
 	}
 	return out, nil
 }
+
+// ResolvesModels dice que Claude Code entiende los alias (sonnet, haiku) tal cual.
+func (Agent) ResolvesModels() bool { return false }
 
 // GeneratedAgents devuelve los subagentes que ya escribió bflow render.
 func (Agent) GeneratedAgents(root string) []string {
@@ -107,7 +106,7 @@ func (Agent) Skills(root string) []agents.Skill {
 // IsGenerated dice si el archivo lo escribió bflow render.
 func IsGenerated(path string) bool {
 	b, err := os.ReadFile(path)
-	return err == nil && bytes.Contains(b, []byte(generatedMark))
+	return err == nil && bytes.Contains(b, []byte(agents.GeneratedMark))
 }
 
 // MinVersion es la versión de Claude Code que bflow necesita: omitClaudeMd

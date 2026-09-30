@@ -79,7 +79,7 @@ func runInstall(c *Ctx) output.Envelope {
 	} else {
 		text.WriteString("\nhooks: " + res.Path + " (sin cambios)")
 	}
-	if cfg.Agent != "claude" {
+	if !cfg.Agent.Has("claude") {
 		warns = append(warns, "agent: no incluye claude en bflow.yaml, así que no se generaron los agentes; pon agent: claude y corre bflow render")
 		return finish()
 	}
