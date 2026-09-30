@@ -5,6 +5,8 @@ vcs:
   host: github
   base_branch: main
   commit_style: "{type}({id}): {summary}"
+tracker:
+  adapter: github # issues de innobytestech/bflow; la fase es la etiqueta bflow:<fase>
 check:
   steps:
     - name: vet
