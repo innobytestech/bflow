@@ -182,7 +182,7 @@ func (c *Client) setLabel(ctx context.Context, is *ghIssue, to flow.Phase) error
 	for _, name := range stale {
 		err := c.do(ctx, "DELETE", c.issuePath(is.Number)+"/labels/"+url.PathEscape(name), nil, nil)
 		var ae *apiError
-		if err != nil && !(errors.As(err, &ae) && ae.status == 404) {
+		if err != nil && (!errors.As(err, &ae) || ae.status != 404) {
 			return err
 		}
 	}
