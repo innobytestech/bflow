@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"innobytes.tech/bflow/internal/adapters/secrets/keyring"
+	ghtracker "innobytes.tech/bflow/internal/adapters/tracker/github"
 	"innobytes.tech/bflow/internal/adapters/tracker/local"
 	"innobytes.tech/bflow/internal/adapters/tracker/plane"
 	gitad "innobytes.tech/bflow/internal/adapters/vcs/git"
@@ -31,16 +32,18 @@ func build(dir string) (*engine.Engine, error) {
 		return nil, err
 	}
 	sec := secrets.Resolver{Store: secretStore(), Getenv: os.Getenv}
-	tr, err := buildTracker(cfg, sec)
-	if err != nil {
-		return nil, err
-	}
-	e := &engine.Engine{Cfg: cfg, Store: store.Open(cfg.Root), Tracker: tr, Now: time.Now}
 	var g *gitad.Git
 	if isGitRepo(cfg.Root) {
 		g = gitad.New(cfg.Root)
 		g.Remote = cfg.VCS.Remote
 		g.Protected = cfg.VCS.ProtectedBranches
+	}
+	tr, err := buildTracker(cfg, g, sec)
+	if err != nil {
+		return nil, err
+	}
+	e := &engine.Engine{Cfg: cfg, Store: store.Open(cfg.Root), Tracker: tr, Now: time.Now}
+	if g != nil {
 		e.Git = g
 	}
 	if h, err := buildHost(cfg, g, sec); err != nil {
@@ -61,12 +64,20 @@ func isGitRepo(dir string) bool {
 	return cmd.Run() == nil
 }
 
-func buildTracker(cfg *config.Config, sec secrets.Resolver) (tracker.Tracker, error) {
+func buildTracker(cfg *config.Config, g *gitad.Git, sec secrets.Resolver) (tracker.Tracker, error) {
 	switch cfg.Tracker.Adapter {
 	case "plane":
 		token, _, _ := sec.Get(secrets.Key("plane", cfg.Tracker.URL), "BFLOW_PLANE_TOKEN")
 		return plane.New(plane.Options{URL: cfg.Tracker.URL, Workspace: cfg.Tracker.Workspace, Project: cfg.Tracker.Project,
 			Token: token, States: cfg.Tracker.States, CachePath: filepath.Join(cfg.Root, ".bflow", "cache", "plane.json")}), nil
+	case "github":
+		repo, api, token, err := githubAccess(cfg, g, sec)
+		if err != nil {
+			return nil, err
+		}
+		return ghtracker.New(ghtracker.Options{API: api, Repo: repo, Prefix: cfg.Tracker.Prefix, Project: cfg.Tracker.Project,
+			StartField: cfg.Tracker.StartField, Token: token, States: cfg.Tracker.States,
+			CachePath: filepath.Join(cfg.Root, ".bflow", "cache", "github.json")}), nil
 	case "local":
 		path := cfg.Tracker.Path
 		if path == "" {
@@ -84,26 +95,37 @@ func buildHost(cfg *config.Config, g *gitad.Git, sec secrets.Resolver) (vcs.Host
 	if cfg.VCS.Host != "github" {
 		return nil, nil
 	}
-	repo := cfg.VCS.Repo
+	repo, api, token, err := githubAccess(cfg, g, sec)
+	if err != nil {
+		return nil, err
+	}
+	c := github.New(repo, token)
+	if api != "" {
+		c.API = api
+	}
+	c.Web = "https://github.com"
+	return c, nil
+}
+
+// githubAccess es lo que el host y el tracker de GitHub comparten: el repo
+// (vcs.repo o el del remoto), la API de vcs.api_url (vacía = pública) y el token
+// de bflow connect github (GH_TOKEN/GITHUB_TOKEN, luego el llavero github:<host>).
+func githubAccess(cfg *config.Config, g *gitad.Git, sec secrets.Resolver) (repo, api, token string, err error) {
+	repo = cfg.VCS.Repo
 	if repo == "" && g != nil {
 		if url, err := g.RemoteURL(context.Background()); err == nil {
 			_, repo, _ = gitad.ParseRemote(url)
 		}
 	}
 	if repo == "" {
-		return nil, fmt.Errorf("vcs.host es github pero no se pudo deducir el repo: agrega vcs.repo (owner/nombre) a bflow.yaml")
+		return "", "", "", fmt.Errorf("vcs.host es github pero no se pudo deducir el repo: agrega vcs.repo (owner/nombre) a bflow.yaml")
 	}
-	web := "https://github.com"
-	token, _, _ := sec.Get(secrets.Key("github", "github.com"), "GH_TOKEN", "GITHUB_TOKEN")
-	c := github.New(repo, token)
+	host := "github.com"
 	if cfg.VCS.APIURL != "" {
-		c.API = cfg.VCS.APIURL
-		if tok, _, err := sec.Get(secrets.Key("github", cfg.VCS.APIURL), "GH_TOKEN", "GITHUB_TOKEN"); err == nil {
-			c.Token = tok
-		}
+		host = cfg.VCS.APIURL
 	}
-	c.Web = web
-	return c, nil
+	token, _, _ = sec.Get(secrets.Key("github", host), "GH_TOKEN", "GITHUB_TOKEN")
+	return repo, cfg.VCS.APIURL, token, nil
 }
 
 func currentUser(g *gitad.Git) string {
@@ -161,6 +183,18 @@ func connect(ctx context.Context, service string, o cli.ConnectOpts) (string, er
 
 // projects lista los proyectos de un tracker con la credencial guardada.
 func projects(ctx context.Context, service, url, workspace string) ([]tracker.Project, error) {
+	if service == "github" { // url es la API (vacía = pública) y workspace el repo owner/nombre
+		sec := secrets.Resolver{Store: secretStore(), Getenv: os.Getenv}
+		host := "github.com"
+		if url != "" {
+			host = url
+		}
+		token, _, err := sec.Get(secrets.Key("github", host), "GH_TOKEN", "GITHUB_TOKEN")
+		if err != nil {
+			return nil, fmt.Errorf("sin token de GitHub (bflow connect github)")
+		}
+		return ghtracker.New(ghtracker.Options{API: url, Repo: workspace, Token: token}).Projects(ctx)
+	}
 	if service != "plane" {
 		return nil, fmt.Errorf("listar proyectos no está disponible para %s", service)
 	}

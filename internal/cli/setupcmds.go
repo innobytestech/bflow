@@ -602,18 +602,29 @@ func doctorTracker(ctx context.Context, t tracker.Tracker, cfg *config.Config, a
 		add("tracker", "ok", "local")
 		return
 	}
-	if pl, ok := t.(tracker.ProjectLister); ok {
+	gh := cfg.Tracker.Adapter == "github"
+	if pl, ok := t.(tracker.ProjectLister); ok && (!gh || cfg.Tracker.Project != "") {
 		ps, err := pl.Projects(ctx)
 		if err != nil {
 			add("tracker", "fail", "%v", err)
 			return
 		}
 		if !slices.ContainsFunc(ps, func(p tracker.Project) bool { return strings.EqualFold(p.ID, cfg.Tracker.Project) }) {
-			add("tracker", "fail", "el proyecto %s no está en %s", cfg.Tracker.Project, cfg.Tracker.Workspace)
+			if gh {
+				add("tracker", "fail", "el project %s no aparece entre los que ve el token (¿falta el permiso de Projects? bflow connect github)", cfg.Tracker.Project)
+			} else {
+				add("tracker", "fail", "el proyecto %s no está en %s", cfg.Tracker.Project, cfg.Tracker.Workspace)
+			}
 			return
 		}
 	}
 	msg := fmt.Sprintf("%s · proyecto %s", cfg.Tracker.Adapter, cfg.Tracker.Project)
+	if gh {
+		msg = "github · etiquetas bflow:* (sin project)"
+		if cfg.Tracker.Project != "" {
+			msg = "github · project " + cfg.Tracker.Project + " (campo Status)"
+		}
+	}
 	if sl, ok := t.(tracker.StateLister); ok {
 		sts, err := sl.StateMap(ctx)
 		if err != nil {

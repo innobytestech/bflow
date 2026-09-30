@@ -452,6 +452,11 @@ func (e *ValidationError) Error() string {
 	return fmt.Sprintf("%s tiene %d problema(s):\n  - %s", where, len(e.Problems), strings.Join(e.Problems, "\n  - "))
 }
 
+var (
+	ghProjectRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9-]*/[1-9][0-9]*$`)
+	ghPrefixRe  = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]*$`)
+)
+
 var uuidRe = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 // Validate revisa la configuración efectiva y reporta todos los problemas juntos.
@@ -471,6 +476,17 @@ func (c *Config) Validate() error {
 		}
 		if c.Tracker.Project == "" {
 			add("tracker.project es obligatorio con plane (identificador legible, p. ej. API)")
+		}
+	}
+	if c.Tracker.Adapter == "github" {
+		if c.VCS.Host != "github" {
+			add("tracker.adapter github exige vcs.host github (de ahí salen el repo y el token)")
+		}
+		if c.Tracker.Project != "" && !ghProjectRe.MatchString(c.Tracker.Project) {
+			add("tracker.project %q no es owner/número (p. ej. acme/7)", c.Tracker.Project)
+		}
+		if c.Tracker.Prefix != "" && !ghPrefixRe.MatchString(c.Tracker.Prefix) {
+			add("tracker.prefix %q debe empezar con letra y llevar solo letras y números", c.Tracker.Prefix)
 		}
 	}
 	if uuidRe.MatchString(c.Tracker.Project) {

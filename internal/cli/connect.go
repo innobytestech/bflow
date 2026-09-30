@@ -43,6 +43,13 @@ func init() {
 				return output.OK("nothing_to_do", map[string]any{"tracker": e.Tracker.Name()}, nil)
 			}
 			created, err := p.EnsureStates(context.Background(), c.DryRun)
+			var manual *tracker.ManualSetupError
+			if errors.As(err, &manual) {
+				env := output.OK("manual", map[string]any{"where": manual.Where, "missing": manual.Missing, "reason": manual.Reason}, nil)
+				env.Code = "manual"
+				env.Text = "crea a mano en " + manual.Where + ":\n  " + strings.Join(manual.Missing, "\n  ") + "\n(" + manual.Reason + ")"
+				return env
+			}
 			if err != nil {
 				return fail(err)
 			}

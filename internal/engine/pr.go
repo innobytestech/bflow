@@ -11,6 +11,7 @@ import (
 
 	"innobytes.tech/bflow/internal/flow"
 	"innobytes.tech/bflow/internal/store"
+	"innobytes.tech/bflow/internal/tracker"
 	"innobytes.tech/bflow/internal/vcs"
 )
 
@@ -41,6 +42,11 @@ func (e *Engine) PRBody(rec store.Record) string {
 	}
 	if body := e.changelog(rec.Flow); body != "" {
 		fmt.Fprintf(&b, "\n## Contrato para consumidores\n\n%s\n", demoteHeadings(body))
+	}
+	if l, ok := e.Tracker.(tracker.PRLinker); ok {
+		if ref := l.CloseRef(rec.Flow.ID); ref != "" {
+			fmt.Fprintf(&b, "\n%s\n", ref)
+		}
 	}
 	b.WriteString("\n---\n")
 	if slices.Contains(e.flowCfg().Lanes[rec.Flow.Lane], flow.Spec) {
