@@ -27,6 +27,7 @@ type Action struct {
 	Command  string `json:"command,omitempty"`
 	Path     string `json:"path,omitempty"`
 	Subagent bool   `json:"subagent,omitempty"`
+	Agent    string `json:"agent,omitempty"` // agent_type del hook; "" en la sesión principal
 }
 
 // Context es lo que el guard sabe del repo y de la tarea activa.
@@ -68,7 +69,7 @@ var frozenPhases = []flow.Phase{flow.Implementing, flow.Paused, flow.Quality, fl
 func Evaluate(a Action, c Context) Decision {
 	switch a.Tool {
 	case Bash:
-		return bash(a.Command, c)
+		return bash(a, c)
 	case Edit, Write:
 		return edit(a, c)
 	}
@@ -96,6 +97,66 @@ var (
 	bflowFreeze = regexp.MustCompile(`^bflow(\.exe)?\s+freeze\b`)
 )
 
+// HumanOnly son los subcomandos que responden una decisión humana: un
+// subagente no los corre (los corre la sesión principal después de preguntar).
+var HumanOnly = []string{"approve", "reject", "unblock", "start", "new"}
+
+// BflowSubcommand devuelve el subcomando de bflow de un segmento ya recortado
+// ("approve" en `./bin/bflow.exe --json approve X`), o "" si el segmento no
+// invoca a bflow.
+func BflowSubcommand(seg string) string {
+	t := strings.Fields(seg)
+	for i := range t {
+		t[i] = strings.Trim(t[i], `"'`)
+	}
+	isAssign := func(w string) bool { return strings.Contains(w, "=") && !strings.HasPrefix(w, "-") }
+	for len(t) > 0 && isAssign(t[0]) {
+		t = t[1:]
+	}
+	if len(t) > 0 && strings.ToLower(t[0]) == "env" {
+		t = t[1:]
+		for len(t) > 0 && (strings.HasPrefix(t[0], "-") || isAssign(t[0])) {
+			t = t[1:]
+		}
+	}
+	if len(t) == 0 {
+		return ""
+	}
+	parts := func(w string) []string {
+		return strings.Split(strings.ReplaceAll(w, `\`, "/"), "/")
+	}
+	name := func(w string) string {
+		ps := parts(strings.TrimRight(strings.ReplaceAll(w, `\`, "/"), "/"))
+		return strings.TrimSuffix(strings.ToLower(ps[len(ps)-1]), ".exe")
+	}
+	switch {
+	case name(t[0]) == "bflow":
+		t = t[1:]
+	case strings.ToLower(t[0]) == "go" && len(t) > 1 && strings.ToLower(t[1]) == "run":
+		t = t[2:]
+		for len(t) > 0 && strings.HasPrefix(t[0], "-") {
+			t = t[1:]
+		}
+		if len(t) == 0 {
+			return ""
+		}
+		ps := parts(strings.TrimRight(strings.ReplaceAll(t[0], `\`, "/"), "/"))
+		if len(ps) < 2 || ps[len(ps)-1] != "bflow" || ps[len(ps)-2] != "cmd" {
+			return ""
+		}
+		t = t[1:]
+	default:
+		return ""
+	}
+	for len(t) > 0 && strings.HasPrefix(t[0], "-") {
+		t = t[1:]
+	}
+	if len(t) == 0 {
+		return ""
+	}
+	return strings.ToLower(t[0])
+}
+
 // TaskScoped dice si el comando toca algo que bflow maneja por tarea (rama,
 // PR): el guard necesita saber si hay una tarea en curso.
 func TaskScoped(cmd string) bool {
@@ -108,16 +169,19 @@ func TaskScoped(cmd string) bool {
 	return false
 }
 
-func bash(cmd string, c Context) Decision {
-	for _, seg := range segSplit.Split(cmd, -1) {
+func bash(a Action, c Context) Decision {
+	for _, seg := range segSplit.Split(a.Command, -1) {
 		s := strings.TrimSpace(seg)
+		sub := BflowSubcommand(s)
 		switch {
 		case resetHard.MatchString(s), cleanForce.MatchString(s), checkoutDash.MatchString(s), stashDrop.MatchString(s):
 			return deny("git_destructive", "`%s` descarta trabajo sin forma de recuperarlo. Si necesitas deshacer algo, haz un commit que lo revierta o pregunta.", s)
 		case restore.MatchString(s) && !strings.Contains(s, "--staged"):
 			return deny("git_destructive", "`%s` descarta cambios del árbol de trabajo. Para quitar algo del stage usa git restore --staged.", s)
-		case bflowFreeze.MatchString(s):
+		case sub == "freeze":
 			return deny("human_only", "bflow freeze acepta cambios a pruebas congeladas: lo corre una persona desde su terminal. Si una prueba está mal, reporta NEEDS_DECISION.")
+		case a.Subagent && slices.Contains(HumanOnly, sub):
+			return deny("human_only", "`bflow %s` responde una decisión de una persona: lo corre la sesión principal después de preguntarle. Termina tu parte con `bflow report` (o NEEDS_DECISION).", sub)
 		case c.Phase != "" && ghPRCreate.MatchString(s):
 			return deny("bflow_pr", "el PR lo abre bflow al aprobar el walkthrough, con el review-map y el walkthrough; para actualizarlo usa bflow pr.")
 		case c.Phase != "" && (checkoutNew.MatchString(s) || switchNew.MatchString(s) || branchNew.MatchString(s)):

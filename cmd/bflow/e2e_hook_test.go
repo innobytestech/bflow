@@ -116,3 +116,51 @@ func TestFrozenTestsWithoutHooks(t *testing.T) {
 	git(t, r.dir, "commit", "-m", "prueba")
 	r.ok("report", id, "--agent", "implementer", "--verdict", "DONE")
 }
+
+// Un subagente no responde compuertas: el guard lo niega, lo registra con el
+// agente y el comando, y la sesión principal sí puede.
+func TestGuardHumanOnlySubagent(t *testing.T) {
+	r, _ := gitRepo(t, "stack: go\nvcs: { base_branch: dev }\n")
+	id := r.ok("task", "add", "Demo").Data["id"].(string)
+	r.ok("start", id, "--lane", "full")
+
+	cmd := "bflow approve " + id + " --gate walkthrough"
+	in := func(agent string) string {
+		m := map[string]any{"hook_event_name": "PreToolUse", "cwd": r.dir, "tool_name": "Bash", "tool_input": map[string]any{"command": cmd}}
+		if agent != "" {
+			m["agent_type"] = agent
+		}
+		b, _ := json.Marshal(m)
+		return string(b)
+	}
+	_, errOut, code := r.hook(in("bflow-documenter"), "guard")
+	if code != 2 || !strings.Contains(errOut, "bflow report") || !strings.Contains(errOut, "approve") {
+		t.Fatalf("subagente: exit %d stderr %q", code, errOut)
+	}
+	if _, errOut, code = r.hook(in(""), "guard"); code != 0 {
+		t.Fatalf("sesión principal: exit %d stderr %q", code, errOut)
+	}
+
+	raw, _ := os.ReadFile(filepath.Join(r.dir, ".bflow", "log.jsonl"))
+	found := false
+	for _, line := range strings.Split(string(raw), "\n") {
+		var e struct {
+			Event string         `json:"event"`
+			Agent string         `json:"agent"`
+			Data  map[string]any `json:"data"`
+		}
+		if json.Unmarshal([]byte(line), &e) != nil || e.Event != "guard" {
+			continue
+		}
+		if found {
+			t.Errorf("más de un evento guard: %s", raw)
+		}
+		found = true
+		if e.Agent != "bflow-documenter" || e.Data["rule"] != "human_only" || e.Data["command"] != cmd {
+			t.Errorf("evento guard: %+v", e)
+		}
+	}
+	if !found {
+		t.Errorf("falta el evento guard en el log:\n%s", raw)
+	}
+}

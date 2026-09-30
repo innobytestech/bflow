@@ -176,3 +176,87 @@ func TestPathNormalization(t *testing.T) {
 		t.Error("rutas absolutas de Windows deben normalizarse a relativas")
 	}
 }
+
+func TestHumanOnlySubagent(t *testing.T) {
+	active := ctx()
+	active.Phase = flow.Implementing
+	sub := func(cmd string) Action { return Action{Tool: Bash, Command: cmd, Subagent: true, Agent: "implementer"} }
+	main := func(cmd string) Action { return Action{Tool: Bash, Command: cmd} }
+	for _, name := range []string{"approve", "reject", "unblock", "start", "new"} {
+		cmd := "bflow " + name + " GH-1"
+		d := Evaluate(sub(cmd), active)
+		if d.Allow || d.Rule != "human_only" {
+			t.Errorf("subagente %q → allow=%v rule=%q", cmd, d.Allow, d.Rule)
+		}
+		if !strings.Contains(d.Reason, name) || !strings.Contains(d.Reason, "bflow report") || !strings.Contains(d.Reason, "persona") {
+			t.Errorf("motivo de %s: %q", name, d.Reason)
+		}
+		if d := Evaluate(main(cmd), active); !d.Allow {
+			t.Errorf("la sesión principal corre %q: %+v", cmd, d)
+		}
+	}
+	cases := []struct {
+		cmd   string
+		ctx   Context
+		allow bool
+	}{
+		{"bflow report GH-1 --agent implementer --verdict DONE", active, true},
+		{"bflow block GH-1 --note x", active, true},
+		{"bflow status", active, true},
+		{"bflow show GH-1 spec", active, true},
+		{"bflow check GH-1", active, true},
+		{"bflow pr GH-1", active, true},
+		{"bflow task add titulo", active, true},
+		{"bflow status && bflow approve GH-1", active, false},
+		{"go test ./... ; ./bin/bflow.exe --json reject GH-1", active, false},
+		{"bflow approve --help", active, false},
+		{"bflow approve GH-1", ctx(), false}, // sin tarea activa ni fase
+		{`env -i X=1 "C:\tools\BFLOW.EXE" unblock GH-1`, active, false},
+	}
+	for _, tc := range cases {
+		d := Evaluate(sub(tc.cmd), tc.ctx)
+		if d.Allow != tc.allow || (!tc.allow && d.Rule != "human_only") {
+			t.Errorf("subagente %q → allow=%v rule=%q, want allow=%v", tc.cmd, d.Allow, d.Rule, tc.allow)
+		}
+	}
+}
+
+func TestFreezeEveryone(t *testing.T) {
+	for _, cmd := range []string{"bflow freeze GH-1", "./bin/bflow.exe freeze GH-1 --allow a_test.go", "X=1 bflow --json freeze GH-1"} {
+		for _, subagent := range []bool{true, false} {
+			d := Evaluate(Action{Tool: Bash, Command: cmd, Subagent: subagent}, ctx())
+			if d.Allow || d.Rule != "human_only" {
+				t.Errorf("%q (subagente=%v) → allow=%v rule=%q", cmd, subagent, d.Allow, d.Rule)
+			}
+		}
+	}
+}
+
+func TestBflowSubcommand(t *testing.T) {
+	cases := []struct{ seg, want string }{
+		{"bflow approve GH-1", "approve"},
+		{"bflow", ""},
+		{"BFLOW.EXE Approve GH-1", "approve"},
+		{"./bin/bflow.exe freeze GH-1", "freeze"},
+		{`C:\tools\bflow.exe reject GH-1`, "reject"},
+		{`"/usr/local/bin/bflow" start GH-1`, "start"},
+		{`'bflow' new idea`, "new"},
+		{"X=1 bflow approve GH-1", "approve"},
+		{"X=1 Y=2 bflow approve GH-1", "approve"},
+		{"env -i X=1 bflow unblock GH-1", "unblock"},
+		{"go run ./cmd/bflow approve GH-1", "approve"},
+		{`go run -race C:\jaad\bflow\cmd\bflow\ approve GH-1`, "approve"},
+		{"bflow --json approve GH-1", "approve"},
+		{"bflow -json status", "status"},
+		{"bflowx approve GH-1", ""},
+		{"echo bflow approve", ""},
+		{"go run ./cmd/other approve", ""},
+		{"go test ./...", ""},
+		{"", ""},
+	}
+	for _, c := range cases {
+		if got := BflowSubcommand(c.seg); got != c.want {
+			t.Errorf("BflowSubcommand(%q) = %q, want %q", c.seg, got, c.want)
+		}
+	}
+}

@@ -484,7 +484,11 @@ func describeEvent(e store.Entry) string {
 	case "unblock":
 		return "desbloqueada" + arrow
 	case "guard":
-		return fmt.Sprintf("guard bloqueó: %v", e.Data["rule"])
+		who := ""
+		if e.Agent != "" {
+			who = " a " + e.Agent
+		}
+		return fmt.Sprintf("guard bloqueó%s: %v", who, e.Data["rule"])
 	case "refused":
 		return fmt.Sprintf("el flujo rechazó %v (%v)", e.Data["event"], e.Data["code"])
 	case "nudge":
