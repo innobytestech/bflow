@@ -218,6 +218,8 @@ bflow doctor         # valida config, herramientas, conexiones y hooks
 
 ```bash
 bflow task add "Validación de RFC en el alta de clientes"   # crea LOCAL-1
+bflow new --lane light --title "Validación de RFC" --file idea.md   # crea la tarea y la arranca, en un paso
+bflow task list                                              # tareas abiertas del tracker
 bflow start LOCAL-1 --lane light
 bflow report LOCAL-1 --agent spec-author --verdict READY    # lo corre el agente
 bflow show LOCAL-1 brief
@@ -344,7 +346,7 @@ La validación junta todos los problemas en un solo mensaje, indica la línea de
 
 | Grupo | Comandos |
 |---|---|
-| Flujo | `status [ID] [--brief]` · `start <ID> --lane [--fixes ID]` · `approve` · `reject --note` · `report --agent --verdict` · `block` / `unblock` · `freeze` · `show` · `task add` · `sync` · `import --from harness` |
+| Flujo | `status [ID] [--brief]` · `start <ID> --lane [--fixes ID]` · `approve` · `reject --note` · `report --agent --verdict` · `block` / `unblock` · `freeze` · `show` · `new --lane --title [--file]` · `task add` · `task list` · `sync` · `import --from harness` |
 | Agentes | `render [--check]` |
 | Git y PR | `pr` · `panel [--sla]` (cierra lo mergeado, recuerda gates vencidos) |
 | Calidad | `check [--quick pkg] [--verify]` · `env check` · `guard` |

@@ -6,6 +6,7 @@ Los cambios de bflow que ve quien lo usa. Las versiones siguen [semver](https://
 
 ### Agregado
 
+- **Idea sin tarea.** `bflow status` sin tareas en curso pregunta (`gate intake`) si la idea va a una tarea nueva o a una existente. `bflow new --lane --title [--file idea.md]` crea la tarea en el tracker y la arranca en un paso (Plane y los demás trackers que permiten crear); `bflow task list` lista las abiertas para no duplicar.
 - **Agentes generados (`bflow render`).** Escribe `.claude/agents/bflow-<agente>.md` con el contrato de bflow (argumentos, archivos, veredictos por fase, `report`) y el oficio: uno por defecto más lo que el repo agrega en `agents:` de `bflow.yaml` (`model`, `effort`, `read`, `extra`, `omit_claude_md`). `render --check` falla si no coinciden con la configuración; `render` nunca pisa un archivo que no generó. Si el repo tiene `AGENTS.md`, mantiene en él un bloque para retomar la tarea con otras herramientas.
 - **`spawn` trae `subagent`** con el nombre del agente generado.
 - **`bflow show <ID> task`** entrega la tarea del tracker marcada como contenido externo (`<pasted_content>`).

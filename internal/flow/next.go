@@ -75,6 +75,27 @@ func laneOptions(cfg Config, id string) []output.Option {
 	return out
 }
 
+// IntakeGate es la pregunta de entrada de una idea sin tarea; no es una Gate
+// de la máquina de estados.
+const IntakeGate = "intake"
+
+// IntakeNext pregunta si la idea va a una tarea nueva o a una que ya existe.
+func IntakeNext(cfg Config) output.Next {
+	var lanes []string
+	for _, o := range laneOptions(cfg, "") {
+		lanes = append(lanes, o.ID)
+	}
+	desc := "Carriles: " + strings.Join(lanes, ", ")
+	return output.Next{Action: output.ActionAsk, Gate: IntakeGate, Skill: "intake",
+		Question: "¿Creamos una tarea nueva para la idea o usamos una que ya existe?",
+		Options: []output.Option{
+			{ID: "new", Label: "Crear tarea nueva", Description: desc,
+				Command: `bflow new --lane <carril> --title "<título>" --file <idea.md>`},
+			{ID: "existing", Label: "Usar una existente", Description: desc,
+				Command: "bflow start <ID> --lane <carril>"},
+		}}
+}
+
 func approveOpt(id string, g Gate, label string) output.Option {
 	return output.Option{ID: "approve", Label: label, Command: cmd("approve", id, "--gate", string(g))}
 }

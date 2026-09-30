@@ -53,6 +53,7 @@ type fakePlane struct {
 	unauthorized bool
 	throttleOnce bool
 	postedHTML   []string
+	failCreate   bool
 }
 
 func newFake(t *testing.T) *fakePlane {
@@ -114,6 +115,18 @@ func (f *fakePlane) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(in)
 	case r.Method == "GET" && p == proj+"/work-items/":
 		f.page(w, r, f.items)
+	case r.Method == "POST" && p == proj+"/work-items/":
+		if f.failCreate {
+			w.WriteHeader(400)
+			fmt.Fprint(w, `{"error":"name is required"}`)
+			return
+		}
+		var in map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&in)
+		it := f.add(len(f.items)+200, in["name"].(string), "st-backlog")
+		it["description_html"] = in["description_html"]
+		w.WriteHeader(201)
+		_ = json.NewEncoder(w).Encode(it)
 	case r.Method == "GET" && strings.HasPrefix(p, base+"/work-items/"):
 		if f.noWSEndpoint {
 			w.WriteHeader(404)
@@ -204,6 +217,39 @@ func TestConformance(t *testing.T) {
 		},
 		Missing: "API-999",
 	})
+}
+
+func TestCreate(t *testing.T) {
+	f := newFake(t)
+	c := newClient(t, f)
+	task, err := c.Create(context.Background(), "Idea nueva", "Primera línea\n\nSegunda")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if task.ID != "API-200" || task.Title != "Idea nueva" || task.State != "Backlog" || task.Phase != flow.Backlog {
+		t.Errorf("tarea creada = %+v", task)
+	}
+	html, _ := f.items[0]["description_html"].(string)
+	if !strings.Contains(html, "<p>Primera línea</p>") {
+		t.Errorf("la descripción debe ir como HTML, got %q", html)
+	}
+	got, err := c.Get(context.Background(), "API-200")
+	if err != nil || got.Title != "Idea nueva" {
+		t.Errorf("la tarea creada se puede leer: %+v, %v", got, err)
+	}
+}
+
+func TestCreateError(t *testing.T) {
+	f := newFake(t)
+	f.failCreate = true
+	c := newClient(t, f)
+	task, err := c.Create(context.Background(), "x", "")
+	if err == nil || !strings.Contains(err.Error(), "400") {
+		t.Fatalf("debe devolver el error de la API, got %v", err)
+	}
+	if task.ID != "" || len(f.items) != 0 {
+		t.Errorf("sin tarea parcial: %+v, items %d", task, len(f.items))
+	}
 }
 
 func TestPhaseMappingWithExistingBEStates(t *testing.T) {

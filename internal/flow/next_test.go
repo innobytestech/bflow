@@ -260,3 +260,32 @@ func TestUpcoming(t *testing.T) {
 		}
 	}
 }
+
+func TestIntakeNext(t *testing.T) {
+	n := IntakeNext(testConfig())
+	if n.Action != "ask" || n.Gate != "intake" || n.Skill != "intake" {
+		t.Fatalf("next: %+v", n)
+	}
+	if !strings.Contains(n.Question, "¿Creamos una tarea nueva") {
+		t.Errorf("pregunta: %q", n.Question)
+	}
+	if got := strings.Join(optIDs(n), ","); got != "new,existing" {
+		t.Fatalf("opciones %q", got)
+	}
+	if c := n.Options[0].Command; c != `bflow new --lane <carril> --title "<título>" --file <idea.md>` {
+		t.Errorf("comando new: %q", c)
+	}
+	if c := n.Options[1].Command; c != "bflow start <ID> --lane <carril>" {
+		t.Errorf("comando existing: %q", c)
+	}
+	for _, o := range n.Options {
+		if !strings.Contains(o.Description, "full, light, hotfix") {
+			t.Errorf("%s: la descripción lista los carriles en orden: %q", o.ID, o.Description)
+		}
+	}
+	light := DefaultConfig()
+	delete(light.Lanes, Full)
+	if d := IntakeNext(light).Options[0].Description; strings.Contains(d, "full") {
+		t.Errorf("solo carriles configurados: %q", d)
+	}
+}

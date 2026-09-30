@@ -32,3 +32,9 @@ Si el brief lista decisiones `[N]`, ratifica cada una (A = lo decidido, B = la a
 ## walkthrough
 Gate `questions`: pregunta con AskUserQuestion, una pregunta por cada una de `display` (hasta 4) con sus respuestas posibles como opciones, en el mismo orden; el humano puede escribir otra. No digas cuál hace el código: la idea es comparar lo que espera con lo que hace. Corre la opción "Ya respondí" con sus respuestas en `--note`.
 Gate `walkthrough`: después de escribir `display`, señala dónde sus respuestas difieren de lo que dice el review-map. Luego recorre los 🔴 uno por uno, mostrando el hunk (`git diff <base>...HEAD -- <archivo>`), y al final pregunta.
+
+## intake
+Gate `intake` (sin tareas en curso): si el humano no trajo la idea, pídela.
+Corre `bflow task list --json`; si un título se parece a la idea, ofrece usar esa tarea (`existing`) antes de crear.
+Para una tarea nueva propón título y carril con su motivo.
+Guarda la idea en un archivo (no en el chat) y corre el `command` de la opción elegida con los marcadores (`<carril>`, `<título>`, `<idea.md>`, `<ID>`) reemplazados.
