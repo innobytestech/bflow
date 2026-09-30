@@ -203,6 +203,12 @@ type AgentAdapter interface {
 	StartupContext(root string) []agents.ContextSource
 	// Version compara la versión instalada de la herramienta con la mínima.
 	Version() (have, min string, ok bool, err error)
+	// InstallSkill escribe la skill embebida en home y devuelve su ruta.
+	InstallSkill(home string) (path string, err error)
+	// SkillState compara la skill instalada en home con la embebida: "ok", "missing" o "stale".
+	SkillState(home string) (path, state string)
+	// InstallSettings fusiona los ajustes de bflow en la configuración del repo.
+	InstallSettings(root string) (agents.SettingsResult, error)
 }
 
 // Commands devuelve los nombres de los comandos registrados.

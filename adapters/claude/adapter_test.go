@@ -1,6 +1,6 @@
 // Package claude contiene los archivos del adaptador de Claude Code que se
-// copian a un repo (.claude/). Esta prueba los mantiene coherentes con bflow.
-package claude
+// instalan con bflow install claude. Esta prueba los mantiene coherentes con bflow.
+package claude_test
 
 import (
 	"encoding/json"

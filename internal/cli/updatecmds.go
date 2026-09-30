@@ -20,6 +20,9 @@ func init() {
 		Run: runUpdate})
 }
 
+// executable es la ruta del binario que update reemplaza (las pruebas la cambian).
+var executable = os.Executable
+
 func runUpdate(c *Ctx) output.Envelope {
 	ctx := context.Background()
 	cl := release.NewClient()
@@ -48,7 +51,7 @@ func runUpdate(c *Ctx) output.Envelope {
 	if err != nil {
 		return output.Fail("update", err)
 	}
-	exe, err := os.Executable()
+	exe, err := executable()
 	if err != nil {
 		return output.Fail("update", err)
 	}
