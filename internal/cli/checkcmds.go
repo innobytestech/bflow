@@ -141,8 +141,14 @@ func runCheck(c *Ctx) output.Envelope {
 			lines = all[max(0, len(all)-10):]
 		}
 		short := strings.Join(lines[:min(len(lines), 10)], "\n")
-		failed = append(failed, map[string]any{"step": s.Name, "tail": short})
-		fmt.Fprintf(&b, "\n❌ %s\n%s", s.Name, short)
+		f := map[string]any{"step": s.Name, "tail": short}
+		fmt.Fprintf(&b, "\n❌ %s\n", s.Name)
+		if s.Preexisting {
+			f["preexisting"] = true
+			b.WriteString(s.PreexistingHint() + "\n")
+		}
+		b.WriteString(short)
+		failed = append(failed, f)
 	}
 	for _, w := range res.Warnings {
 		b.WriteString("\n⚠ " + w)

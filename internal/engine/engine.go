@@ -114,6 +114,7 @@ func (e *Engine) apply(ctx context.Context, id string, ev flow.Event, slug strin
 			if changed := e.FrozenChanged(id); len(changed) > 0 {
 				return frozenRejection(changed)
 			}
+			e.refreezeAllowed(id)
 			if open := openTasks(e, *rec); len(open) > 0 {
 				return &flow.Rejection{Code: "tasks_open", Reason: "DONE exige todas las tareas de la spec marcadas [x]; faltan:\n" + strings.Join(open, "\n") +
 					"\nMárcalas al terminarlas; si una ya no aplica, anótalo en Design y márcala con el motivo."}

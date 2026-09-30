@@ -25,6 +25,10 @@ const FrozenFile = "frozen-tests.json"
 // absent es el hash de una prueba que no existía al congelar.
 const absent = "absent"
 
+// allowed marca una prueba congelada que una persona dejó cambiar una vez: se
+// vuelve a congelar cuando el implementer reporta DONE.
+const allowed = "allow"
+
 // freezeTests congela las pruebas que la tarea escribió o tocó hasta aprobar
 // el contrato: desde ahí el implementer hace pasar esas pruebas sin cambiarlas.
 func (e *Engine) freezeTests(ctx context.Context, id string) (int, error) {
@@ -82,11 +86,50 @@ func (e *Engine) Refreeze(id string) (int, error) {
 	return len(files), nil
 }
 
+// AllowFrozen deja cambiar una vez una prueba congelada. Es para una persona
+// que aprobó el cambio (guard impide que lo corra un agente).
+func (e *Engine) AllowFrozen(id, file string) error {
+	if _, err := e.Store.Load(id); err != nil {
+		return err
+	}
+	file = strings.ReplaceAll(filepath.ToSlash(filepath.Clean(file)), `\`, "/")
+	m := e.readFrozen(id)
+	if _, ok := m[file]; !ok {
+		return errors.New(file + " no es una prueba congelada de " + id + " (bflow status " + id + " --json las lista)")
+	}
+	m[file] = allowed
+	if err := e.saveFrozen(id, m); err != nil {
+		return err
+	}
+	_ = e.Store.Append(store.Entry{TS: e.now(), ID: id, Event: "freeze_allow", By: e.User, Data: map[string]any{"file": file}})
+	return nil
+}
+
+// refreezeAllowed vuelve a congelar, con su contenido actual, las pruebas que
+// se dejaron cambiar una vez.
+func (e *Engine) refreezeAllowed(id string) {
+	m := e.readFrozen(id)
+	n := 0
+	for f, h := range m {
+		if h == allowed {
+			m[f] = e.testHash(f)
+			n++
+		}
+	}
+	if n > 0 && e.saveFrozen(id, m) == nil {
+		_ = e.Store.Append(store.Entry{TS: e.now(), ID: id, Event: "refreeze", By: e.User, Data: map[string]any{"files": n}})
+	}
+}
+
 func (e *Engine) writeFrozen(id string, files []string) error {
 	m := make(map[string]string, len(files))
 	for _, f := range files {
 		m[f] = e.testHash(f)
 	}
+	return e.saveFrozen(id, m)
+}
+
+func (e *Engine) saveFrozen(id string, m map[string]string) error {
 	b, err := json.Marshal(m)
 	if err != nil {
 		return err
@@ -113,12 +156,15 @@ func (e *Engine) readFrozen(id string) map[string]string {
 	return m
 }
 
-// Frozen devuelve las pruebas congeladas de una tarea.
+// Frozen devuelve las pruebas congeladas de una tarea, sin las que una persona
+// dejó cambiar una vez.
 func (e *Engine) Frozen(id string) []string {
 	m := e.readFrozen(id)
 	out := make([]string, 0, len(m))
-	for f := range m {
-		out = append(out, f)
+	for f, h := range m {
+		if h != allowed {
+			out = append(out, f)
+		}
 	}
 	slices.Sort(out)
 	return out
@@ -130,7 +176,7 @@ func (e *Engine) Frozen(id string) []string {
 func (e *Engine) FrozenChanged(id string) []string {
 	var changed []string
 	for f, h := range e.readFrozen(id) {
-		if h != "" && e.testHash(f) != h {
+		if h != "" && h != allowed && e.testHash(f) != h {
 			changed = append(changed, f)
 		}
 	}
@@ -140,7 +186,7 @@ func (e *Engine) FrozenChanged(id string) []string {
 
 func frozenRejection(changed []string) *flow.Rejection {
 	return &flow.Rejection{Code: "frozen_changed", Reason: "cambiaron pruebas congeladas al aprobar el contrato: " + strings.Join(changed, ", ") +
-		". Déjalas como estaban; si una prueba está mal, reporta NEEDS_DECISION. Si una persona la cambió a propósito, que corra bflow freeze desde su terminal."}
+		". Déjalas como estaban; si una prueba está mal, reporta NEEDS_DECISION. Si una persona aprueba el cambio, que corra bflow freeze --allow <archivo> desde su terminal."}
 }
 
 // testHash normaliza los finales de línea para que un checkout con autocrlf

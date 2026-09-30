@@ -102,6 +102,8 @@ Tus reglas de arquitectura en CLAUDE.md o en los documentos de `read` son bienve
 | `guard` bloqueó una acción | El agente intentó algo peligroso o que le toca a bflow | Nada: el agente recibe el motivo y qué hacer en su lugar |
 | DONE rechazado con `check_required` | No hay un check verde del commit actual | El agente corre `bflow check` y commitea |
 | DONE rechazado con `frozen_changed` | Cambió una prueba congelada al aprobar el contrato | Si fue un error, se deja como estaba. Si la cambiaste tú a propósito, corre `bflow freeze` desde tu terminal (un agente no puede) |
+| El implementer pide cambiar una prueba congelada (NEEDS_DECISION) | La prueba del contrato está mal o quedó vieja | Si estás de acuerdo, corre `bflow freeze --allow <archivo>` desde tu terminal: el implementer la puede cambiar una vez y se vuelve a congelar cuando reporta DONE |
+| El check marca `vulns (preexistente)` | Vulnerabilidades en dependencias que la tarea no tocó | Decides tú: aceptarlas en el `accept_file` del paso con fecha de revisión y abrir otra tarea, o que el implementer actualice la dependencia en esta. El `accept_file` solo lo edita una persona |
 | La tarea quedó bloqueada: "terminó 3 veces sin reportar" | Un agente cortó su trabajo varias veces sin reportar a bflow | Revisa qué hizo; `bflow unblock <ID>` lo relanza |
 | Cambias de modelo o de herramienta a mitad de la feature | El estado y las gates siguen en bflow | En otra herramienta, pídele que corra `bflow status --json` y siga `next`. Sin hooks pierdes `guard` y el conteo de tokens, pero no el check ni las pruebas congeladas |
 | El tracker no respondió | El cambio queda pendiente y se reintenta en orden | `bflow sync` o el siguiente comando lo reintenta |

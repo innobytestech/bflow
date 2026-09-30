@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -84,6 +85,11 @@ func runGuard(c *Ctx) output.Envelope {
 	gc := guard.Context{Root: cfg.Root, Protected: cfg.VCS.ProtectedBranches, ProtectedPaths: cfg.Guard.ProtectedPaths,
 		TestPatterns: cfg.Guard.TestPatterns, ForbidCoauthor: cfg.Guard.ForbidCoauthor, StrictLeader: cfg.Guard.StrictLeader,
 		MaxDiffLines: cfg.Guard.MaxDiffLines, DiffLines: func() (int, error) { return diffLines(cfg) }}
+	for _, st := range cfg.Check.Steps {
+		if st.Accept != "" {
+			gc.HumanFiles = append(gc.HumanFiles, filepath.ToSlash(filepath.Clean(st.Accept)))
+		}
+	}
 	if needsTask(a, cfg) && c.Build != nil {
 		if e, err := c.Build(cfg.Root); err == nil {
 			if id, err := e.Active(context.Background()); err == nil {

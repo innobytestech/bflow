@@ -80,6 +80,8 @@ func TestEditRules(t *testing.T) {
 			func(c *Context) { c.Phase = flow.Contract; c.Frozen = []string{"internal/a_test.go"} }, true, ""},
 		{"borrar una prueba congelada por bash", Action{Tool: Bash, Command: "rm internal/a_test.go"},
 			func(c *Context) { c.Phase = flow.Implementing; c.Frozen = []string{"internal/a_test.go"} }, false, "frozen_test"},
+		{"vulnerabilidades aceptadas: solo una persona", Action{Tool: Edit, Path: "security/vulns-accepted.json", Subagent: true},
+			func(c *Context) { c.HumanFiles = []string{"security/vulns-accepted.json"} }, false, "human_file"},
 	}
 	for _, tc := range cases {
 		cc := c
