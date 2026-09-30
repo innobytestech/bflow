@@ -352,7 +352,7 @@ func (f *fake) issueRoute(w http.ResponseWriter, r *http.Request, is *fIssue, su
 	case sub[0] == "comments" && r.Method == "POST":
 		is.Comments = append(is.Comments, fmt.Sprint(in["body"]))
 		w.WriteHeader(http.StatusCreated)
-		io.WriteString(w, `{}`)
+		_, _ = io.WriteString(w, `{}`)
 	case sub[0] == "labels" && r.Method == "POST":
 		for _, l := range asList(in["labels"]) {
 			name := fmt.Sprint(l)
@@ -367,12 +367,12 @@ func (f *fake) issueRoute(w http.ResponseWriter, r *http.Request, is *fIssue, su
 		for i, l := range is.Labels {
 			if l == name {
 				is.Labels = append(is.Labels[:i:i], is.Labels[i+1:]...)
-				io.WriteString(w, `[]`)
+				_, _ = io.WriteString(w, `[]`)
 				return
 			}
 		}
 		w.WriteHeader(http.StatusNotFound)
-		io.WriteString(w, `{"message":"Label does not exist"}`)
+		_, _ = io.WriteString(w, `{"message":"Label does not exist"}`)
 	default:
 		http.NotFound(w, r)
 	}
@@ -433,7 +433,7 @@ func (f *fake) graphql(w http.ResponseWriter, r *http.Request) {
 	f.calls = append(f.calls, "POST "+r.URL.Path)
 	if f.gqlStatus != 0 {
 		w.WriteHeader(f.gqlStatus)
-		io.WriteString(w, `{"message":"Resource not accessible"}`)
+		_, _ = io.WriteString(w, `{"message":"Resource not accessible"}`)
 		return
 	}
 	var req struct {
