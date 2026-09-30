@@ -309,18 +309,18 @@ func (f *fake) rest(w http.ResponseWriter, r *http.Request) {
 		name := fmt.Sprint(in["name"])
 		if _, dup := f.labels[name]; dup {
 			w.WriteHeader(http.StatusUnprocessableEntity)
-			io.WriteString(w, `{"message":"Validation Failed","errors":[{"code":"already_exists"}]}`)
+			_, _ = io.WriteString(w, `{"message":"Validation Failed","errors":[{"code":"already_exists"}]}`)
 			return
 		}
 		f.labels[name] = fOpt{Name: name, Color: fmt.Sprint(in["color"]), Desc: fmt.Sprint(in["description"])}
 		w.WriteHeader(http.StatusCreated)
-		io.WriteString(w, `{}`)
+		_, _ = io.WriteString(w, `{}`)
 	case parts[0] == "issues" && len(parts) >= 2:
 		n, _ := strconv.Atoi(parts[1])
 		is := f.find(n)
 		if is == nil {
 			w.WriteHeader(http.StatusNotFound)
-			io.WriteString(w, `{"message":"Not Found"}`)
+			_, _ = io.WriteString(w, `{"message":"Not Found"}`)
 			return
 		}
 		f.issueRoute(w, r, is, parts[2:], in)
@@ -443,9 +443,9 @@ func (f *fake) graphql(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&req)
 	q, v := req.Query, req.Vars
 	str := func(k string) string { s, _ := v[k].(string); return s }
-	data := func(m map[string]any) { json.NewEncoder(w).Encode(map[string]any{"data": m}) }
+	data := func(m map[string]any) { _ = json.NewEncoder(w).Encode(map[string]any{"data": m}) }
 	fail := func(typ, msg string, d map[string]any) {
-		json.NewEncoder(w).Encode(map[string]any{"data": d, "errors": []any{map[string]any{"type": typ, "message": msg}}})
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": d, "errors": []any{map[string]any{"type": typ, "message": msg}}})
 	}
 	statusJSON := func(p *fProject, it *fItem) any {
 		for _, o := range p.Options {
