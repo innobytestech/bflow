@@ -27,6 +27,7 @@ type Action struct {
 	Command  string `json:"command,omitempty"`
 	Path     string `json:"path,omitempty"`
 	Subagent bool   `json:"subagent,omitempty"`
+	Agent    string `json:"agent,omitempty"` // agent_type del hook; "" en la sesión principal
 }
 
 // Context es lo que el guard sabe del repo y de la tarea activa.
@@ -95,6 +96,17 @@ var (
 	branchNew   = regexp.MustCompile(`^git\s+(-\S+\s+)*branch\s+[^-\s]`)
 	bflowFreeze = regexp.MustCompile(`^bflow(\.exe)?\s+freeze\b`)
 )
+
+// HumanOnly son los subcomandos que responden una decisión humana: un
+// subagente no los corre (los corre la sesión principal después de preguntar).
+var HumanOnly = []string{"approve", "reject", "unblock", "start", "new"}
+
+// BflowSubcommand devuelve el subcomando de bflow de un segmento ya recortado
+// ("approve" en `./bin/bflow.exe --json approve X`), o "" si el segmento no
+// invoca a bflow.
+func BflowSubcommand(seg string) string {
+	return "" // stub del contrato: lo implementa T2
+}
 
 // TaskScoped dice si el comando toca algo que bflow maneja por tarea (rama,
 // PR): el guard necesita saber si hay una tarea en curso.
