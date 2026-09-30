@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strings"
 
 	"innobytes.tech/bflow/internal/config"
@@ -52,7 +53,27 @@ type Unresolved struct {
 // cambia por su valor, vacío se queda vacío y un alias ausente queda vacío y
 // se devuelve en Unresolved (ordenado por alias). No muta specs.
 func ResolveModels(specs []Spec, table map[string]string) ([]Spec, []Unresolved) {
-	return specs, nil
+	out := make([]Spec, len(specs))
+	missing := map[string][]string{}
+	for i, s := range specs {
+		out[i] = s
+		if s.Model == "" || strings.Contains(s.Model, "/") {
+			continue
+		}
+		if v := table[s.Model]; v != "" {
+			out[i].Model = v
+			continue
+		}
+		out[i].Model = ""
+		missing[s.Model] = append(missing[s.Model], s.Subagent)
+	}
+	var un []Unresolved
+	for alias, as := range missing {
+		sort.Strings(as)
+		un = append(un, Unresolved{Alias: alias, Agents: as})
+	}
+	sort.Slice(un, func(i, j int) bool { return un[i].Alias < un[j].Alias })
+	return out, un
 }
 
 type base struct {
