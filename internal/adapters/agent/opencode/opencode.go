@@ -69,7 +69,8 @@ func (Agent) RenderAgents(specs []agents.Spec) (map[string][]byte, error) {
 		b.WriteString("---\n")
 		b.Write(fm)
 		b.WriteString("---\n" + agents.GeneratedMark + "\n\n")
-		b.WriteString(strings.TrimSpace(s.Body) + "\n")
+		b.WriteString(strings.TrimSpace(s.Body))
+		b.WriteString("\n")
 		out[agentsDir+"/"+s.Subagent+".md"] = b.Bytes()
 	}
 	return out, nil

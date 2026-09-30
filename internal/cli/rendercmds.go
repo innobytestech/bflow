@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -57,19 +58,41 @@ func upsertBlock(doc string) string {
 }
 
 func planRender(c *Ctx, cfg *config.Config) (*renderPlan, error) {
-	if c.Agent == nil {
+	if len(c.tools()) == 0 {
 		return nil, errors.New("no hay adaptador de agente")
 	}
 	specs, err := agents.Build(cfg.Flow.Core(), cfg.Agents, cfg.Root)
 	if err != nil {
 		return nil, err
 	}
-	files, err := c.Agent.RenderAgents(specs)
-	if err != nil {
-		return nil, err
+	files := map[string][]byte{}
+	p := &renderPlan{Files: files, Unresolved: map[string][]agents.Unresolved{}}
+	for _, name := range cfg.Agent.Rendered() {
+		t := c.tool(name)
+		if t == nil {
+			return nil, fmt.Errorf("no hay adaptador de %s", name)
+		}
+		toolSpecs := specs
+		if t.ResolvesModels() {
+			var un []agents.Unresolved
+			toolSpecs, un = agents.ResolveModels(specs, cfg.Models[t.Name()])
+			if len(un) > 0 {
+				p.Unresolved[t.Name()] = un
+			}
+		}
+		out, err := t.RenderAgents(toolSpecs)
+		if err != nil {
+			return nil, err
+		}
+		for rel, content := range out {
+			files[rel] = content
+		}
 	}
-	p := &renderPlan{Files: files}
-	generated := c.Agent.GeneratedAgents(cfg.Root)
+	// Lo generado por cualquier herramienta registrada, también la que ya no está en agent:.
+	var generated []string
+	for _, t := range c.tools() {
+		generated = append(generated, t.GeneratedAgents(cfg.Root)...)
+	}
 	for rel, want := range files {
 		have, err := os.ReadFile(filepath.Join(cfg.Root, filepath.FromSlash(rel)))
 		switch {
@@ -106,7 +129,7 @@ func runRender(c *Ctx) output.Envelope {
 	if err != nil {
 		return output.Fail("render", err)
 	}
-	data := map[string]any{"changed": p.Changed, "stale": p.Stale, "total": len(p.Files)}
+	data := map[string]any{"changed": p.Changed, "stale": p.Stale, "total": len(p.Files), "unresolved": p.unresolvedData(c)}
 	if len(p.Conflicts) > 0 {
 		env := output.Fail("render_conflict", fmt.Errorf("%s ya existe y no lo generó bflow: renómbralo o bórralo y vuelve a correr bflow render", strings.Join(p.Conflicts, ", ")))
 		env.Data["conflicts"] = p.Conflicts
@@ -158,6 +181,18 @@ func writeRender(cfg *config.Config, p *renderPlan) error {
 	return nil
 }
 
+// unresolvedData aplana los alias sin resolver: [{tool, alias, agents}], por
+// herramienta en el orden de registro y luego por alias.
+func (p *renderPlan) unresolvedData(c *Ctx) []map[string]any {
+	out := []map[string]any{}
+	for _, t := range c.tools() {
+		for _, u := range p.Unresolved[t.Name()] {
+			out = append(out, map[string]any{"tool": t.Name(), "alias": u.Alias, "agents": u.Agents})
+		}
+	}
+	return out
+}
+
 func renderText(p *renderPlan) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%d archivo(s): %d escrito(s), %d sin cambios", len(p.Files), len(p.Changed), len(p.Files)-len(p.Changed))
@@ -169,6 +204,12 @@ func renderText(p *renderPlan) string {
 	}
 	if len(p.Changed)+len(p.Stale) > 0 {
 		b.WriteString("\nCommitea los cambios para que el equipo use los mismos agentes.")
+	}
+	for _, tool := range slices.Sorted(maps.Keys(p.Unresolved)) {
+		for _, u := range p.Unresolved[tool] {
+			fmt.Fprintf(&b, "\naviso: %s: el alias %q no tiene equivalente (%s) y esos agentes salen sin model; agrega models.%s.%s: proveedor/modelo en bflow.yaml o en la config global",
+				tool, u.Alias, strings.Join(u.Agents, ", "), tool, u.Alias)
+		}
 	}
 	return b.String()
 }

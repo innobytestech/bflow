@@ -58,29 +58,44 @@ func runUpdate(c *Ctx) output.Envelope {
 		return output.Fail("update", err)
 	}
 	home, herr := os.UserHomeDir()
-	hadSkill := false
-	if herr == nil && c.Agent != nil {
-		_, st := c.Agent.SkillState(home)
-		hadSkill = st != "missing"
+	had := map[string]bool{}
+	if herr == nil {
+		for _, t := range c.tools() {
+			_, st := t.SkillState(home)
+			had[t.Name()] = st != "missing"
+		}
 	}
 	if err := release.Replace(exe, bin); err != nil {
 		return output.Fail("update", errors.New("no se pudo reemplazar el binario: "+err.Error()))
 	}
 	data["path"] = exe
 	text := fmt.Sprintf("bflow %s → %s (%s)", c.Version, rel.Tag, exe)
-	switch {
-	case !hadSkill:
-		data["skill"] = "skipped"
-	default:
-		cctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		defer cancel()
-		if err := exec.CommandContext(cctx, exe, "install", "claude", "--skill-only", "--json").Run(); err != nil {
-			data["skill"] = "failed"
-			text += "\nno se pudo refrescar la skill de claude; corre bflow install claude para refrescarla"
-		} else {
-			data["skill"] = "updated"
-			text += "\nskill de claude actualizada"
+	integrations := map[string]string{}
+	for _, t := range c.tools() {
+		name := t.Name()
+		what, done := "la skill", "skill de %s actualizada"
+		if name != "claude" {
+			what, done = "el comando", "comando de %s actualizado"
 		}
+		if !had[name] {
+			integrations[name] = "skipped"
+			continue
+		}
+		cctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		err := exec.CommandContext(cctx, exe, "install", name, "--skill-only", "--json").Run()
+		cancel()
+		if err != nil {
+			integrations[name] = "failed"
+			text += fmt.Sprintf("\nno se pudo refrescar %s de %s; corre bflow install %s para refrescarla", what, name, name)
+		} else {
+			integrations[name] = "updated"
+			text += fmt.Sprintf("\n"+done, name)
+		}
+	}
+	data["integrations"] = integrations
+	data["skill"] = "skipped"
+	if v, ok := integrations["claude"]; ok {
+		data["skill"] = v
 	}
 	return env("updated", text)
 }

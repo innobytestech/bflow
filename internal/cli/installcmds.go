@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"innobytes.tech/bflow/internal/config"
@@ -20,32 +21,36 @@ func init() {
 }
 
 func runInstall(c *Ctx) output.Envelope {
-	tool := ""
+	name := ""
 	if len(c.Args) > 0 {
-		tool = c.Args[0]
+		name = c.Args[0]
 	}
-	switch tool {
-	case "claude":
-	case "opencode":
-		return output.Fail("install_unsupported", fmt.Errorf("aún no hay adaptador de OpenCode (GH-13)"))
-	default:
-		return output.Fail("usage", fmt.Errorf("uso: bflow install <herramienta>; disponibles: claude, opencode"))
+	if !slices.Contains(config.Known.Agents, name) {
+		return output.Fail("usage", fmt.Errorf("uso: bflow install <herramienta>; disponibles: %s", strings.Join(config.Known.Agents, ", ")))
 	}
-	if c.Agent == nil {
-		return output.Fail("install", fmt.Errorf("no hay adaptador de agente"))
+	tool := c.tool(name)
+	if tool == nil || (name == "claude" && c.Agent == nil) {
+		return output.Fail("install", fmt.Errorf("no hay adaptador de %s", name))
 	}
 	home, err := os.UserHomeDir()
 	if err != nil || home == "" {
-		return output.Fail("install", fmt.Errorf("no se pudo resolver tu carpeta de usuario: %v", err))
+		home = ""
+		if name == "claude" {
+			return output.Fail("install", fmt.Errorf("no se pudo resolver tu carpeta de usuario: %v", err))
+		}
 	}
-	skill, err := c.Agent.InstallSkill(home)
+	skill, err := tool.InstallSkill(home)
 	if err != nil {
 		return output.Fail("install", err)
 	}
 	warns := []string{}
 	data := map[string]any{"skill": skill, "settings": "", "changed": false, "render": false, "warnings": warns}
 	var text strings.Builder
-	text.WriteString("skill: " + skill)
+	label := "skill"
+	if name != "claude" {
+		label = "comando"
+	}
+	text.WriteString(label + ": " + skill)
 
 	finish := func() output.Envelope {
 		data["warnings"] = warns
@@ -61,26 +66,32 @@ func runInstall(c *Ctx) output.Envelope {
 	}
 	root := config.FindRoot(c.Dir)
 	if _, err := os.Stat(filepath.Join(root, config.RepoFile)); err != nil {
-		warns = append(warns, "no hay bflow.yaml aquí: los hooks se instalan por repo; corre bflow install claude dentro de él")
+		if name == "claude" {
+			warns = append(warns, "no hay bflow.yaml aquí: los hooks se instalan por repo; corre bflow install claude dentro de él")
+		} else {
+			warns = append(warns, "no hay bflow.yaml aquí: los agentes se generan por repo; corre bflow install "+name+" dentro de él")
+		}
 		return finish()
 	}
 	cfg, err := config.Load(c.Dir)
 	if err != nil {
 		return output.Fail("config", err)
 	}
-	res, err := c.Agent.InstallSettings(cfg.Root)
-	if err != nil {
-		return output.Fail("install", err)
+	if name == "claude" {
+		res, err := c.Agent.InstallSettings(cfg.Root)
+		if err != nil {
+			return output.Fail("install", err)
+		}
+		data["settings"], data["changed"] = res.Path, res.Changed
+		warns = append(warns, res.Warnings...)
+		if res.Changed {
+			text.WriteString("\nhooks: " + res.Path + " (actualizado)")
+		} else {
+			text.WriteString("\nhooks: " + res.Path + " (sin cambios)")
+		}
 	}
-	data["settings"], data["changed"] = res.Path, res.Changed
-	warns = append(warns, res.Warnings...)
-	if res.Changed {
-		text.WriteString("\nhooks: " + res.Path + " (actualizado)")
-	} else {
-		text.WriteString("\nhooks: " + res.Path + " (sin cambios)")
-	}
-	if !cfg.Agent.Has("claude") {
-		warns = append(warns, "agent: no incluye claude en bflow.yaml, así que no se generaron los agentes; pon agent: claude y corre bflow render")
+	if !cfg.Agent.Has(name) {
+		warns = append(warns, fmt.Sprintf("agent: no incluye %s en bflow.yaml, así que no se generaron sus agentes; agrégalo (agent: [claude, opencode]) y corre bflow render", name))
 		return finish()
 	}
 	p, err := applyRender(c, cfg)

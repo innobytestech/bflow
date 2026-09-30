@@ -235,10 +235,25 @@ type yamlEnv struct {
 	RequireEnv map[string]string `yaml:"require_env,omitempty"`
 }
 
+// agentList es agent: como texto con una herramienta y como lista en línea
+// con varias.
+type agentList []string
+
+func (l agentList) MarshalYAML() (any, error) {
+	if len(l) == 1 {
+		return l[0], nil
+	}
+	n := &yaml.Node{Kind: yaml.SequenceNode, Style: yaml.FlowStyle}
+	for _, v := range l {
+		n.Content = append(n.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: v})
+	}
+	return n, nil
+}
+
 type yamlRepo struct {
 	Profile string       `yaml:"profile,omitempty"`
 	Stack   string       `yaml:"stack,omitempty"`
-	Agent   string       `yaml:"agent,omitempty"`
+	Agent   agentList    `yaml:"agent,omitempty"`
 	Tracker *yamlTracker `yaml:"tracker,omitempty"`
 	VCS     *yamlVCS     `yaml:"vcs,omitempty"`
 	Check   *yamlCheck   `yaml:"check,omitempty"`
@@ -254,7 +269,10 @@ func unless(v, inProfile string) string {
 
 // RenderYAML arma un bflow.yaml con solo lo propio del repo.
 func RenderYAML(a Answers, p Profile) (string, error) {
-	r := yamlRepo{Profile: a.Profile, Stack: a.Stack, Agent: unless(strings.Join(a.Agent, ","), strings.Join(p.Agent, ","))}
+	r := yamlRepo{Profile: a.Profile, Stack: a.Stack}
+	if !slices.Equal(a.Agent, p.Agent) {
+		r.Agent = a.Agent
+	}
 	t := yamlTracker{Adapter: unless(a.Tracker, p.Tracker), URL: unless(a.TrackerURL, p.URL), Workspace: unless(a.Workspace, p.Workspace), Project: a.Project}
 	if t.Adapter == "local" && p.Tracker == "" {
 		t.Adapter = "" // local es el default
