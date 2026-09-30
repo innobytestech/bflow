@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"innobytes.tech/bflow/internal/flow"
 	"innobytes.tech/bflow/internal/tracker"
@@ -744,5 +745,28 @@ func TestGraphQLURLEnterprise(t *testing.T) {
 	}
 	if p.item(is) == nil || !slices.Contains(f.calls, "POST /api/graphql") {
 		t.Errorf("calls: %v", f.calls)
+	}
+}
+
+func TestHTTPError422ShowsFieldDetail(t *testing.T) {
+	c := &Client{Token: "tok123"}
+	raw := []byte(`{"message":"Validation Failed","errors":[{"resource":"Issue","field":"title","code":"invalid"},{"code":"custom","message":"tok123 malo"}]}`)
+	err := c.httpError("POST", "/repos/a/b/issues", 422, raw, false)
+	got := err.Error()
+	for _, want := range []string{"Validation Failed", "Issue.title: invalid", "custom: *** malo"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("falta %q en %q", want, got)
+		}
+	}
+	if strings.Contains(got, "tok123") {
+		t.Errorf("token filtrado: %q", got)
+	}
+}
+
+func TestRedactTrimsByRunes(t *testing.T) {
+	c := &Client{}
+	got := c.redact(strings.Repeat("é", 300))
+	if !utf8.ValidString(got) || utf8.RuneCountInString(got) != 200 {
+		t.Errorf("recorte inválido: %d runas, válido=%v", utf8.RuneCountInString(got), utf8.ValidString(got))
 	}
 }

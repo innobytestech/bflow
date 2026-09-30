@@ -143,8 +143,8 @@ func (c *Client) redact(s string) string {
 	if c.Token != "" {
 		s = strings.ReplaceAll(s, c.Token, "***")
 	}
-	if len(s) > 200 {
-		s = s[:200]
+	if r := []rune(s); len(r) > 200 {
+		s = string(r[:200])
 	}
 	return s
 }
@@ -245,11 +245,38 @@ func (c *Client) httpError(method, shown string, status int, raw []byte, graphql
 	msg := strings.TrimSpace(string(raw))
 	var d struct {
 		Message string `json:"message"`
+		Errors  []struct {
+			Resource string `json:"resource"`
+			Field    string `json:"field"`
+			Code     string `json:"code"`
+			Message  string `json:"message"`
+		} `json:"errors"`
 	}
 	if json.Unmarshal(raw, &d) == nil && d.Message != "" {
 		msg = d.Message
 	}
 	msg = c.redact(msg)
+	var det []string
+	for _, e := range d.Errors {
+		where := strings.Trim(e.Resource+"."+e.Field, ".")
+		var p []string
+		if e.Code != "" {
+			p = append(p, e.Code)
+		}
+		if e.Message != "" {
+			p = append(p, e.Message)
+		}
+		s := strings.Join(p, ": ")
+		if where != "" {
+			s = where + ": " + s
+		}
+		if s = strings.TrimSuffix(s, ": "); s != "" {
+			det = append(det, c.redact(s))
+		}
+	}
+	if len(det) > 0 {
+		msg += " (" + strings.Join(det, "; ") + ")"
+	}
 	switch {
 	case status == 401:
 		return &apiError{status, "github: token inválido o vencido (bflow connect github)"}
