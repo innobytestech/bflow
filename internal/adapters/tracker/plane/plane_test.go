@@ -122,11 +122,11 @@ func (f *fakePlane) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var in map[string]any
-		json.NewDecoder(r.Body).Decode(&in)
+		_ = json.NewDecoder(r.Body).Decode(&in)
 		it := f.add(len(f.items)+200, in["name"].(string), "st-backlog")
 		it["description_html"] = in["description_html"]
 		w.WriteHeader(201)
-		json.NewEncoder(w).Encode(it)
+		_ = json.NewEncoder(w).Encode(it)
 	case r.Method == "GET" && strings.HasPrefix(p, base+"/work-items/"):
 		if f.noWSEndpoint {
 			w.WriteHeader(404)

@@ -43,23 +43,23 @@
 
 ## Tasks
 
-- [ ] **T1 · Next de intake** (`internal/flow/next.go`)
+- [x] **T1 · Next de intake** (`internal/flow/next.go`)
   - Nueva `func IntakeNext(cfg Config) output.Next` y constante no exportada a la máquina `IntakeGate = "intake"` (string, fuera de `Gate`).
   - R1: CUANDO se llama `IntakeNext`, DEBE devolver `Action: ask`, `Gate: "intake"`, `Skill: "intake"`, `Question` «¿Creamos una tarea nueva para la idea o usamos una que ya existe?» y dos opciones: `{ID: "new", Label: "Crear tarea nueva", Command: "bflow new --lane <carril> --title \"<título>\" --file <idea.md>"}` y `{ID: "existing", Label: "Usar una existente", Command: "bflow start <ID> --lane <carril>"}`. La descripción de cada opción lista los carriles de `cfg.Lanes` (mismo orden que `laneOptions`).
   - Prueba: `TestIntakeNext` en `internal/flow/next_test.go`.
 
-- [ ] **T2 · status sin tareas en curso** (`internal/cli/flowcmds.go`, `runStatus`)
+- [x] **T2 · status sin tareas en curso** (`internal/cli/flowcmds.go`, `runStatus`)
   - R2: CUANDO `status` corre sin ID y `e.Views` devuelve cero tareas, DEBE responder `kind` `status_list` con `next` = `flow.IntakeNext(e.Cfg.Flow.Core())` (lo mismo que `Engine.flowCfg()`); el texto sin `--brief` agrega `renderNext(next)` tras «bflow: sin tareas en curso»; con `--brief`, el texto no cambia.
   - R3: CUANDO hay una o varias tareas en curso, el comportamiento actual no cambia.
   - Prueba: `TestStatusWithoutTasksAsksIntake` en `internal/cli`.
 
-- [ ] **T3 · Create en Plane** (`internal/adapters/tracker/plane/plane.go`)
+- [x] **T3 · Create en Plane** (`internal/adapters/tracker/plane/plane.go`)
   - `func (c *Client) Create(ctx context.Context, title, description string) (tracker.Task, error)` y `_ tracker.Creator = (*Client)(nil)`.
   - R4: DEBE hacer `POST <proj>/work-items/` con `{"name": title, "description_html": markdown.ToHTML(description)}`, llamar `c.remember(w)` y devolver `c.task(sts, w)` (ID `PROY-<sequence_id>`, estado por defecto del proyecto).
   - R5: CUANDO la API responde error, DEBE devolverlo sin tarea parcial.
   - Pruebas: `TestCreate` y `TestCreateError` en `plane_test.go` (el fake gana `POST proj+"/work-items/"`).
 
-- [ ] **T4 · bflow new** (`internal/cli/flowcmds.go`, `internal/engine/commands.go`)
+- [x] **T4 · bflow new** (`internal/cli/flowcmds.go`, `internal/engine/commands.go`)
   - `func (e *Engine) New(ctx context.Context, lane flow.Lane, title, desc string) (tracker.Task, Outcome, error)`; comando `Register(&Command{Name: "new", ...})` con flags `--lane`, `--title`, `--file`, `--slug`.
   - R6: CUANDO falta `--lane` o `--title` (tras `TrimSpace`), DEBE fallar con `usage` sin llamar al tracker.
   - R7: CUANDO el carril no está en la config del flujo, DEBE rechazar (exit 2, código `unknown_lane`) sin crear la tarea.
@@ -69,12 +69,12 @@
   - R11: CUANDO `Start` falla tras crear, DEBE responder el error con `data.id` y el texto «<ID> creada, pero no arrancó: <motivo>. Reintenta con bflow start <ID> --lane <carril>».
   - Pruebas: `TestNewCreatesAndStarts`, `TestNewRejectsUnknownLaneBeforeCreate`, `TestNewStartFailureKeepsTask` en `internal/engine` con `trackertest.Memory`.
 
-- [ ] **T5 · bflow task list** (`internal/cli/flowcmds.go`, `internal/engine/commands.go`)
+- [x] **T5 · bflow task list** (`internal/cli/flowcmds.go`, `internal/engine/commands.go`)
   - `func (e *Engine) OpenTasks(ctx context.Context) ([]tracker.Task, error)` = `e.Tracker.List(ctx, tracker.Filter{OpenOnly: true})`; comando `Register(&Command{Name: "task list", ...})`.
   - R12: DEBE responder `kind` `task_list` con `data.tasks` = `[{id, title, phase}]` (solo esos campos, JSON compacto) y texto de una línea por tarea `ID · fase · título`.
   - R13: CUANDO el tracker falla, DEBE responder el error (`fail`).
   - Prueba: `TestTaskListOnlyOpen` en `internal/cli` o `internal/engine`.
 
-- [ ] **T6 · Skill, README y CHANGELOG**
+- [x] **T6 · Skill, README y CHANGELOG**
   - R14: `SKILL.md` gana `## intake` (≤5 líneas): pedir la idea si no la hay; correr `bflow task list --json` y, si un título se parece, ofrecer usar esa tarea antes de crear; proponer título y carril con su motivo; guardar la idea en un archivo y correr el `command` elegido con los marcadores reemplazados.
   - README: `new` y `task list` en la tabla de comandos (línea de «Flujo») y un ejemplo junto a `task add`. CHANGELOG: entrada en la versión en curso.

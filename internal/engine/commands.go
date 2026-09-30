@@ -34,6 +34,35 @@ func (e *Engine) Start(ctx context.Context, id string, lane flow.Lane, slug, fix
 	return out, err
 }
 
+// New crea la tarea en el tracker y la arranca en el carril. Si el carril no
+// existe no crea nada. slug es opcional (vacío: se deriva del título). Si Start falla, la tarea ya existe: se devuelve con un
+// error que dice cómo reintentar.
+func (e *Engine) New(ctx context.Context, lane flow.Lane, title, desc string, slug ...string) (tracker.Task, Outcome, error) {
+	if _, ok := e.flowCfg().Lanes[lane]; !ok {
+		var names []string
+		for l := range e.flowCfg().Lanes {
+			names = append(names, string(l))
+		}
+		sort.Strings(names)
+		return tracker.Task{}, Outcome{}, &flow.Rejection{Code: "unknown_lane",
+			Reason: fmt.Sprintf("carril desconocido %q (disponibles: %s)", lane, strings.Join(names, ", "))}
+	}
+	task, err := e.CreateTask(ctx, title, desc)
+	if err != nil {
+		return tracker.Task{}, Outcome{}, err
+	}
+	out, err := e.Start(ctx, task.ID, lane, strings.Join(slug, ""), "")
+	if err != nil {
+		return task, Outcome{ID: task.ID}, fmt.Errorf("%s creada, pero no arrancó: %w. Reintenta con bflow start %s --lane %s", task.ID, err, task.ID, lane)
+	}
+	return task, out, nil
+}
+
+// OpenTasks lista las tareas abiertas del tracker.
+func (e *Engine) OpenTasks(ctx context.Context) ([]tracker.Task, error) {
+	return e.Tracker.List(ctx, tracker.Filter{OpenOnly: true})
+}
+
 // ApproveOpts son las opciones de approve.
 type ApproveOpts struct {
 	Gate       string

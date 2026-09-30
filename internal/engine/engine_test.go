@@ -13,6 +13,7 @@ import (
 	"innobytes.tech/bflow/internal/flow"
 	"innobytes.tech/bflow/internal/store"
 	"innobytes.tech/bflow/internal/testutil"
+	"innobytes.tech/bflow/internal/tracker"
 	"innobytes.tech/bflow/internal/tracker/trackertest"
 )
 
@@ -378,5 +379,69 @@ func TestSlug(t *testing.T) {
 		if got := Slug(in); got != want {
 			t.Errorf("Slug(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestNewCreatesAndStarts(t *testing.T) {
+	v := newEnv(t, "")
+	ctx := context.Background()
+	task, o, err := v.e.New(ctx, flow.Light, "Idea nueva", "Detalle de la idea")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if task.ID != "MEM-1" || o.ID != task.ID || o.To != flow.Spec {
+		t.Fatalf("task %+v outcome %+v", task, o)
+	}
+	got, _ := v.tr.Get(ctx, task.ID)
+	if got.Title != "Idea nueva" || got.Description != "Detalle de la idea" {
+		t.Errorf("tarea en el tracker: %+v", got)
+	}
+	if rec, err := v.e.Store.Load(task.ID); err != nil || rec.Flow.Lane != flow.Light || rec.Flow.Slug != "idea-nueva" {
+		t.Errorf("estado: %+v %v", rec, err)
+	}
+	if o.Next.Action == "" {
+		t.Error("responde con el next de start")
+	}
+	_, o, err = v.e.New(ctx, flow.Light, "Otra", "", "mi-slug")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec, _ := v.e.Store.Load(o.ID); rec.Flow.Slug != "mi-slug" {
+		t.Errorf("slug explícito: %q", rec.Flow.Slug)
+	}
+}
+
+func TestNewRejectsUnknownLaneBeforeCreate(t *testing.T) {
+	v := newEnv(t, "")
+	_, _, err := v.e.New(context.Background(), flow.Lane("zzz"), "x", "")
+	var rj *flow.Rejection
+	if !errors.As(err, &rj) || rj.Code != "unknown_lane" {
+		t.Fatalf("esperaba unknown_lane, got %v", err)
+	}
+	if l, _ := v.tr.List(context.Background(), tracker.Filter{}); len(l) != 0 {
+		t.Errorf("no debe crear la tarea: %v", l)
+	}
+}
+
+func TestNewStartFailureKeepsTask(t *testing.T) {
+	v := newEnv(t, "")
+	// Un .bflow que es un archivo hace fallar al store: Start no puede arrancar.
+	if err := os.WriteFile(filepath.Join(v.e.Cfg.Root, ".bflow"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	task, _, err := v.e.New(ctx, flow.Light, "Idea", "")
+	if err == nil {
+		t.Fatal("Start falla: debe haber error")
+	}
+	if task.ID != "MEM-1" {
+		t.Errorf("la tarea creada se devuelve: %+v", task)
+	}
+	want := "MEM-1 creada, pero no arrancó: "
+	if !strings.Contains(err.Error(), want) || !strings.Contains(err.Error(), "Reintenta con bflow start MEM-1 --lane light") {
+		t.Errorf("mensaje: %v", err)
+	}
+	if l, _ := v.tr.List(ctx, tracker.Filter{}); len(l) != 1 {
+		t.Errorf("la tarea sigue en el tracker: %v", l)
 	}
 }

@@ -97,6 +97,17 @@ func flowCommand(run func(ctx context.Context, e *engine.Engine, id string, c *C
 	}
 }
 
+// afterStart hace lo que sigue a un start correcto: recordar el repo y abrir el panel.
+func afterStart(e *engine.Engine, o *engine.Outcome) {
+	_ = config.RememberRepo(e.Cfg.Root) // para la red de la página del panel
+	if e.Cfg.UI.Watch || e.Cfg.UI.Web {
+		// Sin escritorio (CI, SSH) no se abre y no se avisa: es lo esperado.
+		if _, werr := openWatch(e.Cfg.Root, e.Store.Dir(), e.Cfg.UI.Web); werr != nil && !errors.Is(werr, errNoDesktop) {
+			o.Warnings = append(o.Warnings, "no se pudo abrir el panel (bflow watch): "+werr.Error())
+		}
+	}
+}
+
 func str(fs *flag.FlagSet, name string) string { return fs.Lookup(name).Value.String() }
 
 func init() {
@@ -117,16 +128,72 @@ func init() {
 			return flowCommand(func(ctx context.Context, e *engine.Engine, id string, c *Ctx, _ []string) (engine.Outcome, error) {
 				o, err := e.Start(ctx, id, flow.Lane(lane), str(c.Flags, "slug"), str(c.Flags, "fixes"))
 				if err == nil {
-					_ = config.RememberRepo(e.Cfg.Root) // para la red de la página del panel
-				}
-				if err == nil && (e.Cfg.UI.Watch || e.Cfg.UI.Web) {
-					// Sin escritorio (CI, SSH) no se abre y no se avisa: es lo esperado.
-					if _, werr := openWatch(e.Cfg.Root, e.Store.Dir(), e.Cfg.UI.Web); werr != nil && !errors.Is(werr, errNoDesktop) {
-						o.Warnings = append(o.Warnings, "no se pudo abrir el panel (bflow watch): "+werr.Error())
-					}
+					afterStart(e, &o)
 				}
 				return o, err
 			})(c)
+		}})
+
+	Register(&Command{Name: "new", Summary: "crea una tarea y la arranca: new --lane full|light|hotfix --title \"t\" [--file idea.md] [--slug s]",
+		Setup: func(fs *flag.FlagSet) {
+			fs.String("lane", "", "carril")
+			fs.String("title", "", "título de la tarea")
+			fs.String("file", "", "archivo Markdown con la idea (descripción)")
+			fs.String("slug", "", "slug para rama y carpeta del spec")
+		},
+		Run: func(c *Ctx) output.Envelope {
+			lane, title := strings.TrimSpace(str(c.Flags, "lane")), strings.TrimSpace(str(c.Flags, "title"))
+			if lane == "" || title == "" {
+				return output.Fail("usage", errors.New(`uso: bflow new --lane full|light|hotfix --title "título" [--file idea.md]`))
+			}
+			e, err := engineFor(c)
+			if err != nil {
+				return output.Fail("config", err)
+			}
+			desc := ""
+			if f := str(c.Flags, "file"); f != "" {
+				b, err := os.ReadFile(abs(c.Dir, f))
+				if err != nil {
+					return fail(err)
+				}
+				desc = string(b)
+			}
+			task, o, err := e.New(context.Background(), flow.Lane(lane), title, desc, str(c.Flags, "slug"))
+			if err != nil {
+				env := fail(err)
+				if task.ID != "" {
+					env.Data["id"] = task.ID
+				}
+				return env
+			}
+			afterStart(e, &o)
+			env := outcomeEnvelope(o)
+			env.Data["title"] = task.Title
+			return env
+		}})
+
+	Register(&Command{Name: "task list", Summary: "lista las tareas abiertas del tracker: task list",
+		Run: func(c *Ctx) output.Envelope {
+			e, err := engineFor(c)
+			if err != nil {
+				return output.Fail("config", err)
+			}
+			tasks, err := e.OpenTasks(context.Background())
+			if err != nil {
+				return fail(err)
+			}
+			rows := make([]map[string]any, 0, len(tasks))
+			var lines []string
+			for _, t := range tasks {
+				rows = append(rows, map[string]any{"id": t.ID, "title": t.Title, "phase": t.Phase})
+				lines = append(lines, fmt.Sprintf("%s · %s · %s", t.ID, t.Phase, t.Title))
+			}
+			env := output.OK("task_list", map[string]any{"tasks": rows}, nil)
+			env.Text = strings.Join(lines, "\n")
+			if len(lines) == 0 {
+				env.Text = "bflow: sin tareas abiertas"
+			}
+			return env
 		}})
 
 	Register(&Command{Name: "approve", Summary: "aprueba el gate pendiente: approve [ID] [--gate g] [--choice n] [--note t] [--file f]",
@@ -354,6 +421,15 @@ func runStatus(c *Ctx) output.Envelope {
 	text := "bflow: sin tareas en curso"
 	if len(lines) > 0 {
 		text = "bflow: " + fmt.Sprint(len(lines)) + " tareas en curso (indica el ID)\n  " + strings.Join(lines, "\n  ")
+	}
+	if len(views) == 0 {
+		next := flow.IntakeNext(e.Cfg.Flow.Core())
+		env := output.OK("status_list", map[string]any{"tasks": views}, &next)
+		env.Text = text
+		if !brief {
+			env.Text += "\n" + strings.TrimRight(renderNext(next), "\n")
+		}
+		return env
 	}
 	env := output.OK("status_list", map[string]any{"tasks": views}, nil)
 	env.Text = text
