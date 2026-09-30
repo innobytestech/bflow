@@ -120,21 +120,43 @@ func runRender(c *Ctx) output.Envelope {
 		env.Data = data
 		return env
 	}
+	if err := writeRender(cfg, p); err != nil {
+		return fail(err)
+	}
+	env := output.OK("rendered", data, nil)
+	env.Text = renderText(p)
+	return env
+}
+
+// applyRender planifica y escribe los agentes; con conflictos no escribe nada
+// y devuelve el plan para que quien llama decida qué decir.
+func applyRender(c *Ctx, cfg *config.Config) (*renderPlan, error) {
+	p, err := planRender(c, cfg)
+	if err != nil || len(p.Conflicts) > 0 {
+		return p, err
+	}
+	return p, writeRender(cfg, p)
+}
+
+func writeRender(cfg *config.Config, p *renderPlan) error {
 	for _, rel := range p.Changed {
 		abs := filepath.Join(cfg.Root, filepath.FromSlash(rel))
 		if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
-			return fail(err)
+			return err
 		}
 		if err := os.WriteFile(abs, p.Files[rel], 0o644); err != nil {
-			return fail(err)
+			return err
 		}
 	}
 	for _, rel := range p.Stale {
 		if err := os.Remove(filepath.Join(cfg.Root, filepath.FromSlash(rel))); err != nil {
-			return fail(err)
+			return err
 		}
 	}
-	env := output.OK("rendered", data, nil)
+	return nil
+}
+
+func renderText(p *renderPlan) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%d archivo(s): %d escrito(s), %d sin cambios", len(p.Files), len(p.Changed), len(p.Files)-len(p.Changed))
 	for _, rel := range p.Changed {
@@ -146,6 +168,5 @@ func runRender(c *Ctx) output.Envelope {
 	if len(p.Changed)+len(p.Stale) > 0 {
 		b.WriteString("\nCommitea los cambios para que el equipo use los mismos agentes.")
 	}
-	env.Text = b.String()
-	return env
+	return b.String()
 }

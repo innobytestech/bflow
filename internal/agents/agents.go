@@ -215,3 +215,11 @@ func contract(name string, phases []flow.Phase, b base) string {
 	w.WriteString("- Tu respuesta final es solo la salida de `bflow report`, sin resumen propio.\n")
 	return w.String()
 }
+
+// SettingsResult es lo que devuelve instalar los ajustes de bflow en la
+// configuración de la herramienta del repo.
+type SettingsResult struct {
+	Path     string
+	Changed  bool
+	Warnings []string
+}

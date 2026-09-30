@@ -263,12 +263,7 @@ tracker:
 
 ### 4. Usarlo con Claude Code
 
-Copia los archivos de [`adapters/claude/`](adapters/claude/):
-
-| Archivo | Destino |
-|---|---|
-| `skills/bflow/SKILL.md` | `~/.claude/skills/bflow/SKILL.md` (una vez por máquina) |
-| `settings.json` | `<repo>/.claude/settings.json` |
+Corre `bflow install claude` dentro del repo. Instala la skill en `~/.claude/skills/bflow/SKILL.md` (una vez por máquina), fusiona los hooks, el permiso y la barra de estado en `<repo>/.claude/settings.json` sin tocar lo tuyo, y corre `bflow render` si el repo tiene `agent: claude`. Es idempotente: córrelo otra vez cuando quieras. `bflow install claude --skill-only` instala solo la skill; `bflow update` la refresca sola si ya estaba instalada. Los archivos fuente están en [`adapters/claude/`](adapters/claude/).
 
 La skill tiene unas 30 líneas: no contiene reglas del flujo, solo cómo interpretar `next`. Los hooks corren `bflow hook session-start` al abrir la sesión, `bflow guard` antes de cada edición o comando, `bflow hook tokens` al terminar cada turno y cada subagente (cada uno cuenta solo su transcript), `bflow hook subagent-stop` cuando termina un agente de bflow (si no reportó, lo hace seguir hasta 2 veces con lo que le falta y después bloquea la tarea para que decida una persona) y la barra de estado con `bflow statusline`:
 
