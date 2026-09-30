@@ -97,7 +97,7 @@ func TestMergeSettingsKeepsUserHooksAndOrder(t *testing.T) {
 		t.Errorf("permissions: %v", perm)
 	}
 	idx := func(k string) int { return strings.Index(out, `"`+k+`"`) }
-	if !(idx("model") < idx("permissions") && idx("permissions") < idx("hooks") && idx("hooks") < idx("env") && idx("env") < idx("statusLine")) {
+	if idx("model") >= idx("permissions") || !(idx("permissions") < idx("hooks") && idx("hooks") < idx("env") && idx("env") < idx("statusLine")) {
 		t.Errorf("orden de claves del usuario, lo nuevo al final:\n%s", out)
 	}
 }
