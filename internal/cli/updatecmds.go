@@ -86,7 +86,7 @@ func runUpdate(c *Ctx) output.Envelope {
 		cancel()
 		if err != nil {
 			integrations[name] = "failed"
-			text += fmt.Sprintf("\nno se pudo refrescar %s de %s; corre bflow install %s para refrescarla", what, name, name)
+			text += fmt.Sprintf("\nno se pudo refrescar %s de %s; corre bflow install %s para refrescar", what, name, name)
 		} else {
 			integrations[name] = "updated"
 			text += fmt.Sprintf("\n"+done, name)
