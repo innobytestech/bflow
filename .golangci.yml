@@ -1,0 +1,7 @@
+# golangci-lint v2. El preset std-error-handling conserva lo que v1 excluía
+# por defecto (Close, Fprint* y similares sin revisar).
+version: "2"
+linters:
+  exclusions:
+    presets:
+      - std-error-handling
