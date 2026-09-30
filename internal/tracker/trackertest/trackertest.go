@@ -20,6 +20,9 @@ type Harness struct {
 	Seed func(t *testing.T, tr tracker.Tracker) (id, title string)
 	// Missing es un ID bien formado que no existe.
 	Missing string
+	// NoStartDate es para trackers sin campo de fecha de inicio: "stamp start
+	// once" solo verifica que Transition con StampStart no falla.
+	NoStartDate bool
 }
 
 // Run ejecuta la suite.
@@ -69,6 +72,9 @@ func Run(t *testing.T, h Harness) {
 		}
 		if err := tr.Transition(ctx, id, flow.Implementing, tracker.Patch{StampStart: first.AddDate(0, 0, 5)}); err != nil {
 			t.Fatal(err)
+		}
+		if h.NoStartDate {
+			return
 		}
 		task, _ := tr.Get(ctx, id)
 		if task.Start == nil || task.Start.Format("2006-01-02") != "2026-09-01" {

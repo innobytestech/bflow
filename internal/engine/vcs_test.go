@@ -12,6 +12,7 @@ import (
 
 	"innobytes.tech/bflow/internal/flow"
 	"innobytes.tech/bflow/internal/store"
+	"innobytes.tech/bflow/internal/tracker/trackertest"
 	"innobytes.tech/bflow/internal/vcs"
 )
 
@@ -296,5 +297,38 @@ func TestContractApprovalFreezesTouchedTests(t *testing.T) {
 	}
 	if !hasWarning(o, "1 prueba(s) congelada(s)") {
 		t.Errorf("debe avisar: %v", o.Warnings)
+	}
+}
+
+// linkingTracker es la memoria con la capacidad opcional tracker.PRLinker.
+type linkingTracker struct {
+	*trackertest.Memory
+	ref string
+}
+
+func (l linkingTracker) CloseRef(string) string { return l.ref }
+
+func TestPRBodyClosesIssue(t *testing.T) {
+	v := newEnv(t, "")
+	rec := store.Record{Flow: flow.State{ID: "GH-42", Slug: "demo", Lane: flow.Full}, Title: "Demo"}
+
+	v.e.Tracker = linkingTracker{v.tr, "Closes #42"}
+	body := v.e.PRBody(rec)
+	at, foot := strings.Index(body, "Closes #42"), strings.LastIndex(body, "\n---\n")
+	if at < 0 || foot < 0 || at > foot {
+		t.Errorf("el PR lleva «Closes #42» antes del pie:\n%s", body)
+	}
+	if strings.Count(body, "Closes #42") != 1 {
+		t.Errorf("la línea aparece una sola vez:\n%s", body)
+	}
+
+	v.e.Tracker = linkingTracker{v.tr, ""}
+	if body := v.e.PRBody(rec); strings.Contains(body, "Closes") {
+		t.Errorf("CloseRef vacío no agrega nada:\n%s", body)
+	}
+
+	v.e.Tracker = v.tr // sin la capacidad
+	if body := v.e.PRBody(rec); strings.Contains(body, "Closes") {
+		t.Errorf("un tracker sin PRLinker no agrega nada:\n%s", body)
 	}
 }

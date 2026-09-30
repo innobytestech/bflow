@@ -57,12 +57,14 @@ type Project struct {
 }
 
 type Tracker struct {
-	Adapter   string              `yaml:"adapter,omitempty"`
-	URL       string              `yaml:"url,omitempty"`
-	Workspace string              `yaml:"workspace,omitempty"`
-	Project   string              `yaml:"project,omitempty"` // identificador legible (API), nunca UUID
-	Path      string              `yaml:"path,omitempty"`    // tracker local: carpeta de las tareas (.bflow/local por defecto)
-	States    map[string][]string `yaml:"states,omitempty"`  // fase bflow → nombres en el tracker (el primero se usa al escribir)
+	Adapter    string              `yaml:"adapter,omitempty"`
+	URL        string              `yaml:"url,omitempty"`
+	Workspace  string              `yaml:"workspace,omitempty"`
+	Project    string              `yaml:"project,omitempty"`     // identificador legible (API), nunca UUID
+	Path       string              `yaml:"path,omitempty"`        // tracker local: carpeta de las tareas (.bflow/local por defecto)
+	Prefix     string              `yaml:"prefix,omitempty"`      // github: prefijo de los IDs (GH-42); GH por defecto
+	StartField string              `yaml:"start_field,omitempty"` // github: campo de fecha del project donde se sella el inicio
+	States     map[string][]string `yaml:"states,omitempty"`      // fase bflow → nombres en el tracker (el primero se usa al escribir)
 }
 
 type BranchPrefix struct {
@@ -167,7 +169,7 @@ type globalFile struct {
 
 // Known son los adaptadores que este binario sabe construir.
 var Known = struct{ Trackers, Hosts, Agents []string }{
-	Trackers: []string{"local", "plane"},
+	Trackers: []string{"local", "plane", "github"},
 	Hosts:    []string{"", "github"},
 	Agents:   []string{"", "claude"},
 }

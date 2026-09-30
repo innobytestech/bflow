@@ -330,3 +330,50 @@ func TestConsumerChangelogIsVersioned(t *testing.T) {
 		t.Errorf("ruta del repo: %v", err)
 	}
 }
+
+func TestValidateGithubTracker(t *testing.T) {
+	gh := "vcs: { host: github, repo: acme/app }\n"
+	ok := []string{
+		gh + "tracker: { adapter: github }\n",
+		gh + "tracker: { adapter: github, prefix: GH, project: acme/7 }\n",
+		gh + "tracker: { adapter: github, prefix: Api2, project: Acme-Corp/120, start_field: Inicio }\n",
+	}
+	for _, y := range ok {
+		c, err := Load(fixture(t, "", y))
+		if err != nil {
+			t.Errorf("debe aceptar %q: %v", y, err)
+			continue
+		}
+		if c.Tracker.Adapter != "github" {
+			t.Errorf("adapter = %q", c.Tracker.Adapter)
+		}
+	}
+	c, _ := Load(fixture(t, "", ok[2]))
+	if c.Tracker.Prefix != "Api2" || c.Tracker.StartField != "Inicio" {
+		t.Errorf("prefix/start_field no se leen: %+v", c.Tracker)
+	}
+
+	bad := []struct{ name, yaml, want string }{
+		{"sin host github", "tracker: { adapter: github }\n", "vcs.host"},
+		{"host vacío explícito", "vcs: { host: \"\" }\ntracker: { adapter: github }\n", "vcs.host"},
+		{"project sin número", gh + "tracker: { adapter: github, project: acme }\n", "tracker.project"},
+		{"project con cero", gh + "tracker: { adapter: github, project: acme/0 }\n", "tracker.project"},
+		{"project con cero a la izquierda", gh + "tracker: { adapter: github, project: acme/07 }\n", "tracker.project"},
+		{"project con ruta extra", gh + "tracker: { adapter: github, project: acme/7/x }\n", "tracker.project"},
+		{"project con owner raro", gh + "tracker: { adapter: github, project: -acme/7 }\n", "tracker.project"},
+		{"prefix con guion", gh + "tracker: { adapter: github, prefix: G-H }\n", "tracker.prefix"},
+		{"prefix con número al inicio", gh + "tracker: { adapter: github, prefix: 1GH }\n", "tracker.prefix"},
+	}
+	for _, b := range bad {
+		t.Run(b.name, func(t *testing.T) {
+			_, err := Load(fixture(t, "", b.yaml))
+			if err == nil || !strings.Contains(err.Error(), b.want) {
+				t.Errorf("esperaba error con %q, got %v", b.want, err)
+			}
+		})
+	}
+	// Las reglas son solo de github: plane sigue aceptando su identificador.
+	if _, err := Load(fixture(t, "", "tracker: { adapter: plane, url: https://x, workspace: w, project: API, prefix: a-b }\n")); err != nil {
+		t.Errorf("prefix solo se valida con github: %v", err)
+	}
+}
