@@ -91,7 +91,7 @@ flowchart LR
 
 | Eje | Hoy | Previsto |
 |---|---|---|
-| Tracker | `local` (archivos en el repo, sin cuenta), Plane | Jira, Linear, GitHub Issues, Notion |
+| Tracker | `local` (archivos en el repo, sin cuenta), Plane, GitHub Issues y Projects | Jira, Linear, Notion |
 | Repositorio y PR | GitHub (sin token, deja la URL de compare y la descripción lista) | GitLab, Gitea |
 | Agente | Claude Code | Codex, OpenCode |
 | Stack | Go, Angular, Node (defaults de check y rutas de código) | otros |
