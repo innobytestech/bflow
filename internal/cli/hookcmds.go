@@ -105,7 +105,7 @@ func runGuard(c *Ctx) output.Envelope {
 		return output.Envelope{OK: true, Code: "allowed", Quiet: true}
 	}
 	fmt.Fprintln(c.Stderr, "bflow guard: "+d.Reason)
-	logGuard(c, cfg.Root, d.Rule)
+	logGuard(c, cfg.Root, d.Rule, a)
 	env := output.Rejected(d.Rule, d.Reason)
 	env.Quiet = !c.JSON
 	return env
@@ -113,7 +113,7 @@ func runGuard(c *Ctx) output.Envelope {
 
 // logGuard registra el bloqueo en la tarea activa para medir la fricción. Solo
 // corre al bloquear; sin tarea activa no hay a quién atribuirlo.
-func logGuard(c *Ctx, root, rule string) {
+func logGuard(c *Ctx, root, rule string, a guard.Action) {
 	if c.Build == nil {
 		return
 	}
@@ -122,7 +122,8 @@ func logGuard(c *Ctx, root, rule string) {
 		return
 	}
 	if id, err := e.Active(context.Background()); err == nil {
-		_ = e.Store.Append(store.Entry{TS: time.Now(), ID: id, Event: "guard", By: e.User, Data: map[string]any{"rule": rule}})
+		_ = e.Store.Append(store.Entry{TS: time.Now(), ID: id, Event: "guard", By: e.User, Agent: a.Agent,
+			Data: map[string]any{"rule": rule, "command": truncateCmd(a.Command)}})
 	}
 }
 
@@ -216,4 +217,12 @@ func runSessionStart(c *Ctx) output.Envelope {
 	env := output.OK("session", data, next)
 	env.Text = strings.Join(lines, "\n")
 	return env
+}
+
+// truncateCmd corta el comando para el log: basta para saber qué se intentó.
+func truncateCmd(s string) string {
+	if r := []rune(s); len(r) > 200 {
+		return string(r[:200]) + "…"
+	}
+	return s
 }

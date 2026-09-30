@@ -102,11 +102,11 @@ En `case "guard"`, si `e.Agent != ""` se agrega ` (<agent>)`.
 
 ## Tasks
 
-- [ ] T1 Contrato (R1-R12). `Action.Agent`, `HumanOnly` y la firma `BflowSubcommand(seg string) string` en guard.go, con un stub que devuelve "". Pruebas (fallan con el stub):
+- [x] T1 Contrato (R1-R12). `Action.Agent`, `HumanOnly` y la firma `BflowSubcommand(seg string) string` en guard.go, con un stub que devuelve "". Pruebas (fallan con el stub):
   - `internal/guard/guard_test.go`: `TestHumanOnlySubagent` (approve/reject/unblock/start/new negados a subagente con `human_only`, permitidos a la principal; `report`, `block`, `status`, `task add` permitidos a subagente; `bflow status && bflow approve X` negado; `bflow approve --help` negado; sin fase). `TestFreezeEveryone` (freeze negado a ambos, también como `./bin/bflow.exe freeze`). `TestBflowSubcommand` (tabla: `bflow`, `BFLOW.EXE`, `./bin/bflow.exe`, `C:\tools\bflow.exe`, `"/usr/local/bin/bflow"`, `X=1 bflow`, `env -i X=1 bflow`, `go run ./cmd/bflow`, `go run -race C:\jaad\bflow\cmd\bflow\`, `bflow --json approve`, `bflowx approve` → "", `echo bflow approve` → "", `go run ./cmd/other approve` → "").
   - `internal/adapters/agent/claude/hook_test.go`: en `TestParsePreToolUse`, el caso con `agent_type` espera `Agent: "implementer"`, y se agrega `TestParsePreToolUseAgent` (Bash con `agent_type":"bflow-documenter"` → `Agent` y `Subagent`).
   - `cmd/bflow/e2e_hook_test.go`: `TestGuardHumanOnlySubagent`. Con tarea activa, PreToolUse Bash `bflow approve <ID> --gate walkthrough` con `agent_type: bflow-documenter` → exit 2, stderr con `bflow report`, y el log con el evento `guard`, `agent=bflow-documenter`, `rule=human_only` y `command`. Sin `agent_type` → exit 0.
-- [ ] T2 Implementar `BflowSubcommand` y la regla en `bash(a Action, c)`; quitar `bflowFreeze` (R1-R9).
-- [ ] T3 Adaptador Claude: `Agent: in.AgentType` en `ParsePreToolUse` (R10).
-- [ ] T4 `logGuard` con agente y comando cortado; `watch` muestra el agente (R11, R12).
-- [ ] T5 Docs: entrada en CHANGELOG.md; en README.md (lista de `bflow guard`, línea 66) agregar que los subagentes no aprueban, rechazan, desbloquean ni empiezan tareas; una línea en docs/guia.md (tabla de la línea 102) (R1, R11).
+- [x] T2 Implementar `BflowSubcommand` y la regla en `bash(a Action, c)`; quitar `bflowFreeze` (R1-R9).
+- [x] T3 Adaptador Claude: `Agent: in.AgentType` en `ParsePreToolUse` (R10).
+- [x] T4 `logGuard` con agente y comando cortado; `watch` muestra el agente (R11, R12).
+- [x] T5 Docs: entrada en CHANGELOG.md; en README.md (lista de `bflow guard`, línea 66) agregar que los subagentes no aprueban, rechazan, desbloquean ni empiezan tareas; una línea en docs/guia.md (tabla de la línea 102) (R1, R11).

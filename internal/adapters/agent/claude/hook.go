@@ -31,13 +31,13 @@ func ParsePreToolUse(raw []byte) (a guard.Action, cwd string, ok bool) {
 	sub := in.AgentType != "" || in.AgentID != ""
 	switch in.ToolName {
 	case "Bash":
-		a = guard.Action{Tool: guard.Bash, Command: in.ToolInput.Command, Subagent: sub}
+		a = guard.Action{Tool: guard.Bash, Command: in.ToolInput.Command, Subagent: sub, Agent: in.AgentType}
 	case "Edit", "MultiEdit":
-		a = guard.Action{Tool: guard.Edit, Path: in.ToolInput.FilePath, Subagent: sub}
+		a = guard.Action{Tool: guard.Edit, Path: in.ToolInput.FilePath, Subagent: sub, Agent: in.AgentType}
 	case "Write":
-		a = guard.Action{Tool: guard.Write, Path: in.ToolInput.FilePath, Subagent: sub}
+		a = guard.Action{Tool: guard.Write, Path: in.ToolInput.FilePath, Subagent: sub, Agent: in.AgentType}
 	case "NotebookEdit":
-		a = guard.Action{Tool: guard.Edit, Path: in.ToolInput.NotebookPath, Subagent: sub}
+		a = guard.Action{Tool: guard.Edit, Path: in.ToolInput.NotebookPath, Subagent: sub, Agent: in.AgentType}
 	}
 	return a, in.Cwd, true
 }
