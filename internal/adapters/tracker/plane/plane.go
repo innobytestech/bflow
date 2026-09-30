@@ -69,6 +69,7 @@ var (
 	_ tracker.Tracker          = (*Client)(nil)
 	_ tracker.StateProvisioner = (*Client)(nil)
 	_ tracker.ProjectLister    = (*Client)(nil)
+	_ tracker.Creator          = (*Client)(nil)
 )
 
 func (c *Client) Name() string { return "plane" }
@@ -447,6 +448,25 @@ func (c *Client) List(ctx context.Context, f tracker.Filter) ([]tracker.Task, er
 		out = append(out, t)
 	}
 	return out, nil
+}
+
+// Create crea un work item en el estado por defecto del proyecto.
+func (c *Client) Create(ctx context.Context, title, description string) (tracker.Task, error) {
+	p, err := c.proj(ctx)
+	if err != nil {
+		return tracker.Task{}, err
+	}
+	sts, err := c.loadStates(ctx)
+	if err != nil {
+		return tracker.Task{}, err
+	}
+	var w workItem
+	body := map[string]string{"name": title, "description_html": markdown.ToHTML(description)}
+	if err := c.do(ctx, "POST", p+"/work-items/", body, &w); err != nil {
+		return tracker.Task{}, err
+	}
+	c.remember(w)
+	return c.task(sts, w), nil
 }
 
 func (c *Client) Transition(ctx context.Context, id string, to flow.Phase, p tracker.Patch) error {
