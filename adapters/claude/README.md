@@ -1,12 +1,12 @@
 # Adaptador de Claude Code
 
-La skill y los hooks se copian a mano. Los agentes no: `bflow render` los escribe en `<repo>/.claude/agents/bflow-<agente>.md` y se commitean.
+`bflow install claude` instala la skill y fusiona los hooks; no hay que copiar nada a mano. Los agentes los escribe `bflow render` los escribe en `<repo>/.claude/agents/bflow-<agente>.md` y se commitean.
 
-| Archivo | Dónde va | Para qué |
+| Archivo (embebido en el binario) | Dónde lo deja `bflow install claude` | Para qué |
 |---|---|---|
 | `skills/bflow/SKILL.md` | `~/.claude/skills/bflow/` (una vez por máquina) | La sesión principal interpreta `next`; no contiene reglas del flujo |
-| `settings.json` | `<repo>/.claude/settings.json` (combinar si ya existe) | Hooks: `bflow hook session-start`, `bflow guard` antes de Bash/Edit/Write, `bflow hook tokens` al terminar turnos y subagentes, `bflow hook subagent-stop` al terminar un agente `bflow-*`; barra de estado `bflow statusline` |
+| `settings.json` | `<repo>/.claude/settings.json` (se fusiona: lo tuyo se conserva; las entradas de bflow se reemplazan) | Hooks: `bflow hook session-start`, `bflow guard` antes de Bash/Edit/Write, `bflow hook tokens` al terminar turnos y subagentes, `bflow hook subagent-stop` al terminar un agente `bflow-*`; barra de estado `bflow statusline` |
 
 Los hooks van por repo y no globales: `bflow guard` aplica reglas (ramas protegidas, `.env`, pruebas congeladas) que solo tienen sentido donde hay `bflow.yaml`.
 
-`bflow doctor` avisa si el repo declara `agent: claude` y faltan los hooks.
+`bflow doctor` avisa si el repo declara `agent: claude` y faltan los hooks o la skill instalada no coincide con la de este bflow.

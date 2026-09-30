@@ -11,7 +11,7 @@ Esta guía es para quien ya instaló bflow y configuró un repo (ver el [README]
 | Mueve la tarea en el tracker y comenta los rechazos | Revisa calidad, seguridad y UX | Resuelves las decisiones que el agente no puede tomar |
 | Corre el check y bloquea lo peligroso | Documenta y prepara el walkthrough | Recorres el diff antes del PR |
 
-En Claude Code le dices a la sesión algo como "sigamos con API-12" o "qué sigue". La skill `bflow` corre `bflow status`, lee `next` y hace lo que indica: te pregunta, lanza agentes o espera. No tienes que recordar comandos; cada respuesta de bflow dice el siguiente paso.
+Si aún no lo hiciste, corre `bflow install claude` dentro del repo: deja la skill y los hooks. En Claude Code le dices a la sesión algo como "sigamos con API-12" o "qué sigue". La skill `bflow` corre `bflow status`, lee `next` y hace lo que indica: te pregunta, lanza agentes o espera. No tienes que recordar comandos; cada respuesta de bflow dice el siguiente paso.
 
 ## Las gates: qué ves y qué decides
 
