@@ -1,0 +1,6 @@
+{"input":{"tool":"bash","sessionID":"ses_f0768cc32ffe4a638uwwXEbyP6","callID":"call_084a7v5ajgr3"},"output":{"args":{"command":"echo hola","description":"eco"}}}
+{"input":{"tool":"write","sessionID":"ses_f0768cc32ffe4a638uwwXEbyP6","callID":"call_d7mo69x61xo"},"output":{"args":{"filePath":"a.txt","content":"x\n"}}}
+{"input":{"tool":"edit","sessionID":"ses_f0768cc32ffe4a638uwwXEbyP6","callID":"call_1lyrkwmayhg"},"output":{"args":{"filePath":"a.txt","oldString":"x","newString":"y"}}}
+{"input":{"tool":"task","sessionID":"ses_f0768cc32ffe4a638uwwXEbyP6","callID":"call_i54e32qe6ls"},"output":{"args":{"description":"hijo","prompt":"SUBTAREA corre echo hijo","subagent_type":"probe"}}}
+{"input":{"tool":"bash","sessionID":"ses_f0768be54ffeqqsSexAU9Jqy1w","callID":"call_rvizui3mse"},"output":{"args":{"command":"echo hijo","description":"eco hijo"}}}
+{"input":{"tool":"apply_patch","sessionID":"ses_f076706bcffe65796JGO01Q4M6","callID":"call_va98j9at8ih"},"output":{"args":{"patchText":"*** Begin Patch\n*** Add File: b.txt\n+z\n*** Update File: a.txt\n@@\n-x\n+w\n*** End Patch"}}}

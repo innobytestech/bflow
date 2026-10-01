@@ -10,6 +10,7 @@ import (
 	"io"
 	"sort"
 	"strings"
+	"time"
 
 	"innobytes.tech/bflow/internal/agents"
 	"innobytes.tech/bflow/internal/engine"
@@ -214,6 +215,32 @@ func (c *Ctx) tool(name string) ToolAdapter {
 	for _, t := range c.tools() {
 		if t.Name() == name {
 			return t
+		}
+	}
+	return nil
+}
+
+// TokenSource vive en metrics para que los adaptadores no importen cli.
+type TokenSource = metrics.TokenSource
+
+// HookAdapter es lo que guard y hook tokens necesitan de una herramienta que
+// no es la de c.Agent (OpenCode). Se elige con --tool.
+type HookAdapter interface {
+	Name() string
+	// ParseActions traduce la entrada nativa en acciones; ok=false si no tiene la forma.
+	ParseActions(raw []byte) (acts []guard.Action, cwd string, ok bool)
+	// TokenSources dice qué archivos leer en este evento y si es la sesión principal.
+	TokenSources(raw []byte, cacheDir string) (srcs []TokenSource, main bool)
+	ReadUsage(path string, cur *metrics.Cursor) ([]metrics.Sample, error)
+	// Prune borra los archivos leídos por completo y viejos, y sus offsets.
+	Prune(cacheDir string, cur *metrics.Cursor, olderThan time.Duration)
+}
+
+// hooks devuelve la herramienta de --tool si implementa HookAdapter.
+func (c *Ctx) hooks(name string) HookAdapter {
+	if t := c.tool(name); t != nil {
+		if h, ok := t.(HookAdapter); ok {
+			return h
 		}
 	}
 	return nil

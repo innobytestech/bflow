@@ -133,8 +133,8 @@ func sendNotification(title, body string) error {
 }
 
 // notifyActive avisa de la tarea activa si espera a la persona y ui.notify
-// no está apagado.
-func notifyActive(e *engine.Engine) {
+// no está apagado. Es variable para que las pruebas vean cuándo se llama.
+var notifyActive = func(e *engine.Engine) {
 	if n := e.Cfg.UI.Notify; n != nil && !*n {
 		return
 	}

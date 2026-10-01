@@ -18,6 +18,12 @@ var Command = must(leader.Render(head, map[string]string{"ask_tool": "la herrami
 //go:embed command_head.md
 var head []byte
 
+// Plugin es el plugin de OpenCode que bflow render escribe en
+// .opencode/plugins/bflow.js: guard y conteo de tokens.
+//
+//go:embed plugin.js
+var Plugin []byte
+
 func must(b []byte, err error) []byte {
 	if err != nil {
 		panic("adapters/opencode: " + err.Error())

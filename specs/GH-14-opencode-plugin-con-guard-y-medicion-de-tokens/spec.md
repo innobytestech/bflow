@@ -116,6 +116,13 @@ func (c *Ctx) hooks(name string) HookAdapter
 - Los datos van por stdin, nunca interpolados en un comando (sin inyección de shell).
 - Lo que se confirme con la captura (nombre del campo de agente, forma de `args` del patch, carpeta `plugins/` frente a `plugin/`) manda sobre esta sección; el implementer lo anota en Design si cambia.
 
+### Desviaciones mecánicas de T1 (captura real, OpenCode 1.1.53)
+
+- `TokenSource` se declara en `internal/metrics` y `cli.TokenSource` es un alias: los adaptadores no pueden importar `cli` (las pruebas de `cli` importan el adaptador y habría ciclo).
+- La captura se hizo con un proveedor `@ai-sdk/openai-compatible` falso (servidor local con script) porque no hay credenciales de modelo vivas; los eventos y `tool.execute.before` son los reales de OpenCode. Cargó `.opencode/plugins/` sin problema.
+- `args` del patch es `patchText` (herramienta `apply_patch`); edit/write usan `filePath`. El mensaje de asistente trae `agent` y `mode`; su `parentID` es el id del mensaje de usuario, no el de la sesión padre: el padre sale de `session.created` (`info.parentID`) y `session.idle` solo trae `sessionID`.
+- `notifyActive` pasa a variable para que las pruebas vean cuándo se llama.
+
 ### Superficie de seguridad
 - Authz: el plugin no decide; toda regla está en `guard.Evaluate`, la misma de Claude. Un subagente mal detectado se trata como sesión principal (más restrictiva con StrictLeader).
 - Fail-open deliberado (D2): queda visible por el aviso de sesión y por doctor.
