@@ -59,6 +59,7 @@ func runSummary(r metrics.Run) string {
 		metrics.Exact(r.FinalContext), metrics.Exact(r.Total.CacheRead), metrics.Exact(r.Total.New()))
 }
 
+// renderCalls arma una tabla por corrida con encabezado, filas y totales, uno por agente o sesión principal.
 func renderCalls(runs []metrics.Run, note string) string {
 	var b strings.Builder
 	for _, r := range runs {

@@ -91,6 +91,7 @@ type panelTask struct {
 	CallsNote string     `json:"calls_note,omitempty"`
 }
 
+// panelRun es una corrida (transcript de agente o sesión principal) en el panel web.
 type panelRun struct {
 	Key     string     `json:"key"` // Run.Run: el JS recuerda abierto/cerrado con él
 	Label   string     `json:"label"`
