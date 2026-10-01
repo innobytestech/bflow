@@ -79,8 +79,15 @@ func Evaluate(a Action, c Context) Decision {
 
 // Segments separa un comando en sus segmentos (&&, ||, ; y |), recortados y sin
 // vacíos. Lo usan TaskScoped, bash y review.FromAction.
-// STUB (GH-20 T1): lo implementa T2.
-func Segments(cmd string) []string { return nil }
+func Segments(cmd string) []string {
+	var out []string
+	for _, seg := range segSplit.Split(cmd, -1) {
+		if s := strings.TrimSpace(seg); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
+}
 
 var (
 	segSplit     = regexp.MustCompile(`&&|\|\||;|\|`)
@@ -166,8 +173,7 @@ func BflowSubcommand(seg string) string {
 // TaskScoped dice si el comando toca algo que bflow maneja por tarea (rama,
 // PR): el guard necesita saber si hay una tarea en curso.
 func TaskScoped(cmd string) bool {
-	for _, seg := range segSplit.Split(cmd, -1) {
-		s := strings.TrimSpace(seg)
+	for _, s := range Segments(cmd) {
 		if ghPRCreate.MatchString(s) || checkoutNew.MatchString(s) || switchNew.MatchString(s) || branchNew.MatchString(s) {
 			return true
 		}
@@ -176,8 +182,7 @@ func TaskScoped(cmd string) bool {
 }
 
 func bash(a Action, c Context) Decision {
-	for _, seg := range segSplit.Split(a.Command, -1) {
-		s := strings.TrimSpace(seg)
+	for _, s := range Segments(a.Command) {
 		sub := BflowSubcommand(s)
 		switch {
 		case resetHard.MatchString(s), cleanForce.MatchString(s), checkoutDash.MatchString(s), stashDrop.MatchString(s):
