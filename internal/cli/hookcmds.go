@@ -26,6 +26,7 @@ func init() {
 	Register(&Command{Name: "guard", Summary: "hook PreToolUse: lee la acción por stdin y la bloquea (exit 2) si rompe una regla",
 		Setup: func(fs *flag.FlagSet) {
 			fs.String("tool", "", "herramienta cuya entrada se lee (opencode); vacío: Claude Code")
+			fs.Bool("reads", false, "el hook también ve Read: registra las lecturas del reviewer en quality")
 		},
 		Run: runGuard})
 	Register(&Command{Name: "hook session-start", Summary: "hook de inicio de sesión: entorno, compromisos y tarea activa en pocas líneas",

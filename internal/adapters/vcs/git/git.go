@@ -174,3 +174,7 @@ func (g *Git) UserName(ctx context.Context) string {
 
 // ParseRemote se mantiene por compatibilidad; la implementación vive en vcs.
 func ParseRemote(url string) (host, repo string, ok bool) { return vcs.ParseRemote(url) }
+
+// DiffLines suma líneas agregadas y borradas entre base y HEAD.
+// STUB (GH-20 T1): lo implementa T4.
+func (g *Git) DiffLines(ctx context.Context, base string) (int, error) { return 0, nil }

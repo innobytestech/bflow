@@ -19,6 +19,7 @@ const (
 	Bash  = "bash"
 	Edit  = "edit"
 	Write = "write"
+	Read  = "read" // solo la registra el reviewer (guard --reads); Evaluate la permite
 )
 
 // Action es lo que el agente quiere hacer.
@@ -75,6 +76,11 @@ func Evaluate(a Action, c Context) Decision {
 	}
 	return allow
 }
+
+// Segments separa un comando en sus segmentos (&&, ||, ; y |), recortados y sin
+// vacíos. Lo usan TaskScoped, bash y review.FromAction.
+// STUB (GH-20 T1): lo implementa T2.
+func Segments(cmd string) []string { return nil }
 
 var (
 	segSplit     = regexp.MustCompile(`&&|\|\||;|\|`)

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"innobytes.tech/bflow/internal/flow"
+	"innobytes.tech/bflow/internal/review"
 	"innobytes.tech/bflow/internal/store"
 )
 
@@ -102,6 +103,8 @@ type TaskStats struct {
 	Models map[string]Usage `json:"models,omitempty"`
 	// Tokens por agente, como en PhaseStats.
 	Agents map[string]Usage `json:"agents,omitempty"`
+	// Review es la última cobertura del reviewer (evento review_coverage).
+	Review *review.Coverage `json:"review,omitempty"`
 }
 
 func addTo(m *map[string]Usage, k string, u Usage) {

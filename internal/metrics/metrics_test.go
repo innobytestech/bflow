@@ -292,3 +292,33 @@ func TestClosedOutsideNotCountedAsWork(t *testing.T) {
 		t.Errorf("el tramo previo al cierre no es trabajo: agent=%v human=%v blocked=%v", st.Agent, st.Human, st.Blocked)
 	}
 }
+
+func coverage(min int, id string, data map[string]any) store.Entry {
+	return store.Entry{TS: at(min), ID: id, Event: "review_coverage", Agent: "reviewer", Data: data}
+}
+
+// R14: Review es la última cobertura de la tarea; sin evento, nil.
+func TestComputeReviewCoverage(t *testing.T) {
+	log := append(featureLog(),
+		coverage(201, "T-1", map[string]any{"measured": true, "total": float64(5), "read": float64(3), "round": float64(0), "unread": []any{"a.go", "b.go"}}),
+		coverage(346, "T-1", map[string]any{"measured": true, "total": float64(5), "read": float64(4), "round": float64(1), "unread": []any{"b.go"}, "red_outside": []any{"gone.go"}}),
+		coverage(347, "OTRA-1", map[string]any{"measured": true, "total": float64(9), "read": float64(9)}),
+	)
+	st := Compute("T-1", log, at(430))
+	if st.Review == nil {
+		t.Fatal("Review es la última cobertura")
+	}
+	r := st.Review
+	if !r.Measured || r.Total != 5 || r.Read != 4 || len(r.Unread) != 1 || r.Unread[0] != "b.go" || len(r.RedOutside) != 1 {
+		t.Errorf("la última, no la primera ni la de otra tarea: %+v", r)
+	}
+	// El evento no altera el tiempo por fase ni la fricción.
+	base := Compute("T-1", featureLog(), at(430))
+	st.Review = nil
+	if st.Total != base.Total || st.Agent != base.Agent || st.Human != base.Human || len(st.Phases) != len(base.Phases) || st.Refused != base.Refused {
+		t.Errorf("review_coverage no cuenta como trabajo: %+v vs %+v", st, base)
+	}
+	if base.Review != nil {
+		t.Errorf("sin evento Review es nil: %+v", base.Review)
+	}
+}
