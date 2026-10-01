@@ -35,7 +35,7 @@ Nadie marca una tarea como terminada a mano: bflow la cierra cuando detecta el m
 
 ## Ajustar a los agentes
 
-`bflow render` genera los agentes en `.claude/agents/bflow-<agente>.md` y, si `agent:` es una lista con `opencode` (`agent: [claude, opencode]`), también en `.opencode/agents/bflow-<agente>.md`. Para OpenCode, `bflow install opencode` instala el comando `/bflow` y `models.opencode` traduce los alias (`sonnet`, `haiku`) a `proveedor/modelo`; ojo: el guard y los tokens de OpenCode llegan con GH-14. Commitéalos para que todo el equipo use los mismos, y no los edites: cada archivo tiene dos partes.
+`bflow render` genera los agentes en `.claude/agents/bflow-<agente>.md` y, si `agent:` es una lista con `opencode` (`agent: [claude, opencode]`), también en `.opencode/agents/bflow-<agente>.md`. Para OpenCode, `bflow install opencode` instala el comando `/bflow` y `models.opencode` traduce los alias (`sonnet`, `haiku`) a `proveedor/modelo`; `render` también escribe `.opencode/plugins/bflow.js`, el plugin que le da a OpenCode el guard y el conteo de tokens (si `bflow` no está en el PATH, el guard no actúa y el plugin avisa una vez por sesión). OpenCode no tiene nudge de subagente ni hook de inicio: lo cubren `bflow report`, `bflow check --verify` y el bloque de AGENTS.md. Commitéalos para que todo el equipo use los mismos, y no los edites: cada archivo tiene dos partes.
 
 - **Contrato con bflow:** qué recibe el agente, qué archivos escribe, qué veredictos puede reportar y cómo. Sale del flujo y no se configura.
 - **Oficio:** cómo hace su trabajo. Trae uno por defecto y tú lo complementas en `bflow.yaml`:

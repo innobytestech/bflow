@@ -759,7 +759,7 @@ func doctorEnvelope(items []docItem) output.Envelope {
 }
 
 // doctorOpenCode revisa la integración con OpenCode: versión, comando /bflow,
-// alias de modelo sin resolver y lo que aún no cubre (GH-14).
+// alias de modelo sin resolver, el plugin de guard y tokens y lo que OpenCode no cubre.
 func doctorOpenCode(c *Ctx, cfg *config.Config, add func(string, string, string, ...any)) {
 	t := c.tool("opencode")
 	if t == nil {
@@ -793,7 +793,17 @@ func doctorOpenCode(c *Ctx, cfg *config.Config, add func(string, string, string,
 			add("modelos", "ok", "opencode: modelos de los agentes resueltos")
 		}
 	}
-	add("guard", "warn", "opencode: el guard y el conteo de tokens de bflow aún no cubren OpenCode (llegan con GH-14); las reglas del flujo dependen del contrato de cada agente")
+	plugin := ".opencode/plugins/bflow.js"
+	switch p, err := planRender(c, cfg); {
+	case err != nil:
+	case slices.Contains(p.Conflicts, plugin):
+		add("plugin", "fail", "opencode: %s existe y no lo generó bflow; renómbralo o bórralo y corre bflow render", plugin)
+	case slices.Contains(p.Changed, plugin):
+		add("plugin", "warn", "opencode: el plugin %s falta o difiere del de este bflow (guard y tokens); corre bflow render", plugin)
+	default:
+		add("plugin", "ok", "opencode: plugin de guard y tokens al día (%s)", plugin)
+	}
+	add("cobertura", "ok", "opencode no tiene nudge de subagente ni hook de inicio de sesión; lo cubren bflow report, bflow check --verify y el bloque de AGENTS.md")
 }
 
 // usesClaude dice si el repo ya trabaja con Claude Code.

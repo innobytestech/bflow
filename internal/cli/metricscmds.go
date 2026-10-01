@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"maps"
@@ -24,7 +25,10 @@ import (
 func init() {
 	Register(&Command{Name: "stats", Summary: "tiempo por fase (agente, humano, bloqueada), iteraciones y tokens: stats [ID]", Run: runStats})
 	Register(&Command{Name: "statusline", Summary: "una línea para la barra de estado (lee una caché: milisegundos)", Run: runStatusline})
-	Register(&Command{Name: "hook tokens", Summary: "hook Stop/SubagentStop: suma los tokens nuevos a la fase y, al terminar el turno, avisa si la tarea espera a la persona", Run: runHookTokens})
+	Register(&Command{Name: "hook tokens", Summary: "hook Stop/SubagentStop: suma los tokens nuevos a la fase y, al terminar el turno, avisa si la tarea espera a la persona", Run: runHookTokens,
+		Setup: func(fs *flag.FlagSet) {
+			fs.String("tool", "", "herramienta cuyo evento se lee (opencode); vacío: Claude Code")
+		}})
 }
 
 func runStats(c *Ctx) output.Envelope {
@@ -235,6 +239,27 @@ func nextLabel(v engine.View) string {
 func runHookTokens(c *Ctx) output.Envelope {
 	quiet := output.Envelope{OK: true, Code: "tokens", Quiet: true}
 	raw, _ := io.ReadAll(c.Stdin)
+	if tool := str(c.Flags, "tool"); tool != "" {
+		h := c.hooks(tool)
+		if h == nil {
+			return quiet
+		}
+		e, err := engineFor(c)
+		if err != nil {
+			return quiet
+		}
+		cacheDir := filepath.Join(e.Store.Dir(), "cache", h.Name())
+		srcs, main := h.TokenSources(raw, cacheDir)
+		if len(srcs) == 0 {
+			return quiet
+		}
+		var prune func(*metrics.Cursor)
+		if main {
+			defer notifyActive(e)
+			prune = func(cur *metrics.Cursor) { h.Prune(cacheDir, cur, 7*24*time.Hour) }
+		}
+		return tokensFrom(e, h.Name(), srcs, h.ReadUsage, prune)
+	}
 	if c.Agent == nil {
 		return quiet
 	}
@@ -249,6 +274,14 @@ func runHookTokens(c *Ctx) output.Envelope {
 	if agent == "" {
 		defer notifyActive(e)
 	}
+	return tokensFrom(e, c.Agent.Name(), []TokenSource{{Path: path, Agent: agent}}, c.Agent.ReadUsage, nil)
+}
+
+// tokensFrom lee las líneas nuevas de cada fuente bajo el lock del cursor y las
+// suma a la tarea activa; prune (si hay) limpia la caché antes de guardar el cursor.
+func tokensFrom(e *engine.Engine, tool string, srcs []TokenSource,
+	read func(string, *metrics.Cursor) ([]metrics.Sample, error), prune func(*metrics.Cursor)) output.Envelope {
+	quiet := output.Envelope{OK: true, Code: "tokens", Quiet: true}
 	curPath := filepath.Join(e.Store.Dir(), "cache", "tokens-cursor.json")
 	_ = store.EnsureDirFor(curPath)
 	unlock, err := store.LockFile(curPath+".lock", 5*time.Second, time.Minute)
@@ -260,9 +293,22 @@ func runHookTokens(c *Ctx) output.Envelope {
 	if b, err := os.ReadFile(curPath); err == nil {
 		_ = json.Unmarshal(b, &cur)
 	}
-	samples, err := c.Agent.ReadUsage(path, &cur)
-	if err != nil {
-		return quiet
+	type batch struct {
+		agent   string
+		samples []metrics.Sample
+	}
+	var batches []batch
+	for _, src := range srcs {
+		samples, err := read(src.Path, &cur)
+		if err != nil {
+			return quiet
+		}
+		if len(samples) > 0 {
+			batches = append(batches, batch{src.Agent, samples})
+		}
+	}
+	if prune != nil {
+		prune(&cur)
 	}
 	if len(cur.Seen) > 5000 { // los offsets evitan releer; los ids viejos ya no hacen falta
 		cur.Seen = nil
@@ -270,16 +316,28 @@ func runHookTokens(c *Ctx) output.Envelope {
 	if b, err := json.Marshal(cur); err == nil {
 		_ = store.WriteAtomic(curPath, b)
 	}
-	if len(samples) == 0 {
+	if len(batches) == 0 {
 		return quiet
 	}
 	id, err := e.Active(context.Background())
 	if err != nil {
 		return quiet
 	}
+	for _, b := range batches {
+		if u, name, ok := addTokens(e, id, tool, b.samples, b.agent); ok {
+			quiet.Data = map[string]any{"id": id, "agent": name, "tokens": u}
+		}
+	}
+	return quiet
+}
+
+// addTokens reparte las muestras en las fases donde ocurrieron, las anota como
+// entradas `tokens` de la tarea y suma el total a su caché. agent "" es la sesión principal.
+func addTokens(e *engine.Engine, id, tool string, samples []metrics.Sample, agent string) (metrics.Usage, string, bool) {
+	var u metrics.Usage
 	log, err := e.Store.Log(id)
 	if err != nil {
-		return quiet
+		return u, "", false
 	}
 	name := metrics.MainSession
 	if agent != "" {
@@ -288,9 +346,8 @@ func runHookTokens(c *Ctx) output.Envelope {
 	shares := metrics.Allot(log, id, strings.TrimPrefix(agent, flow.SubagentPrefix), samples)
 	now := time.Now()
 	var entries []store.Entry
-	var u metrics.Usage
 	for _, s := range shares {
-		d := map[string]any{"phase": string(s.Phase), "tool": c.Agent.Name(),
+		d := map[string]any{"phase": string(s.Phase), "tool": tool,
 			"input": s.Input, "output": s.Output, "cache_read": s.CacheRead, "cache_write": s.CacheWrite}
 		if s.Calls > 0 {
 			d["calls"], d["max_context"] = s.Calls, s.MaxContext
@@ -303,6 +360,5 @@ func runHookTokens(c *Ctx) output.Envelope {
 	}
 	_ = e.Store.Append(entries...)
 	e.AddTokens(id, u.New(), u.CacheRead)
-	quiet.Data = map[string]any{"id": id, "agent": name, "tokens": u}
-	return quiet
+	return u, name, true
 }

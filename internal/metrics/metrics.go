@@ -41,6 +41,9 @@ type Sample struct {
 	Usage
 }
 
+// TokenSource es un archivo de uso y de quién es ("" = sesión principal).
+type TokenSource struct{ Path, Agent string }
+
 // MainSession es el nombre con el que se registran los tokens de la sesión
 // principal, para separarlos de los de los agentes.
 const MainSession = "main"

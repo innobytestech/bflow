@@ -44,8 +44,8 @@ func TestOpenCodeRender(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(out) != 3 {
-		t.Fatalf("un archivo por agente: %d", len(out))
+	if len(out) != 4 { // tres agentes y el plugin
+		t.Fatalf("un archivo por agente y el plugin: %d", len(out))
 	}
 
 	imp, ok := out[".opencode/agents/bflow-implementer.md"]
