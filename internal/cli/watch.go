@@ -138,6 +138,7 @@ func readWatchIn(e *engine.Engine) (watchData, error) {
 		return d, err
 	}
 	d.Stats = metrics.Compute(active, log, time.Now())
+	d.Calls, d.CallsFile = readCalls(e, active)
 	for _, en := range log {
 		if en.Event != "tokens" {
 			d.Events = append(d.Events, en)

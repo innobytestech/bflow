@@ -1,7 +1,14 @@
 package metrics
 
 import (
+	"bufio"
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"io"
+	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 
 	"innobytes.tech/bflow/internal/flow"
@@ -55,18 +62,135 @@ type Run struct {
 }
 
 // RunKey identifica la corrida de un transcript: tool + ":" + base sin extensión.
-func RunKey(tool, path string) string { return "" }
+func RunKey(tool, path string) string {
+	// Las rutas de Windows y de Unix pueden llegar en cualquier sistema.
+	path = strings.ReplaceAll(path, "\\", "/")
+	base := filepath.Base(filepath.ToSlash(path))
+	if i := strings.LastIndex(path, "/"); i >= 0 {
+		base = path[i+1:]
+	}
+	base = strings.TrimSuffix(base, filepath.Ext(base))
+	return tool + ":" + base
+}
 
 // ParseCalls lee calls.jsonl y salta las líneas malas (R6).
-func ParseCalls(r io.Reader) []Call { return nil }
+func ParseCalls(r io.Reader) []Call {
+	var out []Call
+	br := bufio.NewReader(r)
+	for {
+		line, err := br.ReadBytes('\n')
+		if line = bytes.TrimSpace(line); len(line) > 0 {
+			var c Call
+			if json.Unmarshal(line, &c) == nil && c.Run != "" && c.Msg != "" {
+				out = append(out, c)
+			}
+		}
+		if err != nil {
+			return out
+		}
+	}
+}
 
 // Runs fusiona (R3), agrupa y acumula (R4); orden por primera llamada.
-func Runs(calls []Call) []Run { return nil }
+func Runs(calls []Call) []Run {
+	type mk struct{ run, msg string }
+	merged := map[mk]*Call{}
+	byRun := map[string][]*Call{}
+	var order []string
+	for _, c := range calls {
+		k := mk{c.Run, c.Msg}
+		if m := merged[k]; m != nil {
+			m.Input += c.Input
+			m.CacheWrite += c.CacheWrite
+			m.CacheRead += c.CacheRead
+			m.Output += c.Output
+			continue
+		}
+		cc := c
+		merged[k] = &cc
+		if byRun[c.Run] == nil {
+			order = append(order, c.Run)
+		}
+		byRun[c.Run] = append(byRun[c.Run], &cc)
+	}
+	var runs []Run
+	for _, key := range order {
+		cs := byRun[key]
+		sort.SliceStable(cs, func(i, j int) bool { return cs[i].TS.Before(cs[j].TS) })
+		r := Run{Run: key, Agent: cs[0].Agent, Phase: cs[0].Phase}
+		var accRead, accNew int64
+		for i, c := range cs {
+			accRead += c.CacheRead
+			accNew += c.New()
+			r.Rows = append(r.Rows, CallRow{N: i + 1, Call: *c, Context: c.Context(), AccRead: accRead, AccNew: accNew})
+			r.Total.Add(Usage{Input: c.Input, Output: c.Output, CacheRead: c.CacheRead, CacheWrite: c.CacheWrite,
+				Calls: 1, MaxContext: c.Context()})
+			r.FinalContext = c.Context()
+			r.Last = c.TS
+		}
+		runs = append(runs, r)
+	}
+	sort.SliceStable(runs, func(i, j int) bool { return runs[i].Rows[0].TS.Before(runs[j].Rows[0].TS) })
+	count := map[string]int{}
+	for _, r := range runs {
+		count[r.Agent]++
+	}
+	seen := map[string]int{}
+	for i := range runs {
+		a := runs[i].Agent
+		name := a
+		if a == MainSession {
+			name = "sesión principal"
+		}
+		seen[a]++
+		if count[a] > 1 {
+			name = fmt.Sprintf("%s #%d", name, seen[a])
+		}
+		runs[i].Label = name
+	}
+	return runs
+}
 
 // Exact da una cifra con separador de miles: 17711 -> "17,711".
-func Exact(n int64) string { return "" }
+func Exact(n int64) string {
+	s := fmt.Sprint(n)
+	neg := strings.HasPrefix(s, "-")
+	s = strings.TrimPrefix(s, "-")
+	var b []byte
+	for i := range len(s) {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			b = append(b, ',')
+		}
+		b = append(b, s[i])
+	}
+	if neg {
+		return "-" + string(b)
+	}
+	return string(b)
+}
 
 // Phases da una fase por muestra, con la regla de Allot (R2).
 func Phases(entries []store.Entry, id, agent string, samples []Sample) []flow.Phase {
-	return nil
+	if len(samples) == 0 {
+		return nil
+	}
+	var fixed flow.Phase
+	if agent != "" {
+		for _, e := range entries {
+			if e.ID == id && e.Event == string(flow.EvReport) && e.Agent == agent {
+				fixed = e.From
+			}
+		}
+		if fixed == "" {
+			fixed = PhaseAt(entries, id, samples[0].TS)
+		}
+	}
+	out := make([]flow.Phase, len(samples))
+	for i, s := range samples {
+		out[i] = fixed
+		if fixed == "" {
+			out[i] = PhaseAt(entries, id, s.TS)
+		}
+	}
+	return out
 }

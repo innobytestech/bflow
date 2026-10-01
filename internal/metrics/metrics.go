@@ -293,28 +293,14 @@ func Allot(entries []store.Entry, id, agent string, samples []Sample) []Share {
 	if len(samples) == 0 {
 		return nil
 	}
-	var fixed flow.Phase
-	if agent != "" {
-		for _, e := range entries {
-			if e.ID == id && e.Event == string(flow.EvReport) && e.Agent == agent {
-				fixed = e.From
-			}
-		}
-		if fixed == "" {
-			fixed = PhaseAt(entries, id, samples[0].TS)
-		}
-	}
+	phases := Phases(entries, id, agent, samples)
 	type key struct {
 		p flow.Phase
 		m string
 	}
 	sum := map[key]Usage{}
-	for _, s := range samples {
-		p := fixed
-		if p == "" {
-			p = PhaseAt(entries, id, s.TS)
-		}
-		k := key{p, s.Model}
+	for i, s := range samples {
+		k := key{phases[i], s.Model}
 		u := sum[k]
 		u.Add(s.Usage)
 		sum[k] = u

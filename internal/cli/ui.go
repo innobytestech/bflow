@@ -214,6 +214,19 @@ func buildPanel(version string, d watchData, now time.Time) panelState {
 	for i := len(evs) - 1; i >= 0; i-- {
 		t.Events = append(t.Events, map[string]string{"time": eventTime(evs[i].TS, now), "text": describeEvent(evs[i])})
 	}
+	t.CallsNote = callsNote(st, d.Calls)
+	for i, r := range d.Calls {
+		pr := panelRun{Key: r.Run, Label: r.Label, Summary: runSummary(r), Total: callTotal(r), Open: true}
+		for _, row := range r.Rows {
+			pr.Rows = append(pr.Rows, callCells(row))
+		}
+		for j, o := range d.Calls {
+			if j != i && o.Last.After(r.Last) {
+				pr.Open = false
+			}
+		}
+		t.Runs = append(t.Runs, pr)
+	}
 	ps.Task = t
 	return ps
 }

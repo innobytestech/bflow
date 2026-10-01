@@ -172,14 +172,14 @@ type panelRun struct {
 
 ## Tasks
 
-- [ ] **T1 Contrato** (R1-R15): tipos y firmas sin lógica (`Sample.Msg`, `Call`, `CallRow`, `Run`, `CallsFile`, `RunKey`, `ParseCalls`, `Runs`, `Exact`, `Phases`, `Store.AppendFile`, `panelRun`, campos nuevos de `panelTask` y `watchData`) y estas pruebas, que deben fallar:
+- [x] **T1 Contrato** (R1-R15): tipos y firmas sin lógica (`Sample.Msg`, `Call`, `CallRow`, `Run`, `CallsFile`, `RunKey`, `ParseCalls`, `Runs`, `Exact`, `Phases`, `Store.AppendFile`, `panelRun`, campos nuevos de `panelTask` y `watchData`) y estas pruebas, que deben fallar:
   - metrics: `TestRunKey`, `TestExact`, `TestParseCallsSkipsBadLines`, `TestRunsMergesSameMessage`, `TestRunsAccumulatesPerRun`, `TestRunsLabels`, `TestPhasesMatchesAllot`
   - adaptadores: `TestReadUsageSetsMsg` (claude y opencode)
   - store: `TestAppendFileStaysInTaskDir`
   - cli: `TestHookTokensWritesCalls`, `TestCallsMatchTokenEvents`, `TestStatsCallsText`, `TestStatsCallsJSON`, `TestStatsJSONUnchangedWithoutCalls`, `TestStatsCallsNeedsID`, `TestStatsCallsLegacyNote`, `TestStatsCallsPartialNote`, `TestPanelRuns`
-- [ ] **T2 Lectores** (R1): `Msg` en `Sample` en claude/transcript.go y opencode/transcript.go. Pasa `TestReadUsageSetsMsg`.
-- [ ] **T3 metrics** (R2-R6): `Phases` (con `Allot` reescrito sobre ella), `RunKey`, `ParseCalls`, `Runs`, `Exact`. Pasan las pruebas de metrics y TestAllot.
-- [ ] **T4 Escritura** (R1, R2, R5, R14): `Store.AppendFile` y el hook (`tokensFrom` → `addTokens` con `run`). Pasan `TestAppendFileStaysInTaskDir`, `TestHookTokensWritesCalls` (Claude y OpenCode; un mensaje leído en dos pasadas deja una fila) y `TestCallsMatchTokenEvents`.
-- [ ] **T5 CLI** (R7-R11): flag `--calls`, `readCalls`, `callsNote`, `callCells` y `renderCalls`. Pasan las pruebas `TestStatsCalls*` y `TestStatsJSONUnchangedWithoutCalls`.
-- [ ] **T6 Panel web** (R8, R9, R12, R13, R15): `readWatchIn`, `buildPanel` e index.html (`<details>` por corrida, `runOpen`). Pasa `TestPanelRuns` (`open` en la más reciente, filas formateadas, `calls_note`).
-- [ ] **T7 Docs** (R7, R12): `docs/guia.md` (sección de stats: `--calls` y cómo leer el acumulado: lo releído en la llamada N es el contexto de la N-1), la fila de Métricas del `README.md` (`stats [ID] [--calls]`) y `CHANGELOG.md`.
+- [x] **T2 Lectores** (R1): `Msg` en `Sample` en claude/transcript.go y opencode/transcript.go. Pasa `TestReadUsageSetsMsg`.
+- [x] **T3 metrics** (R2-R6): `Phases` (con `Allot` reescrito sobre ella), `RunKey`, `ParseCalls`, `Runs`, `Exact`. Pasan las pruebas de metrics y TestAllot.
+- [x] **T4 Escritura** (R1, R2, R5, R14): `Store.AppendFile` y el hook (`tokensFrom` → `addTokens` con `run`). Pasan `TestAppendFileStaysInTaskDir`, `TestHookTokensWritesCalls` (Claude y OpenCode; un mensaje leído en dos pasadas deja una fila) y `TestCallsMatchTokenEvents`.
+- [x] **T5 CLI** (R7-R11): flag `--calls`, `readCalls`, `callsNote`, `callCells` y `renderCalls`. Pasan las pruebas `TestStatsCalls*` y `TestStatsJSONUnchangedWithoutCalls`.
+- [x] **T6 Panel web** (R8, R9, R12, R13, R15): `readWatchIn`, `buildPanel` e index.html (`<details>` por corrida, `runOpen`). Pasa `TestPanelRuns` (`open` en la más reciente, filas formateadas, `calls_note`).
+- [x] **T7 Docs** (R7, R12): `docs/guia.md` (sección de stats: `--calls` y cómo leer el acumulado: lo releído en la llamada N es el contexto de la N-1), la fila de Métricas del `README.md` (`stats [ID] [--calls]`) y `CHANGELOG.md`.
