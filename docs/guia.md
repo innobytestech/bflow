@@ -92,7 +92,7 @@ Tus reglas de arquitectura en CLAUDE.md o en los documentos de `read` son bienve
 - **La conversación se puede descartar; el hilo vive en bflow.** El estado, las decisiones y los reportes están en `.bflow/`, la spec y el tracker. Después de aprobar una gate puedes hacer `/clear`: al reiniciar, bflow le vuelve a dar a la sesión la tarea y el siguiente paso.
 - **No pegues specs ni código en el chat.** Los agentes leen por ruta y por sección (`bflow show <ID> spec --section design`).
 - **Agentes con modelo y esfuerzo a su medida:** los mecánicos (documenter) con un modelo menor y esfuerzo bajo.
-- `bflow stats <ID>` muestra los tokens por fase, por agente (la sesión principal aparte) y por modelo, con lo nuevo separado de la caché leída, que cuesta cerca del 10% de la entrada. Úsalo para ver si un cambio de configuración ahorró de verdad.
+- `bflow stats <ID>` muestra los tokens por fase, por agente (la sesión principal aparte) y por modelo, con lo nuevo separado de la caché leída, que cuesta cerca del 10% de la entrada. Úsalo para ver si un cambio de configuración ahorró de verdad. `bflow stats <ID> --calls` agrega una tabla por llamada del modelo, una por corrida (agente o sesión principal), con el contexto de cada llamada y los acumulados. Cómo leerla: lo releído en la llamada N es el contexto de la llamada N-1, porque cada llamada vuelve a leer lo anterior de la caché; por eso el acumulado de releído crece mucho más rápido que lo nuevo. El panel web muestra las mismas tablas bajo Tokens. Las tareas registradas antes del detalle por llamada avisan que no lo tienen.
 
 ## Cuando algo se atora
 

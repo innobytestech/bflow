@@ -23,7 +23,10 @@ import (
 )
 
 func init() {
-	Register(&Command{Name: "stats", Summary: "tiempo por fase (agente, humano, bloqueada), iteraciones y tokens: stats [ID]", Run: runStats})
+	Register(&Command{Name: "stats", Summary: "tiempo por fase (agente, humano, bloqueada), iteraciones y tokens: stats [ID]", Run: runStats,
+		Setup: func(fs *flag.FlagSet) {
+			fs.Bool("calls", false, "una tabla por llamada del modelo, por corrida (requiere ID)")
+		}})
 	Register(&Command{Name: "statusline", Summary: "una línea para la barra de estado (lee una caché: milisegundos)", Run: runStatusline})
 	Register(&Command{Name: "hook tokens", Summary: "hook Stop/SubagentStop: suma los tokens nuevos a la fase y, al terminar el turno, avisa si la tarea espera a la persona", Run: runHookTokens,
 		Setup: func(fs *flag.FlagSet) {
@@ -41,11 +44,24 @@ func runStats(c *Ctx) output.Envelope {
 		return fail(err)
 	}
 	now := time.Now()
+	wantCalls := str(c.Flags, "calls") == "true"
+	if wantCalls && len(c.Args) == 0 {
+		return output.Fail("usage", fmt.Errorf("--calls requiere un ID: stats ID --calls"))
+	}
 	if len(c.Args) > 0 {
 		id := strings.ToUpper(c.Args[0])
 		st := metrics.Compute(id, log, now)
 		if st.Phase == "" {
 			return output.Fail("not_found", fmt.Errorf("%s no tiene historial en .bflow/log.jsonl", id))
+		}
+		if wantCalls {
+			runs, _ := readCalls(e, id)
+			env := output.OK("stats", map[string]any{"stats": st, "calls": runs}, nil)
+			env.Text = statsLine(st) + "\n" + renderCalls(runs, callsNote(st, runs))
+			if !st.TokensAvailable {
+				env.Text = statsLine(st) + "\n  " + noTokensText
+			}
+			return env
 		}
 		env := output.OK("stats", map[string]any{"stats": st}, nil)
 		env.Text = renderStats(st)
@@ -130,7 +146,7 @@ func renderStats(st metrics.TaskStats) string {
 		fmt.Fprintf(&b, "  tokens: %s (entrada %s · salida %s · caché escrita %s)", metrics.Summary(t),
 			metrics.Human(t.Input), metrics.Human(t.Output), metrics.Human(t.CacheWrite))
 	} else {
-		b.WriteString("  tokens: no disponibles (se registran con el hook de tokens del agente)")
+		b.WriteString("  " + noTokensText)
 	}
 	return b.String()
 }
@@ -295,6 +311,7 @@ func tokensFrom(e *engine.Engine, tool string, srcs []TokenSource,
 	}
 	type batch struct {
 		agent   string
+		run     string
 		samples []metrics.Sample
 	}
 	var batches []batch
@@ -304,7 +321,7 @@ func tokensFrom(e *engine.Engine, tool string, srcs []TokenSource,
 			return quiet
 		}
 		if len(samples) > 0 {
-			batches = append(batches, batch{src.Agent, samples})
+			batches = append(batches, batch{src.Agent, metrics.RunKey(tool, src.Path), samples})
 		}
 	}
 	if prune != nil {
@@ -324,7 +341,7 @@ func tokensFrom(e *engine.Engine, tool string, srcs []TokenSource,
 		return quiet
 	}
 	for _, b := range batches {
-		if u, name, ok := addTokens(e, id, tool, b.samples, b.agent); ok {
+		if u, name, ok := addTokens(e, id, tool, b.run, b.samples, b.agent); ok {
 			quiet.Data = map[string]any{"id": id, "agent": name, "tokens": u}
 		}
 	}
@@ -333,7 +350,7 @@ func tokensFrom(e *engine.Engine, tool string, srcs []TokenSource,
 
 // addTokens reparte las muestras en las fases donde ocurrieron, las anota como
 // entradas `tokens` de la tarea y suma el total a su caché. agent "" es la sesión principal.
-func addTokens(e *engine.Engine, id, tool string, samples []metrics.Sample, agent string) (metrics.Usage, string, bool) {
+func addTokens(e *engine.Engine, id, tool, run string, samples []metrics.Sample, agent string) (metrics.Usage, string, bool) {
 	var u metrics.Usage
 	log, err := e.Store.Log(id)
 	if err != nil {
@@ -359,6 +376,16 @@ func addTokens(e *engine.Engine, id, tool string, samples []metrics.Sample, agen
 		u.Add(s.Usage)
 	}
 	_ = e.Store.Append(entries...)
+	var lines [][]byte
+	phases := metrics.Phases(log, id, strings.TrimPrefix(agent, flow.SubagentPrefix), samples)
+	for i, s := range samples {
+		b, err := json.Marshal(metrics.Call{TS: s.TS, Run: run, Tool: tool, Agent: name, Phase: phases[i], Model: s.Model, Msg: s.Msg,
+			Input: s.Input, CacheWrite: s.CacheWrite, CacheRead: s.CacheRead, Output: s.Output})
+		if err == nil {
+			lines = append(lines, b)
+		}
+	}
+	_ = e.Store.AppendFile(id, metrics.CallsFile, lines)
 	e.AddTokens(id, u.New(), u.CacheRead)
 	return u, name, true
 }

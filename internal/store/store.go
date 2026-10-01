@@ -294,6 +294,31 @@ func (s *Store) ReadFile(id, rel string) ([]byte, error) {
 	return os.ReadFile(p)
 }
 
+// AppendFile agrega líneas a un archivo de trabajo de la tarea, en un solo
+// Write y sin lock propio: el único escritor es el hook bajo el lock del cursor.
+func (s *Store) AppendFile(id, rel string, lines [][]byte) error {
+	p, err := s.Path(id, rel)
+	if err != nil {
+		return err
+	}
+	if err := s.ensureDir(filepath.Dir(p)); err != nil {
+		return err
+	}
+	var buf []byte
+	for _, l := range lines {
+		buf = append(append(buf, l...), '\n')
+	}
+	f, err := os.OpenFile(p, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(buf)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	return err
+}
+
 // Append agrega entradas a log.jsonl. Cada entrada es una línea escrita con
 // una sola llamada, bajo el lock del log.
 func (s *Store) Append(entries ...Entry) error {

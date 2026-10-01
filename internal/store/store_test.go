@@ -313,3 +313,29 @@ func TestEnsureDirForIgnoresBflow(t *testing.T) {
 		t.Error("la carpeta de la caché debe existir")
 	}
 }
+
+func TestAppendFileStaysInTaskDir(t *testing.T) {
+	s := Open(testutil.TempDir(t))
+	if err := s.AppendFile("A-1", "calls.jsonl", [][]byte{[]byte(`{"a":1}`), []byte(`{"a":2}`)}); err != nil {
+		t.Fatalf("crea la carpeta y el archivo: %v", err)
+	}
+	if err := s.AppendFile("A-1", "calls.jsonl", [][]byte{[]byte(`{"a":3}`)}); err != nil {
+		t.Fatal(err)
+	}
+	b, err := s.ReadFile("A-1", "calls.jsonl")
+	if err != nil || string(b) != "{\"a\":1}\n{\"a\":2}\n{\"a\":3}\n" {
+		t.Errorf("una línea con \n por entrada, agregando: %q %v", b, err)
+	}
+	if err := s.AppendFile("A-1", "calls.jsonl", nil); err != nil {
+		t.Errorf("sin líneas no falla: %v", err)
+	}
+	if err := s.AppendFile("A-1", "../../escape.jsonl", [][]byte{[]byte("x")}); err == nil {
+		t.Error("no debe salir de la carpeta de la tarea")
+	}
+	if err := s.AppendFile("../A-1", "calls.jsonl", [][]byte{[]byte("x")}); err == nil {
+		t.Error("el id se valida")
+	}
+	if _, err := os.Stat(filepath.Join(s.Root, "escape.jsonl")); err == nil {
+		t.Error("nada fuera de la carpeta")
+	}
+}

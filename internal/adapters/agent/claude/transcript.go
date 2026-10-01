@@ -124,7 +124,7 @@ func readFile(path string, cur *metrics.Cursor) ([]metrics.Sample, error) {
 			if ts.IsZero() {
 				ts = time.Now()
 			}
-			out = append(out, metrics.Sample{TS: ts, Model: e.Message.Model, Usage: delta})
+			out = append(out, metrics.Sample{TS: ts, Model: e.Message.Model, Msg: e.Message.ID, Usage: delta})
 		}
 		cur.Seen[e.Message.ID] = metrics.Usage{Input: max(u.Input, prev.Input), Output: max(u.Output, prev.Output),
 			CacheRead: max(u.CacheRead, prev.CacheRead), CacheWrite: max(u.CacheWrite, prev.CacheWrite)}

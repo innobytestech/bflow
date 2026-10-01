@@ -86,6 +86,19 @@ type panelTask struct {
 	Agents   []map[string]string `json:"agents,omitempty"` // name, tokens, share (0-100 del gasto nuevo)
 	Friction string              `json:"friction,omitempty"`
 	Events   []map[string]string `json:"events,omitempty"`
+	// Runs es el detalle por llamada (calls.jsonl), una corrida por bloque.
+	Runs      []panelRun `json:"runs,omitempty"`
+	CallsNote string     `json:"calls_note,omitempty"`
+}
+
+// panelRun es una corrida (transcript de agente o sesión principal) en el panel web.
+type panelRun struct {
+	Key     string     `json:"key"` // Run.Run: el JS recuerda abierto/cerrado con él
+	Label   string     `json:"label"`
+	Summary string     `json:"summary"` // "9 llamadas · contexto final 60,079 · releído 344,086 · nuevo 61,204"
+	Open    bool       `json:"open"`    // la corrida con la llamada más reciente
+	Rows    [][]string `json:"rows"`    // celdas ya formateadas, mismo orden de columnas que R7
+	Total   []string   `json:"total"`
 }
 
 // panelRepo es una fila del tablero de la red: un repo y su tarea activa.
@@ -201,6 +214,19 @@ func buildPanel(version string, d watchData, now time.Time) panelState {
 	evs := d.Events[max(0, len(d.Events)-2*watchEvents):]
 	for i := len(evs) - 1; i >= 0; i-- {
 		t.Events = append(t.Events, map[string]string{"time": eventTime(evs[i].TS, now), "text": describeEvent(evs[i])})
+	}
+	t.CallsNote = callsNote(st, d.Calls)
+	for i, r := range d.Calls {
+		pr := panelRun{Key: r.Run, Label: r.Label, Summary: runSummary(r), Total: callTotal(r), Open: true}
+		for _, row := range r.Rows {
+			pr.Rows = append(pr.Rows, callCells(row))
+		}
+		for j, o := range d.Calls {
+			if j != i && o.Last.After(r.Last) {
+				pr.Open = false
+			}
+		}
+		t.Runs = append(t.Runs, pr)
 	}
 	ps.Task = t
 	return ps

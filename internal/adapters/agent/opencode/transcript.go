@@ -138,7 +138,7 @@ func (Agent) ReadUsage(path string, cur *metrics.Cursor) ([]metrics.Sample, erro
 			if l.Completed == 0 {
 				ts = time.Now()
 			}
-			out = append(out, metrics.Sample{TS: ts, Model: l.ProviderID + "/" + l.ModelID, Usage: delta})
+			out = append(out, metrics.Sample{TS: ts, Model: l.ProviderID + "/" + l.ModelID, Msg: key, Usage: delta})
 		}
 		cur.Seen[key] = metrics.Usage{Input: max(u.Input, prev.Input), Output: max(u.Output, prev.Output),
 			CacheRead: max(u.CacheRead, prev.CacheRead), CacheWrite: max(u.CacheWrite, prev.CacheWrite)}

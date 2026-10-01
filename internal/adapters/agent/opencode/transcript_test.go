@@ -280,3 +280,20 @@ func TestPruneViejosLeidos(t *testing.T) {
 		t.Errorf("el offset de lo que se queda se conserva")
 	}
 }
+
+func TestReadUsageSetsMsg(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ses_1.jsonl")
+	appendTo(t, path, ul("m1", "ses_1", "", "build", 10, 5, 0, 100, 0, 1000))
+	appendTo(t, path, ul("m2", "ses_1", "", "build", 1, 2, 0, 0, 0, 2000))
+	got, err := Agent{}.ReadUsage(path, &metrics.Cursor{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ids []string
+	for _, s := range got {
+		ids = append(ids, s.Msg)
+	}
+	if !reflect.DeepEqual(ids, []string{"opencode:m1", "opencode:m2"}) {
+		t.Errorf("el id lleva el prefijo opencode:, igual que la llave de cur.Seen: %v", ids)
+	}
+}
