@@ -2,7 +2,7 @@
 
 **Motor de flujo Spec-Driven Development para trabajar con agentes de IA.** Un solo binario en Go que lleva cada tarea de la idea al PR mergeado (discovery, spec, contrato, implementación, revisión, walkthrough), decide las transiciones, habla con tu tracker y con git, y le dice al agente exactamente qué hacer después, en pocas líneas de JSON.
 
-> Estado: **MVP**. Funciona de punta a punta con el tracker local, Plane y GitHub, y con Claude Code como agente. La API de comandos puede cambiar antes de la 1.0.
+> Estado: **MVP**. Funciona de punta a punta con el tracker local, Plane y GitHub, y con Claude Code y OpenCode como agente. La API de comandos puede cambiar antes de la 1.0.
 
 ---
 
@@ -38,15 +38,15 @@ bflow es opinado a propósito: tiene un flujo definido y gates humanas fijas. Mu
 
 Lo que vive en el CLI se cumple con cualquier herramienta. Lo que depende de hooks, solo donde hay hooks.
 
-| Garantía | Claude Code con los hooks de bflow | Sin hooks (otra herramienta) |
-|---|---|---|
-| El estado, las fases y las gates los maneja bflow, no el modelo | ✅ | ✅ |
-| `DONE` exige un check verde sobre el commit actual | ✅ | ✅ |
-| Las pruebas del contrato no cambian después de aprobarlo | ✅ se bloquea la edición y se revisa al reportar | ✅ se revisa al reportar |
-| `git reset --hard`, push forzado o a ramas protegidas, `.env`, `.bflow/` | ✅ se bloquea antes de que ocurra | ❌ |
-| Ramas y PR solo los crea bflow mientras hay una tarea en curso | ✅ | ❌ |
-| Un agente que termina sin reportar sigue trabajando (2 avisos, luego decide una persona) | ✅ | ❌ |
-| Tokens por fase, agente y modelo | ✅ | ❌ (solo tiempos) |
+| Garantía | Claude Code con los hooks de bflow | OpenCode con el plugin de bflow | Sin hooks (otra herramienta) |
+|---|---|---|---|
+| El estado, las fases y las gates los maneja bflow, no el modelo | ✅ | ✅ | ✅ |
+| `DONE` exige un check verde sobre el commit actual | ✅ | ✅ | ✅ |
+| Las pruebas del contrato no cambian después de aprobarlo | ✅ se bloquea la edición y se revisa al reportar | ✅ se bloquea la edición y se revisa al reportar | ✅ se revisa al reportar |
+| `git reset --hard`, push forzado o a ramas protegidas, `.env`, `.bflow/` | ✅ se bloquea antes de que ocurra | ✅ se bloquea antes de que ocurra (si `bflow` no está en el PATH el guard no actúa y el plugin avisa) | ❌ |
+| Ramas y PR solo los crea bflow mientras hay una tarea en curso | ✅ | ✅ | ❌ |
+| Un agente que termina sin reportar sigue trabajando (2 avisos, luego decide una persona) | ✅ | ❌ OpenCode no tiene evento de fin de subagente; lo cubren `bflow report`, `bflow check --verify` y el bloque de AGENTS.md | ❌ |
+| Tokens por fase, agente y modelo | ✅ | ✅ | ❌ (solo tiempos) |
 
 **Lo que bflow no garantiza:**
 
@@ -93,7 +93,7 @@ flowchart LR
 |---|---|---|
 | Tracker | `local` (archivos en el repo, sin cuenta), Plane, GitHub Issues y Projects | Jira, Linear, Notion |
 | Repositorio y PR | GitHub (sin token, deja la URL de compare y la descripción lista) | GitLab, Gitea |
-| Agente | Claude Code y OpenCode (agentes y comando `/bflow`; el guard y los tokens de OpenCode llegan con GH-14) | Codex |
+| Agente | Claude Code y OpenCode (agentes, comando `/bflow` y plugin con guard y tokens) | Codex |
 | Stack | Go, Angular, Node (defaults de check y rutas de código) | otros |
 
 ### Fases
@@ -286,7 +286,7 @@ models:
     haiku: anthropic/claude-haiku-4
 ```
 
-Un valor con `/` se usa tal cual. Un alias sin equivalente deja al agente sin `model:` (usa el de tu OpenCode) y `render` y `bflow doctor` lo avisan. Aviso: el guard y el conteo de tokens de bflow todavía solo cubren Claude Code; llegan a OpenCode con GH-14. Los archivos fuente están en [`adapters/opencode/`](adapters/opencode/).
+Un valor con `/` se usa tal cual. Un alias sin equivalente deja al agente sin `model:` (usa el de tu OpenCode) y `render` y `bflow doctor` lo avisan. Con `opencode` en `agent:`, `render` también escribe `.opencode/plugins/bflow.js` (se commitea y no se edita): el guard antes de bash, edit, write y patch, y los tokens por fase y agente. OpenCode no tiene nudge de subagente ni hook de inicio de sesión. Los archivos fuente están en [`adapters/opencode/`](adapters/opencode/).
 
 Para seguir la tarea sin leer la conversación, `bflow watch` es un panel en vivo en otra terminal: quién trabaja y desde cuándo, o qué gate espera tu decisión; lo que sigue; tiempos por fase; tokens por agente; fricción, y los últimos eventos. `bflow watch --open` lo abre en otra pestaña o ventana (Windows Terminal, PowerShell, Terminal de macOS o la terminal de Linux) si no hay uno abierto. Con `ui: { watch: true }`, `bflow start` lo abre solo; nunca en CI ni sin escritorio. Como es una preferencia personal, va en la config global, no en `bflow.yaml`. El primer `bflow init` en cada máquina pregunta qué abrir y guarda la respuesta ahí: panel y navegador, solo el panel o nada. No vuelve a preguntar, pero puedes cambiarla editando `ui:`.
 
