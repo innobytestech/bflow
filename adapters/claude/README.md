@@ -4,7 +4,7 @@
 
 | Archivo (embebido en el binario) | Dónde lo deja `bflow install claude` | Para qué |
 |---|---|---|
-| `skills/bflow/SKILL.md` | `~/.claude/skills/bflow/` (una vez por máquina) | La sesión principal interpreta `next`; no contiene reglas del flujo |
+| `skill_head.md` + [`../leader/bflow.md`](../leader/bflow.md) | `~/.claude/skills/bflow/` (una vez por máquina) | La sesión principal interpreta `next`; no contiene reglas del flujo |
 | `settings.json` | `<repo>/.claude/settings.json` (se fusiona: lo tuyo se conserva; las entradas de bflow se reemplazan) | Hooks: `bflow hook session-start`, `bflow guard` antes de Bash/Edit/Write, `bflow hook tokens` al terminar turnos y subagentes, `bflow hook subagent-stop` al terminar un agente `bflow-*`; barra de estado `bflow statusline` |
 
 Los hooks van por repo y no globales: `bflow guard` aplica reglas (ramas protegidas, `.env`, pruebas congeladas) que solo tienen sentido donde hay `bflow.yaml`.

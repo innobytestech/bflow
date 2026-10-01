@@ -14,6 +14,7 @@ import (
 
 	claudefiles "innobytes.tech/bflow/adapters/claude"
 	claudeagent "innobytes.tech/bflow/internal/adapters/agent/claude"
+	opencodeagent "innobytes.tech/bflow/internal/adapters/agent/opencode"
 	"innobytes.tech/bflow/internal/release"
 	"innobytes.tech/bflow/internal/testutil"
 	"innobytes.tech/bflow/internal/tracker/trackertest"
@@ -25,7 +26,7 @@ func TestMain(m *testing.M) {
 	if os.Getenv("BFLOW_AS_CLI") == "1" {
 		dir, _ := os.Getwd()
 		os.Exit(Run(os.Args[1:], &Env{Stdout: os.Stdout, Stderr: os.Stderr, Stdin: os.Stdin, Version: "v9.9.9",
-			Dir: dir, Agent: claudeagent.Agent{}}))
+			Dir: dir, Agent: claudeagent.Agent{}, Tools: []ToolAdapter{claudeagent.Agent{}, opencodeagent.Agent{}}}))
 	}
 	os.Exit(m.Run())
 }
@@ -162,16 +163,20 @@ func TestInstallSkillOnly(t *testing.T) {
 	}
 }
 
-func TestInstallOpencodeUnsupported(t *testing.T) {
+func TestInstallOpencodeTool(t *testing.T) {
 	home := setHome(t)
-	env := installEnv(t, "agent: claude\n")
+	_, command := setXDG(t)
+	env := toolsEnv(t, "agent: claude\n")
 
 	code, out, raw := runJSON(t, env, "install", "opencode")
-	if code != 1 || out["code"] != "install_unsupported" || !strings.Contains(raw, "GH-13") {
-		t.Errorf("opencode aún no tiene adaptador: %d %s", code, raw)
+	if code != 0 || out["code"] != "installed" || dataOf(out)["skill"] != command {
+		t.Errorf("opencode ya tiene adaptador: %d %s", code, raw)
+	}
+	if _, err := os.Stat(command); err != nil {
+		t.Errorf("instala el comando: %v", err)
 	}
 	if _, err := os.Stat(skillPath(home)); err == nil {
-		t.Error("no instala nada")
+		t.Error("no instala la skill de Claude")
 	}
 }
 

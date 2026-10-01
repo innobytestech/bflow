@@ -139,12 +139,35 @@ func panelLabels() []string {
 	return out
 }
 
+// parseAgentFlag separa --agent por comas y lo valida contra las herramientas conocidas.
+func parseAgentFlag(v string) ([]string, error) {
+	if v == "" {
+		return nil, nil
+	}
+	var out []string
+	for _, n := range strings.Split(v, ",") {
+		n = strings.TrimSpace(n)
+		switch {
+		case !slices.Contains(config.Known.Agents, n):
+			return nil, fmt.Errorf("--agent %q no existe (disponibles: %s)", n, strings.Join(config.Known.Agents, ", "))
+		case slices.Contains(out, n):
+			return nil, fmt.Errorf("--agent repite %q", n)
+		}
+		out = append(out, n)
+	}
+	return out, nil
+}
+
 func runInit(c *Ctx) output.Envelope {
 	ctx := context.Background()
 	root := config.FindRoot(c.Dir)
 	path := filepath.Join(root, config.RepoFile)
 	if _, err := os.Stat(path); err == nil && str(c.Flags, "force") != "true" && !c.DryRun {
 		return output.Rejected("exists", path+" ya existe (usa --force para regenerarlo, o edita el archivo)")
+	}
+	flagAgents, err := parseAgentFlag(str(c.Flags, "agent"))
+	if err != nil {
+		return output.Fail("usage", err)
 	}
 	p := newPrompter(c, str(c.Flags, "yes") == "true")
 	det := setup.Detect(root, setup.Tools{Has: func(n string) bool { _, err := exec.LookPath(n); return err == nil }})
@@ -263,9 +286,17 @@ func runInit(c *Ctx) output.Envelope {
 	if a.BaseBranch == "" {
 		a.BaseBranch = p.ask("Rama base de los PR", setup.PickBase(head, branches))
 	}
-	a.Agent = firstNonEmpty(str(c.Flags, "agent"), prof.Agent)
-	if a.Agent == "" && usesClaude(root) {
-		a.Agent = "claude"
+	a.Agent = prof.Agent
+	if len(flagAgents) > 0 {
+		a.Agent = flagAgents
+	}
+	if len(a.Agent) == 0 {
+		if usesClaude(root) {
+			a.Agent = append(a.Agent, "claude")
+		}
+		if usesOpenCode(root) {
+			a.Agent = append(a.Agent, "opencode")
+		}
 	}
 
 	if len(a.Steps) > 0 && !p.yes {
@@ -330,8 +361,11 @@ func runInit(c *Ctx) output.Envelope {
 	} else if a.Host == "github" {
 		next = append(next, "bflow connect github (para abrir PR solo)")
 	}
-	if a.Agent == "claude" {
+	if slices.Contains(a.Agent, "claude") {
 		next = append(next, "bflow render (genera los agentes en .claude/agents; commitéalos)")
+	}
+	if slices.Contains(a.Agent, "opencode") {
+		next = append(next, "bflow install opencode (comando /bflow y agentes en .opencode/agents; define models.opencode en bflow.yaml o en "+config.GlobalPath()+")")
 	}
 	next = append(next, "bflow doctor")
 	env := output.OK("initialized", data, nil)
@@ -554,7 +588,7 @@ func runDoctor(c *Ctx) output.Envelope {
 		}
 	}
 
-	if cfg.Agent == "claude" {
+	if cfg.Agent.Has("claude") {
 		b, err := os.ReadFile(filepath.Join(cfg.Root, ".claude", "settings.json"))
 		var missing []string
 		for _, h := range []string{"bflow guard", "bflow hook session-start", "bflow hook subagent-stop"} {
@@ -588,16 +622,6 @@ func runDoctor(c *Ctx) output.Envelope {
 		default:
 			add("agente", "ok", "claude: versión %s", have)
 		}
-		switch p, err := planRender(c, cfg); {
-		case err != nil:
-			add("agentes", "fail", "%v", err)
-		case len(p.Conflicts) > 0:
-			add("agentes", "fail", "%s existe y no lo generó bflow: renómbralo y corre bflow render", strings.Join(p.Conflicts, ", "))
-		case len(p.Changed)+len(p.Stale) > 0:
-			add("agentes", "warn", "desactualizados: %s (bflow render y commitea)", strings.Join(append(p.Changed, p.Stale...), ", "))
-		default:
-			add("agentes", "ok", "%d archivos generados y al día", len(p.Files))
-		}
 		var procs []string
 		for _, s := range c.Agent.Skills(cfg.Root) {
 			if s.Name == "bflow" || slices.Contains(cfg.Doctor.IgnoreSkills, s.Name) {
@@ -615,6 +639,22 @@ func runDoctor(c *Ctx) output.Envelope {
 		if cfg.Guard.ForbidCoauthor && !c.Agent.CoauthorOff(cfg.Root) {
 			add("agente", "warn", `claude agrega Co-Authored-By a sus commits y guard.forbid_coauthor los bloquea: cada commit se rechaza y se repite. Corre bflow install claude, o pon "attribution": { "commit": "", "pr": "" } en .claude/settings.json`)
 		}
+	}
+
+	if len(cfg.Agent) > 0 {
+		switch p, err := planRender(c, cfg); {
+		case err != nil:
+			add("agentes", "fail", "%v", err)
+		case len(p.Conflicts) > 0:
+			add("agentes", "fail", "%s existe y no lo generó bflow: renómbralo y corre bflow render", strings.Join(p.Conflicts, ", "))
+		case len(p.Changed)+len(p.Stale) > 0:
+			add("agentes", "warn", "desactualizados: %s (bflow render y commitea)", strings.Join(append(p.Changed, p.Stale...), ", "))
+		default:
+			add("agentes", "ok", "%d archivos generados y al día", len(p.Files))
+		}
+	}
+	if cfg.Agent.Has("opencode") {
+		doctorOpenCode(c, cfg, add)
 	}
 
 	if cfg.Tracker.Adapter == "local" {
@@ -718,9 +758,54 @@ func doctorEnvelope(items []docItem) output.Envelope {
 	return env
 }
 
+// doctorOpenCode revisa la integración con OpenCode: versión, comando /bflow,
+// alias de modelo sin resolver y lo que aún no cubre (GH-14).
+func doctorOpenCode(c *Ctx, cfg *config.Config, add func(string, string, string, ...any)) {
+	t := c.tool("opencode")
+	if t == nil {
+		add("agente", "fail", "opencode: no hay adaptador en este bflow")
+		return
+	}
+	switch have, _, _, err := t.Version(); {
+	case err != nil:
+		add("agente", "warn", "opencode: no se pudo leer la versión (%v); ¿está instalado y en el PATH?", err)
+	default:
+		add("agente", "ok", "opencode: versión %s", have)
+	}
+	if home, err := os.UserHomeDir(); err == nil || os.Getenv("XDG_CONFIG_HOME") != "" {
+		switch path, state := t.SkillState(home); state {
+		case "ok":
+			add("comando", "ok", "opencode: comando /bflow al día (%s)", path)
+		case "missing":
+			add("comando", "warn", "opencode: falta el comando /bflow; corre bflow install opencode")
+		default:
+			add("comando", "warn", "opencode: el comando /bflow instalado (%s) difiere del de este bflow; corre bflow install opencode", path)
+		}
+	}
+	if p, err := planRender(c, cfg); err == nil {
+		if un := p.Unresolved["opencode"]; len(un) > 0 {
+			var parts []string
+			for _, u := range un {
+				parts = append(parts, fmt.Sprintf("%s (%s)", u.Alias, strings.Join(u.Agents, ", ")))
+			}
+			add("modelos", "warn", "opencode: alias sin equivalente, esos agentes salen sin model: %s; define models.opencode.<alias> en bflow.yaml o en %s", strings.Join(parts, "; "), config.GlobalPath())
+		} else {
+			add("modelos", "ok", "opencode: modelos de los agentes resueltos")
+		}
+	}
+	add("guard", "warn", "opencode: el guard y el conteo de tokens de bflow aún no cubren OpenCode (llegan con GH-14); las reglas del flujo dependen del contrato de cada agente")
+}
+
 // usesClaude dice si el repo ya trabaja con Claude Code.
-func usesClaude(root string) bool {
-	for _, p := range []string{".claude", "CLAUDE.md"} {
+func usesClaude(root string) bool { return anyExists(root, ".claude", "CLAUDE.md") }
+
+// usesOpenCode dice si el repo ya trabaja con OpenCode.
+func usesOpenCode(root string) bool {
+	return anyExists(root, ".opencode", "opencode.json", "opencode.jsonc")
+}
+
+func anyExists(root string, paths ...string) bool {
+	for _, p := range paths {
 		if _, err := os.Stat(filepath.Join(root, p)); err == nil {
 			return true
 		}

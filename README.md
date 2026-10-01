@@ -93,7 +93,7 @@ flowchart LR
 |---|---|---|
 | Tracker | `local` (archivos en el repo, sin cuenta), Plane, GitHub Issues y Projects | Jira, Linear, Notion |
 | Repositorio y PR | GitHub (sin token, deja la URL de compare y la descripción lista) | GitLab, Gitea |
-| Agente | Claude Code | Codex, OpenCode |
+| Agente | Claude Code y OpenCode (agentes y comando `/bflow`; el guard y los tokens de OpenCode llegan con GH-14) | Codex |
 | Stack | Go, Angular, Node (defaults de check y rutas de código) | otros |
 
 ### Fases
@@ -270,6 +270,23 @@ La skill tiene unas 30 líneas: no contiene reglas del flujo, solo cómo interpr
 ```
 API-12 · implementing · 1h42m · ronda 1 · 145k nuevos · 2.9M caché
 ```
+
+#### OpenCode
+
+`agent:` acepta una herramienta (`agent: claude`) o una lista (`agent: [claude, opencode]`); vacío equivale a `claude`. Con `opencode` en la lista, `bflow render` escribe también `.opencode/agents/bflow-<agente>.md` (subagentes con permisos `edit` y `bash` según lo que hace cada agente) y `bflow render --check` cubre los dos conjuntos. `bflow init` detecta `.opencode/`, `opencode.json` y `opencode.jsonc`, y `--agent claude,opencode` acepta varias.
+
+Corre `bflow install opencode` para dejar el comando `/bflow` en `$XDG_CONFIG_HOME/opencode/commands/bflow.md` (o `~/.config/opencode/commands/bflow.md`); con `opencode` en `agent:` también corre `render`. `bflow update` lo refresca solo si ya estaba instalado. Sale del mismo cuerpo que la skill de Claude.
+
+OpenCode pide el modelo como `proveedor/modelo`, así que los alias de los agentes (`sonnet`, `haiku`) se traducen con `models.opencode`, en `bflow.yaml`, en un perfil o en la config global (gana el repo, por alias):
+
+```yaml
+models:
+  opencode:
+    sonnet: anthropic/claude-sonnet-4
+    haiku: anthropic/claude-haiku-4
+```
+
+Un valor con `/` se usa tal cual. Un alias sin equivalente deja al agente sin `model:` (usa el de tu OpenCode) y `render` y `bflow doctor` lo avisan. Aviso: el guard y el conteo de tokens de bflow todavía solo cubren Claude Code; llegan a OpenCode con GH-14. Los archivos fuente están en [`adapters/opencode/`](adapters/opencode/).
 
 Para seguir la tarea sin leer la conversación, `bflow watch` es un panel en vivo en otra terminal: quién trabaja y desde cuándo, o qué gate espera tu decisión; lo que sigue; tiempos por fase; tokens por agente; fricción, y los últimos eventos. `bflow watch --open` lo abre en otra pestaña o ventana (Windows Terminal, PowerShell, Terminal de macOS o la terminal de Linux) si no hay uno abierto. Con `ui: { watch: true }`, `bflow start` lo abre solo; nunca en CI ni sin escritorio. Como es una preferencia personal, va en la config global, no en `bflow.yaml`. El primer `bflow init` en cada máquina pregunta qué abrir y guarda la respuesta ahí: panel y navegador, solo el panel o nada. No vuelve a preguntar, pero puedes cambiarla editando `ui:`.
 

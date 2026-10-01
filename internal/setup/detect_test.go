@@ -147,3 +147,35 @@ func TestRenderYAMLIsShortAndValid(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderYAMLAgentList(t *testing.T) {
+	agentLine := func(t *testing.T, agent, inProfile []string) string {
+		t.Helper()
+		y, err := RenderYAML(Answers{Stack: "go", Agent: agent}, Profile{Agent: inProfile})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, l := range strings.Split(y, "\n") {
+			if strings.HasPrefix(l, "agent:") {
+				return l
+			}
+		}
+		return ""
+	}
+	for _, c := range []struct {
+		name          string
+		agent, inProf []string
+		want          string
+	}{
+		{"uno: escalar", []string{"claude"}, nil, "agent: claude"},
+		{"uno opencode: escalar", []string{"opencode"}, nil, "agent: opencode"},
+		{"varios: lista en línea", []string{"claude", "opencode"}, nil, "agent: [claude, opencode]"},
+		{"ninguno: se omite", nil, nil, ""},
+		{"igual al del perfil: se omite", []string{"claude", "opencode"}, []string{"claude", "opencode"}, ""},
+		{"distinto al del perfil: se escribe", []string{"claude", "opencode"}, []string{"claude"}, "agent: [claude, opencode]"},
+	} {
+		if got := agentLine(t, c.agent, c.inProf); got != c.want {
+			t.Errorf("%s: %q, quiero %q", c.name, got, c.want)
+		}
+	}
+}

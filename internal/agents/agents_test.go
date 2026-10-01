@@ -3,6 +3,8 @@ package agents
 import (
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -112,5 +114,60 @@ func TestCatalogHasCraft(t *testing.T) {
 		if b, err := craftFS.ReadFile("craft/" + name + ".md"); err != nil || len(b) == 0 {
 			t.Errorf("%s no tiene oficio por defecto: %v", name, err)
 		}
+	}
+}
+
+func TestResolveModels(t *testing.T) {
+	specs := []Spec{
+		{Name: "implementer", Subagent: "bflow-implementer", Model: "sonnet"},
+		{Name: "reviewer", Subagent: "bflow-reviewer", Model: "sonnet"},
+		{Name: "documenter", Subagent: "bflow-documenter", Model: "haiku"},
+		{Name: "spec-author", Subagent: "bflow-spec-author", Model: ""},
+		{Name: "perf", Subagent: "bflow-perf", Model: "openai/gpt-5"},
+		{Name: "otro", Subagent: "bflow-otro", Model: "opus"},
+	}
+	orig := append([]Spec(nil), specs...)
+	out, un := ResolveModels(specs, map[string]string{"sonnet": "anthropic/claude-sonnet-4"})
+
+	got := map[string]string{}
+	for _, s := range out {
+		got[s.Name] = s.Model
+	}
+	want := map[string]string{
+		"implementer": "anthropic/claude-sonnet-4", // alias de la tabla
+		"reviewer":    "anthropic/claude-sonnet-4",
+		"documenter":  "",             // alias ausente: se omite
+		"spec-author": "",             // vacío sigue vacío
+		"perf":        "openai/gpt-5", // con "/" va tal cual
+		"otro":        "",
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("%s: model %q, quiero %q", k, got[k], v)
+		}
+	}
+	if len(out) != len(specs) {
+		t.Fatalf("mismos agentes: %d", len(out))
+	}
+	for i := range specs {
+		if !reflect.DeepEqual(specs[i], orig[i]) {
+			t.Errorf("no muta la entrada: %+v", specs[i])
+		}
+	}
+
+	if len(un) != 2 || un[0].Alias != "haiku" || un[1].Alias != "opus" {
+		t.Fatalf("sin resolver, ordenado por alias: %+v", un)
+	}
+	if !slices.Equal(un[0].Agents, []string{"bflow-documenter"}) || !slices.Equal(un[1].Agents, []string{"bflow-otro"}) {
+		t.Errorf("agentes afectados: %+v", un)
+	}
+
+	_, un = ResolveModels(specs, map[string]string{"sonnet": "a/b", "haiku": "a/c", "opus": "a/d"})
+	if len(un) != 0 {
+		t.Errorf("con toda la tabla no queda nada sin resolver: %+v", un)
+	}
+	_, un = ResolveModels(specs, nil)
+	if len(un) != 3 || !slices.Equal(un[1].Agents, []string{"bflow-otro"}) || !slices.Equal(un[2].Agents, []string{"bflow-implementer", "bflow-reviewer"}) {
+		t.Errorf("sin tabla, cada alias con sus agentes ordenados: %+v", un)
 	}
 }

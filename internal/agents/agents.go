@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strings"
 
 	"innobytes.tech/bflow/internal/config"
@@ -34,6 +35,45 @@ type Spec struct {
 	Effort       string
 	OmitClaudeMd bool
 	Body         string // Markdown: contrato y oficio
+}
+
+// GeneratedMark distingue los archivos que escribe bflow render de los que
+// escribió una persona. Lo llevan los agentes de todas las herramientas.
+const GeneratedMark = "<!-- generado por bflow render: no lo edites; cambia bflow.yaml (agents) o el archivo extra y vuelve a correrlo -->"
+
+// Unresolved es un alias de modelo sin equivalente en la tabla de una
+// herramienta, con los agentes (Spec.Subagent, ordenados) que lo usan.
+type Unresolved struct {
+	Alias  string
+	Agents []string
+}
+
+// ResolveModels traduce el modelo de cada agente con la tabla alias →
+// proveedor/modelo: un valor con "/" se usa tal cual, un alias de la tabla se
+// cambia por su valor, vacío se queda vacío y un alias ausente queda vacío y
+// se devuelve en Unresolved (ordenado por alias). No muta specs.
+func ResolveModels(specs []Spec, table map[string]string) ([]Spec, []Unresolved) {
+	out := make([]Spec, len(specs))
+	missing := map[string][]string{}
+	for i, s := range specs {
+		out[i] = s
+		if s.Model == "" || strings.Contains(s.Model, "/") {
+			continue
+		}
+		if v := table[s.Model]; v != "" {
+			out[i].Model = v
+			continue
+		}
+		out[i].Model = ""
+		missing[s.Model] = append(missing[s.Model], s.Subagent)
+	}
+	var un []Unresolved
+	for alias, as := range missing {
+		sort.Strings(as)
+		un = append(un, Unresolved{Alias: alias, Agents: as})
+	}
+	sort.Slice(un, func(i, j int) bool { return un[i].Alias < un[j].Alias })
+	return out, un
 }
 
 type base struct {

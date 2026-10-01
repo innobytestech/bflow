@@ -29,7 +29,7 @@ type Config struct {
 	Profile string               `yaml:"profile,omitempty"`
 	Project Project              `yaml:"project,omitempty"`
 	Stack   string               `yaml:"stack,omitempty"`
-	Agent   string               `yaml:"agent,omitempty"`
+	Agent   Tools                `yaml:"agent,omitempty"`
 	Tracker Tracker              `yaml:"tracker,omitempty"`
 	VCS     VCS                  `yaml:"vcs,omitempty"`
 	Flow    Flow                 `yaml:"flow,omitempty"`
@@ -39,6 +39,9 @@ type Config struct {
 	Agents  map[string]AgentConf `yaml:"agents,omitempty"` // ajustes por agente para bflow render
 	Doctor  Doctor               `yaml:"doctor,omitempty"`
 	UI      UI                   `yaml:"ui,omitempty"` // preferencias de la persona; también en la config global
+	// Models traduce los alias de modelo de los agentes (sonnet, haiku) al
+	// proveedor/modelo de cada herramienta: models.<herramienta>.<alias>.
+	Models map[string]map[string]string `yaml:"models,omitempty"`
 
 	Root    string  `yaml:"-"` // raíz del repo
 	Sources Sources `yaml:"-"`
@@ -163,15 +166,17 @@ type Guard struct {
 }
 
 type globalFile struct {
-	Profiles map[string]Config `yaml:"profiles"`
-	UI       UI                `yaml:"ui"`
+	Profiles map[string]Config            `yaml:"profiles"`
+	UI       UI                           `yaml:"ui"`
+	Models   map[string]map[string]string `yaml:"models"`
 }
 
 // Known son los adaptadores que este binario sabe construir.
-var Known = struct{ Trackers, Hosts, Agents []string }{
-	Trackers: []string{"local", "plane", "github"},
-	Hosts:    []string{"", "github"},
-	Agents:   []string{"", "claude"},
+var Known = struct{ Trackers, Hosts, Agents, ModelTables []string }{
+	Trackers:    []string{"local", "plane", "github"},
+	Hosts:       []string{"", "github"},
+	Agents:      []string{"claude", "opencode"},
+	ModelTables: []string{"opencode"},
 }
 
 // GlobalDir es la carpeta de configuración global.
@@ -218,6 +223,44 @@ func FindRoot(dir string) string {
 	}
 }
 
+// Tools son las herramientas de agente del repo. En YAML: texto o lista.
+type Tools []string
+
+// UnmarshalYAML acepta `agent: claude` o `agent: [claude, opencode]`.
+func (t *Tools) UnmarshalYAML(n *yaml.Node) error {
+	*t = nil
+	if n.Kind == yaml.SequenceNode {
+		var l []string
+		if err := n.Decode(&l); err != nil {
+			return err
+		}
+		if len(l) > 0 {
+			*t = Tools(l)
+		}
+		return nil
+	}
+	var s string
+	if err := n.Decode(&s); err != nil {
+		return err
+	}
+	if s != "" {
+		*t = Tools{s}
+	}
+	return nil
+}
+
+// Has dice si la herramienta está en la lista.
+func (t Tools) Has(name string) bool { return slices.Contains(t, name) }
+
+// Rendered son las herramientas para las que render genera agentes; sin
+// lista, solo claude.
+func (t Tools) Rendered() []string {
+	if len(t) == 0 {
+		return []string{"claude"}
+	}
+	return t
+}
+
 // Load carga la configuración efectiva para el repo que contiene dir.
 func Load(dir string) (*Config, error) {
 	root := FindRoot(dir)
@@ -247,6 +290,9 @@ func Load(dir string) (*Config, error) {
 	merged := map[string]any{}
 	if ui, ok := globalMap["ui"].(map[string]any); ok { // preferencias personales: el repo o el perfil las pisan
 		merged["ui"] = ui
+	}
+	if models, ok := globalMap["models"].(map[string]any); ok { // tabla de alias global: perfil y repo la pisan por alias
+		merged["models"] = models
 	}
 	if profile != "" {
 		pm, ok := globalProfiles[profile]
@@ -495,8 +541,25 @@ func (c *Config) Validate() error {
 	if !slices.Contains(Known.Hosts, c.VCS.Host) {
 		add("vcs.host %q no existe (disponibles: github, o vacío para solo git local)", c.VCS.Host)
 	}
-	if !slices.Contains(Known.Agents, c.Agent) {
-		add("agent %q no existe (disponibles: claude)", c.Agent)
+	seenAgent := map[string]bool{}
+	for _, a := range c.Agent {
+		if !slices.Contains(Known.Agents, a) {
+			add("agent %q no existe (disponibles: %s)", a, strings.Join(Known.Agents, ", "))
+		} else if seenAgent[a] {
+			add("agent repite %q", a)
+		}
+		seenAgent[a] = true
+	}
+	for _, table := range sortedKeys(c.Models) {
+		if !slices.Contains(Known.ModelTables, table) {
+			add("models.%s no existe (disponible: %s)", table, strings.Join(Known.ModelTables, ", "))
+			continue
+		}
+		for _, alias := range sortedKeys(c.Models[table]) {
+			if strings.TrimSpace(c.Models[table][alias]) == "" {
+				add("models.%s.%s está vacío", table, alias)
+			}
+		}
 	}
 	for i, s := range c.Check.Steps {
 		if s.Name == "" {

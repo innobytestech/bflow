@@ -3,6 +3,8 @@
 package claude_test
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"regexp"
@@ -10,6 +12,8 @@ import (
 	"strings"
 	"testing"
 
+	files "innobytes.tech/bflow/adapters/claude"
+	"innobytes.tech/bflow/adapters/leader"
 	"innobytes.tech/bflow/internal/cli"
 )
 
@@ -64,11 +68,7 @@ func TestSettings(t *testing.T) {
 }
 
 func TestSkill(t *testing.T) {
-	b, err := os.ReadFile("skills/bflow/SKILL.md")
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := string(b)
+	s := string(files.Skill)
 	if !strings.HasPrefix(s, "---\nname: bflow\ndescription: ") {
 		t.Error("frontmatter con name y description")
 	}
@@ -97,5 +97,31 @@ func TestSkill(t *testing.T) {
 		if !strings.Contains(s, skill) {
 			t.Errorf("falta la sección %s (Next.skill la nombra)", skill)
 		}
+	}
+}
+
+// skillBefore es el sha256 de la skill de Claude tal como salía antes de que
+// compartiera cuerpo con el comando de OpenCode (git show <antes>:adapters/claude/skills/bflow/SKILL.md).
+const skillBefore = "9dddabb7e06e994b43cfdafc8c8a2e11457aa4072dc44f3e15f0780b2f7a5e7c"
+
+func TestSkillFromCommonBody(t *testing.T) {
+	head, err := os.ReadFile("skill_head.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := leader.Render(head, map[string]string{"ask_tool": "AskUserQuestion"})
+	if err != nil {
+		t.Fatalf("leader.Render: %v", err)
+	}
+	if string(files.Skill) != string(want) {
+		t.Error("files.Skill sale de skill_head.md + el cuerpo común con AskUserQuestion")
+	}
+	sum := sha256.Sum256(files.Skill)
+	if got := hex.EncodeToString(sum[:]); got != skillBefore {
+		t.Errorf("la skill de Claude debe ser idéntica byte a byte a la de antes (R12): sha256 %s", got)
+	}
+	s := string(files.Skill)
+	if strings.Contains(s, "{{") || strings.Contains(s, "herramienta `question`") {
+		t.Error("sin marcadores ni el nombre de la herramienta de preguntas de OpenCode")
 	}
 }

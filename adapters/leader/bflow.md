@@ -1,9 +1,3 @@
----
-name: bflow
-description: Conduce el flujo SDD con bflow. Úsala al empezar, avanzar o retomar una tarea, cuando pregunten "qué sigue", mencionen un ID de tarea o aprueben o rechacen algo del flujo.
-argument-hint: "[ID]"
----
-
 # bflow
 
 bflow guarda el estado y decide las transiciones; tú hablas con el humano y lanzas agentes. Así el flujo no depende de reglas que haya que recordar.
@@ -15,7 +9,7 @@ Todo comando `bflow … --json` responde con `next`. Haz lo que diga y luego sig
 - `ask`
   1. Si trae `display`, escríbelo tal cual en tu mensaje antes de preguntar: el humano no ve la salida de las herramientas, y sin eso aprueba a ciegas. No lo resumas.
   2. Si trae `skill`, aplica esa sección de abajo.
-  3. Pregunta con AskUserQuestion usando `question` y los `label` de `options`.
+  3. Pregunta con {{ask_tool}} usando `question` y los `label` de `options`.
   4. Corre el `command` de la opción elegida. Si `needs_note`, cambia `<motivo>` o `<decisión>` por las palabras del humano, entre comillas.
 - `spawn`: lanza cada agente de `agents` con el subagente `subagent` (todos en el mismo mensaje si `parallel`; si no existe, corre `bflow render`). Pásale solo sus `args` y su comando `report`; no pegues specs ni código, el agente lee las rutas. Al terminar, el último `report` trae el siguiente `next`.
 - `wait`: dile al humano qué se espera (`reason`).
@@ -30,7 +24,7 @@ Pregunta hasta 3 cosas por tanda (alcance, datos clave, errores, restricciones),
 Si el brief lista decisiones `[N]`, ratifica cada una (A = lo decidido, B = la alternativa descartada) antes de preguntar si se aprueba.
 
 ## walkthrough
-Gate `questions`: pregunta con AskUserQuestion, una pregunta por cada una de `display` (hasta 4) con sus respuestas posibles como opciones, en el mismo orden; el humano puede escribir otra. No digas cuál hace el código: la idea es comparar lo que espera con lo que hace. Corre la opción "Ya respondí" con sus respuestas en `--note`.
+Gate `questions`: pregunta con {{ask_tool}}, una pregunta por cada una de `display` (hasta 4) con sus respuestas posibles como opciones, en el mismo orden; el humano puede escribir otra. No digas cuál hace el código: la idea es comparar lo que espera con lo que hace. Corre la opción "Ya respondí" con sus respuestas en `--note`.
 Gate `walkthrough`: después de escribir `display`, señala dónde sus respuestas difieren de lo que dice el review-map. Luego recorre los 🔴 uno por uno, mostrando el hunk (`git diff <base>...HEAD -- <archivo>`), y al final pregunta.
 
 ## intake
