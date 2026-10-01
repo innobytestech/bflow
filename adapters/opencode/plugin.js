@@ -14,7 +14,9 @@ export const BflowPlugin = async ({ client, directory }) => {
     if (warned) return
     warned = true
     const text = "bflow: " + msg
-    Promise.resolve(client?.tui?.showToast?.({ body: { message: text, variant: "warning" } })).catch(() => console.error(text))
+    Promise.resolve(client?.tui?.showToast?.({ body: { message: text, variant: "warning" } }))
+      .then((r) => { if (!r || r.error) throw r?.error })
+      .catch(() => console.error(text)) // sin TUI (opencode run) el aviso sale por stderr
   }
   const note = (id, patch) => sessions.set(id, { ...sessions.get(id), ...patch })
   const resolve = async (id) => {
