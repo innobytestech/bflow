@@ -419,7 +419,7 @@ func TestPanelClosesTaskWithMergedPRInAnyPhase(t *testing.T) {
 	rn, _ := v.e.Store.Load(byNumber)
 	h.prs[rb.Branch] = vcs.PR{Number: 30, URL: "https://host/pull/30", State: "merged", Merged: true}
 	h.prs[rn.Branch] = vcs.PR{Number: 31, URL: "https://host/pull/31", State: "merged", Merged: true}
-	v.e.Store.Update(byNumber, func(r *store.Record, _ bool) error { r.PR = &store.PR{Number: 31}; return nil })
+	_, _ = v.e.Store.Update(byNumber, func(r *store.Record, _ bool) error { r.PR = &store.PR{Number: 31}; return nil })
 	h.prs["otra"] = vcs.PR{Number: 99, State: "open"}
 
 	rep, err := v.e.Panel(ctx, false)
@@ -480,7 +480,7 @@ func TestPanelKeepsTaskWhenPRClosedUnmerged(t *testing.T) {
 	id := v.task(t, "Cerrado sin merge")
 	toDecision(t, v, id)
 	rec, _ := v.e.Store.Load(id)
-	v.e.Store.Update(id, func(r *store.Record, _ bool) error { r.PR = &store.PR{Number: 40}; return nil })
+	_, _ = v.e.Store.Update(id, func(r *store.Record, _ bool) error { r.PR = &store.PR{Number: 40}; return nil })
 	h.prs[rec.Branch] = vcs.PR{Number: 40, State: "closed"}
 
 	rep, err := v.e.Panel(ctx, false)
@@ -494,7 +494,7 @@ func TestPanelKeepsTaskWhenPRClosedUnmerged(t *testing.T) {
 		t.Errorf("aviso: %v", rep.Warnings)
 	}
 	// Un host que falla tampoco cierra: solo avisa.
-	v.e.Store.Update(id, func(r *store.Record, _ bool) error { r.PR = nil; return nil })
+	_, _ = v.e.Store.Update(id, func(r *store.Record, _ bool) error { r.PR = nil; return nil })
 	h.deny = errors.New("boom")
 	rep, _ = v.e.Panel(ctx, false)
 	if len(rep.ClosedOutside) != 0 || phaseOf(t, v, id) != flow.Implementing || len(rep.Warnings) == 0 {

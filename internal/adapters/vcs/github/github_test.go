@@ -186,7 +186,7 @@ func TestFindMergedPR(t *testing.T) {
 	if _, err := c.FindMergedPR(ctx, "feature/X-1"); !errors.Is(err, vcs.ErrNoPR) {
 		t.Fatalf("sin PR: %v", err)
 	}
-	c.OpenPR(ctx, vcs.PRSpec{Base: "dev", Head: "feature/X-1", Title: "t"}) // 101, abierto
+	_, _ = c.OpenPR(ctx, vcs.PRSpec{Base: "dev", Head: "feature/X-1", Title: "t"}) // 101, abierto
 	if _, err := c.FindMergedPR(ctx, "feature/X-1"); !errors.Is(err, vcs.ErrNoPR) {
 		t.Errorf("uno abierto no cuenta: %v", err)
 	}
@@ -194,7 +194,7 @@ func TestFindMergedPR(t *testing.T) {
 	if _, err := c.FindMergedPR(ctx, "feature/X-1"); !errors.Is(err, vcs.ErrNoPR) {
 		t.Errorf("cerrado sin merge no cuenta: %v", err)
 	}
-	c.OpenPR(ctx, vcs.PRSpec{Base: "dev", Head: "feature/X-1", Title: "t2"}) // 102
+	_, _ = c.OpenPR(ctx, vcs.PRSpec{Base: "dev", Head: "feature/X-1", Title: "t2"}) // 102
 	f.prs[1]["state"], f.prs[1]["merged_at"] = "closed", "2026-01-02T03:04:05Z"
 	pr, err := c.FindMergedPR(ctx, "feature/X-1")
 	if err != nil || pr.Number != 102 || !pr.Merged || pr.State != "merged" {
