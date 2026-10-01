@@ -325,8 +325,13 @@ func updateRun(t *testing.T, bin []byte) (map[string]any, string) {
 	if code != 0 || out["code"] != "updated" {
 		t.Fatalf("update debe terminar OK aunque falle el refresco: %d %s", code, raw)
 	}
-	text, _ := out["text"].(string)
-	return dataOf(out), text
+
+	textBuf := &bytes.Buffer{}
+	textEnv := &Env{Stdout: textBuf, Stderr: &bytes.Buffer{}, Version: "v0.0.1", Dir: env.Dir, Agent: claudeagent.Agent{}, Tools: bothTools()}
+	if code := Run([]string{"update"}, textEnv); code != 0 {
+		t.Fatalf("update (texto) debe terminar OK aunque falle el refresco: %d %s", code, textBuf.String())
+	}
+	return dataOf(out), textBuf.String()
 }
 
 func TestUpdateRefreshesIntegrations(t *testing.T) {
