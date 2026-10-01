@@ -527,7 +527,7 @@ func init() {
 			return e.PR(ctx, id)
 		})})
 
-	Register(&Command{Name: "panel", Summary: "compromisos: cierra PR mergeados, sincroniza y avisa SLA: panel [--sla]",
+	Register(&Command{Name: "panel", Summary: "compromisos: cierra lo mergeado o terminado en el tracker, sincroniza y avisa SLA: panel [--sla]",
 		Setup: func(fs *flag.FlagSet) {
 			fs.Bool("sla", false, "comentar en el tracker los gates vencidos y las tareas vencidas")
 		},
@@ -541,7 +541,7 @@ func init() {
 				return fail(err)
 			}
 			env := output.OK("panel", map[string]any{"items": rep.Items, "more": rep.More, "closed": rep.Closed,
-				"reminded": rep.Reminded, "warnings": rep.Warnings}, nil)
+				"closed_outside": rep.ClosedOutside, "reminded": rep.Reminded, "warnings": rep.Warnings}, nil)
 			env.Text = renderPanel(rep)
 			return env
 		}})
@@ -551,6 +551,13 @@ func renderPanel(rep engine.PanelReport) string {
 	var b strings.Builder
 	for _, id := range rep.Closed {
 		fmt.Fprintf(&b, "✅ %s cerrada: PR mergeado\n", id)
+	}
+	for _, c := range rep.ClosedOutside {
+		why := "(tracker)"
+		if c.Reason == "pr" {
+			why = fmt.Sprintf("(PR #%d mergeado)", c.PR)
+		}
+		fmt.Fprintf(&b, "%s cerrada: terminada fuera de esta copia %s\n", c.ID, why)
 	}
 	if len(rep.Items) == 0 {
 		b.WriteString("📋 sin compromisos pendientes\n")

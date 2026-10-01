@@ -85,6 +85,9 @@ type TaskStats struct {
 	Splits          int           `json:"splits"`
 	Tokens          Usage         `json:"tokens"`
 	TokensAvailable bool          `json:"tokens_available"`
+	// ClosedOutside es el motivo ("tracker" | "pr") si la tarea se cerró
+	// porque se terminó fuera de esta copia.
+	ClosedOutside string `json:"closed_outside,omitempty"`
 
 	// Calidad: rechazos humanos por gate y hotfixes que la corrigen (--fixes).
 	RejectionsByGate map[string]int `json:"rejections_by_gate,omitempty"`
@@ -182,6 +185,16 @@ func Compute(id string, entries []store.Entry, now time.Time) TaskStats {
 		}
 	}
 	for _, e := range evs {
+		if e.Event == string(flow.EvClosedOutside) {
+			// Terminada fuera de esta copia: el tramo previo no fue trabajo
+			// de agente ni espera humana medible.
+			st.ClosedOutside, _ = e.Data["reason"].(string)
+			if st.ClosedOutside == "" {
+				st.ClosedOutside = "unknown"
+			}
+			cur, last, started = e.To, e.TS, true
+			continue
+		}
 		add(e.TS)
 		opened := e.Data["gate_opened"] != nil
 		switch e.Event {

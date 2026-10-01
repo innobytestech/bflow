@@ -31,7 +31,7 @@ Lo que necesitas para decidir llega escrito en el chat: bflow le entrega a la se
 
 El walkthrough va en dos pasos que controla bflow. Primero contestas qué esperas que haga el cambio, sin ver el código. Después la sesión compara tus respuestas con lo que el código hace, señala las diferencias y recorre contigo los cambios 🔴 uno por uno. Es la forma de revisar sin leer todo el diff.
 
-Nadie marca una tarea como terminada a mano: bflow la cierra cuando detecta el merge (`bflow panel`).
+Nadie marca una tarea como terminada a mano: bflow la cierra cuando detecta el merge (`bflow panel`). Si la terminaste en otra máquina o sesión, `bflow panel` también cierra la copia local cuando el tracker ya la da por hecha o cerrada, o cuando el PR de su rama está mergeado, en cualquier fase en que haya quedado, y lo dice ("terminada fuera de esta copia").
 
 ## Ajustar a los agentes
 

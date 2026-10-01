@@ -63,7 +63,8 @@ type PR struct {
 type Host interface {
 	Name() string
 	OpenPR(ctx context.Context, pr PRSpec) (PR, error)
-	FindPR(ctx context.Context, head string) (PR, error) // ErrNoPR si no hay
+	FindPR(ctx context.Context, head string) (PR, error)       // ErrNoPR si no hay
+	FindMergedPR(ctx context.Context, head string) (PR, error) // ErrNoPR si no hay uno mergeado
 	UpdatePRBody(ctx context.Context, number int, body string) error
 	PRStatus(ctx context.Context, number int) (PR, error)
 	CompareURL(base, head string) string

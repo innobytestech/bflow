@@ -12,6 +12,7 @@ import (
 
 	"innobytes.tech/bflow/internal/flow"
 	"innobytes.tech/bflow/internal/store"
+	"innobytes.tech/bflow/internal/tracker"
 	"innobytes.tech/bflow/internal/tracker/trackertest"
 	"innobytes.tech/bflow/internal/vcs"
 )
@@ -47,10 +48,11 @@ func (g *fakeGit) RemoteURL(context.Context) (string, error) {
 }
 
 type fakeHost struct {
-	prs    map[string]vcs.PR // por rama
-	bodies map[int]string
-	deny   error // si no es nil, OpenPR y FindPR fallan con él
-	opened int
+	prs        map[string]vcs.PR // por rama
+	bodies     map[int]string
+	deny       error // si no es nil, OpenPR y FindPR fallan con él
+	opened     int
+	findMerged int
 }
 
 func newHost() *fakeHost { return &fakeHost{prs: map[string]vcs.PR{}, bodies: map[int]string{}} }
@@ -71,6 +73,16 @@ func (h *fakeHost) FindPR(_ context.Context, head string) (vcs.PR, error) {
 		return vcs.PR{}, h.deny
 	}
 	if pr, ok := h.prs[head]; ok && pr.State == "open" {
+		return pr, nil
+	}
+	return vcs.PR{}, vcs.ErrNoPR
+}
+func (h *fakeHost) FindMergedPR(_ context.Context, head string) (vcs.PR, error) {
+	h.findMerged++
+	if h.deny != nil {
+		return vcs.PR{}, h.deny
+	}
+	if pr, ok := h.prs[head]; ok && pr.Merged {
 		return pr, nil
 	}
 	return vcs.PR{}, vcs.ErrNoPR
@@ -330,5 +342,162 @@ func TestPRBodyClosesIssue(t *testing.T) {
 	v.e.Tracker = v.tr // sin la capacidad
 	if body := v.e.PRBody(rec); strings.Contains(body, "Closes") {
 		t.Errorf("un tracker sin PRLinker no agrega nada:\n%s", body)
+	}
+}
+
+// toDecision lleva una tarea light a implementing con un gate decision abierto
+// (el caso GH-13) y con rama registrada.
+func toDecision(t *testing.T, v *env, id string) {
+	t.Helper()
+	ctx := context.Background()
+	m := mustT(t)
+	m(v.e.Start(ctx, id, flow.Light, "", ""))
+	m(v.e.Report(ctx, id, ReportOpts{Agent: "spec-author", Verdict: flow.Ready}))
+	m(v.e.Approve(ctx, id, ApproveOpts{}))
+	m(v.e.Report(ctx, id, ReportOpts{Agent: "implementer", Verdict: flow.NeedsDecision, Note: "n", Options: []string{"A", "B"}}))
+	rec, _ := v.e.Store.Load(id)
+	if rec.Flow.Phase != flow.Implementing || rec.Flow.Gate == nil || rec.Branch == "" {
+		t.Fatalf("preparación: %+v", rec)
+	}
+}
+
+func lastEntry(t *testing.T, v *env, id string) store.Entry {
+	t.Helper()
+	es, err := v.e.Store.Log(id)
+	if err != nil || len(es) == 0 {
+		t.Fatalf("log: %v", err)
+	}
+	return es[len(es)-1]
+}
+
+func TestPanelClosesTaskDoneInTracker(t *testing.T) {
+	v := newEnv(t, "vcs: { base_branch: dev }\n")
+	h := newHost()
+	v.e.Host = h
+	ctx := context.Background()
+	id := v.task(t, "Traspaso")
+	toDecision(t, v, id)
+	v.tr.Calls = nil
+	_ = v.tr.Transition(ctx, id, flow.Done, tracker.Patch{})
+	v.tr.Calls = nil
+
+	rep, err := v.e.Panel(ctx, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.ClosedOutside) != 1 || rep.ClosedOutside[0] != (ClosedOutside{ID: id, From: flow.Implementing, Reason: "tracker"}) {
+		t.Fatalf("closed_outside: %+v", rep.ClosedOutside)
+	}
+	rec, _ := v.e.Store.Load(id)
+	if rec.Flow.Phase != flow.Done || rec.Flow.Gate != nil {
+		t.Errorf("local: %+v", rec.Flow)
+	}
+	if len(v.tr.Calls) != 0 {
+		t.Errorf("no se escribe en el tracker: %v", v.tr.Calls)
+	}
+	en := lastEntry(t, v, id)
+	if en.Event != "closed_outside" || en.From != flow.Implementing || en.To != flow.Done || en.Data["reason"] != "tracker" {
+		t.Errorf("log: %+v", en)
+	}
+	if h.findMerged != 0 {
+		t.Error("con el tracker en done no se consulta el PR")
+	}
+	if len(rep.Items) != 0 {
+		t.Errorf("ya no es compromiso: %+v", rep.Items)
+	}
+}
+
+func TestPanelClosesTaskWithMergedPRInAnyPhase(t *testing.T) {
+	v := newEnv(t, "vcs: { base_branch: dev }\n")
+	h := newHost()
+	v.e.Host = h
+	ctx := context.Background()
+	byBranch, byNumber := v.task(t, "Por rama"), v.task(t, "Por numero")
+	toDecision(t, v, byBranch)
+	toDecision(t, v, byNumber)
+	rb, _ := v.e.Store.Load(byBranch)
+	rn, _ := v.e.Store.Load(byNumber)
+	h.prs[rb.Branch] = vcs.PR{Number: 30, URL: "https://host/pull/30", State: "merged", Merged: true}
+	h.prs[rn.Branch] = vcs.PR{Number: 31, URL: "https://host/pull/31", State: "merged", Merged: true}
+	_, _ = v.e.Store.Update(byNumber, func(r *store.Record, _ bool) error { r.PR = &store.PR{Number: 31}; return nil })
+	h.prs["otra"] = vcs.PR{Number: 99, State: "open"}
+
+	rep, err := v.e.Panel(ctx, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.ClosedOutside) != 2 || len(rep.Closed) != 0 {
+		t.Fatalf("cierres: %+v %+v", rep.ClosedOutside, rep.Closed)
+	}
+	for id, n := range map[string]int{byBranch: 30, byNumber: 31} {
+		rec, _ := v.e.Store.Load(id)
+		if rec.Flow.Phase != flow.Done || rec.PR == nil || rec.PR.Number != n || !rec.PR.Merged {
+			t.Errorf("%s: %+v %+v", id, rec.Flow, rec.PR)
+		}
+		if task, _ := v.tr.Get(ctx, id); task.Phase != flow.Done {
+			t.Errorf("%s: el tracker debe pasar a done: %s", id, task.Phase)
+		}
+		if en := lastEntry(t, v, id); en.Event != "closed_outside" || en.Data["reason"] != "pr" || fmt.Sprint(en.Data["pr"]) != fmt.Sprint(n) {
+			t.Errorf("%s log: %+v", id, en)
+		}
+	}
+}
+
+func TestPanelDropsPendingWhenTrackerDone(t *testing.T) {
+	v := newEnv(t, "vcs: { base_branch: dev }\n")
+	ctx := context.Background()
+	id := v.task(t, "Pendientes")
+	v.tr.FailTransitions = true
+	toDecision(t, v, id)
+	if rec, _ := v.e.Store.Load(id); len(rec.Pending) == 0 {
+		t.Fatal("debían quedar efectos pendientes")
+	}
+	v.tr.FailTransitions = false
+	_ = v.tr.Transition(ctx, id, flow.Done, tracker.Patch{})
+	v.tr.Calls = nil
+
+	rep, err := v.e.Panel(ctx, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec, _ := v.e.Store.Load(id)
+	if len(rep.ClosedOutside) != 1 || rec.Flow.Phase != flow.Done || len(rec.Pending) != 0 {
+		t.Fatalf("%+v %+v", rep.ClosedOutside, rec)
+	}
+	if len(v.tr.Calls) != 0 {
+		t.Errorf("no debe reintentar ni comentar: %v", v.tr.Calls)
+	}
+	if task, _ := v.tr.Get(ctx, id); task.Phase != flow.Done {
+		t.Errorf("el tracker no regresa: %s", task.Phase)
+	}
+}
+
+func TestPanelKeepsTaskWhenPRClosedUnmerged(t *testing.T) {
+	v := newEnv(t, "vcs: { base_branch: dev }\n")
+	h := newHost()
+	v.e.Host = h
+	ctx := context.Background()
+	id := v.task(t, "Cerrado sin merge")
+	toDecision(t, v, id)
+	rec, _ := v.e.Store.Load(id)
+	_, _ = v.e.Store.Update(id, func(r *store.Record, _ bool) error { r.PR = &store.PR{Number: 40}; return nil })
+	h.prs[rec.Branch] = vcs.PR{Number: 40, State: "closed"}
+
+	rep, err := v.e.Panel(ctx, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.ClosedOutside) != 0 || phaseOf(t, v, id) != flow.Implementing {
+		t.Errorf("no debe cerrar: %+v", rep.ClosedOutside)
+	}
+	if len(rep.Warnings) != 1 || !strings.Contains(rep.Warnings[0], "sin merge") {
+		t.Errorf("aviso: %v", rep.Warnings)
+	}
+	// Un host que falla tampoco cierra: solo avisa.
+	_, _ = v.e.Store.Update(id, func(r *store.Record, _ bool) error { r.PR = nil; return nil })
+	h.deny = errors.New("boom")
+	rep, _ = v.e.Panel(ctx, false)
+	if len(rep.ClosedOutside) != 0 || phaseOf(t, v, id) != flow.Implementing || len(rep.Warnings) == 0 {
+		t.Errorf("host caído: %+v %v", rep.ClosedOutside, rep.Warnings)
 	}
 }
