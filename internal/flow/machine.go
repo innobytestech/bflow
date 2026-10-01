@@ -64,6 +64,17 @@ func (t *tx) apply(ev Event) error {
 	if s.Phase == Done {
 		return reject("task_done", "la tarea %s ya está cerrada", s.ID)
 	}
+	if ev.Kind == EvClosedOutside {
+		if s.Phase == Backlog {
+			return reject("not_started", "la tarea %s no ha empezado", s.ID)
+		}
+		s.Block = nil
+		t.enter(Done)
+		if ev.Reason == "tracker" {
+			t.moved = false // el tracker ya la tiene cerrada
+		}
+		return nil
+	}
 	if s.Phase == Blocked && ev.Kind != EvUnblock {
 		return reject("blocked", "la tarea %s está bloqueada (%s); desbloquéala primero", s.ID, s.Block.Reason)
 	}

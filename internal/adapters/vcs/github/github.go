@@ -40,14 +40,17 @@ type apiPR struct {
 	HTMLURL string `json:"html_url"`
 	State   string `json:"state"`
 	Merged  bool   `json:"merged"`
+	// La lista de pulls no trae "merged", solo "merged_at".
+	MergedAt *string `json:"merged_at"`
 }
 
 func (p apiPR) pr() vcs.PR {
+	merged := p.Merged || p.MergedAt != nil
 	st := p.State
-	if p.Merged {
+	if merged {
 		st = "merged"
 	}
-	return vcs.PR{Number: p.Number, URL: p.HTMLURL, State: st, Merged: p.Merged}
+	return vcs.PR{Number: p.Number, URL: p.HTMLURL, State: st, Merged: merged}
 }
 
 func (c *Client) do(ctx context.Context, method, path string, in, out any) error {
@@ -144,6 +147,22 @@ func (c *Client) FindPR(ctx context.Context, head string) (vcs.PR, error) {
 		return vcs.PR{}, vcs.ErrNoPR
 	}
 	return ps[0].pr(), nil
+}
+
+// FindMergedPR busca un PR ya mergeado cuya rama origen sea head.
+func (c *Client) FindMergedPR(ctx context.Context, head string) (vcs.PR, error) {
+	owner := strings.SplitN(c.Repo, "/", 2)[0]
+	q := url.Values{"head": {owner + ":" + head}, "state": {"closed"}}
+	var ps []apiPR
+	if err := c.do(ctx, "GET", c.pulls()+"?"+q.Encode(), nil, &ps); err != nil {
+		return vcs.PR{}, c.noAccess(err)
+	}
+	for _, p := range ps {
+		if pr := p.pr(); pr.Merged {
+			return pr, nil
+		}
+	}
+	return vcs.PR{}, vcs.ErrNoPR
 }
 
 func (c *Client) UpdatePRBody(ctx context.Context, n int, body string) error {

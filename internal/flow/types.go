@@ -130,6 +130,9 @@ const (
 	EvBlock   EventKind = "block"
 	EvUnblock EventKind = "unblock"
 	EvMerged  EventKind = "merged"
+	// EvClosedOutside cierra una tarea que se terminó fuera de esta copia
+	// (el tracker la da por hecha o su PR se mergeó), en cualquier fase empezada.
+	EvClosedOutside EventKind = "closed_outside"
 )
 
 // Event es algo que pasó: una decisión humana, un reporte de agente o un
@@ -150,6 +153,8 @@ type Event struct {
 	Verdict Verdict  `json:"verdict,omitempty"`
 	Options []string `json:"options,omitempty"`  // report NEEDS_DECISION
 	CheckOK bool     `json:"check_ok,omitempty"` // report DONE en implementing: check verificado en HEAD
+
+	Reason string `json:"reason,omitempty"` // closed_outside: "tracker" o "pr"
 }
 
 // AgentArtifacts son los archivos de .bflow/tasks/<ID>/ que escriben los

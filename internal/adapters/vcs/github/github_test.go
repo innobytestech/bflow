@@ -157,9 +157,10 @@ func TestNoAccess(t *testing.T) {
 	f.status = 404
 	ctx := context.Background()
 	for name, err := range map[string]error{
-		"OpenPR":    func() error { _, err := c.OpenPR(ctx, vcs.PRSpec{Base: "dev", Head: "h", Title: "t"}); return err }(),
-		"FindPR":    func() error { _, err := c.FindPR(ctx, "h"); return err }(),
-		"CheckRepo": c.CheckRepo(ctx),
+		"OpenPR":       func() error { _, err := c.OpenPR(ctx, vcs.PRSpec{Base: "dev", Head: "h", Title: "t"}); return err }(),
+		"FindPR":       func() error { _, err := c.FindPR(ctx, "h"); return err }(),
+		"FindMergedPR": func() error { _, err := c.FindMergedPR(ctx, "h"); return err }(),
+		"CheckRepo":    c.CheckRepo(ctx),
 	} {
 		if !errors.Is(err, vcs.ErrNoAccess) || !strings.Contains(err.Error(), "acme/acme-api") {
 			t.Errorf("%s con 404 debe decir que el token no ve el repo: %v", name, err)
@@ -176,5 +177,31 @@ func TestCompareURL(t *testing.T) {
 	want := "https://github.com/acme/acme-web/compare/dev...feat/fe-web108-x?expand=1"
 	if got := c.CompareURL("dev", "feat/fe-web108-x"); got != want {
 		t.Errorf("%s", got)
+	}
+}
+
+func TestFindMergedPR(t *testing.T) {
+	c, f := setup(t)
+	ctx := context.Background()
+	if _, err := c.FindMergedPR(ctx, "feature/X-1"); !errors.Is(err, vcs.ErrNoPR) {
+		t.Fatalf("sin PR: %v", err)
+	}
+	c.OpenPR(ctx, vcs.PRSpec{Base: "dev", Head: "feature/X-1", Title: "t"}) // 101, abierto
+	if _, err := c.FindMergedPR(ctx, "feature/X-1"); !errors.Is(err, vcs.ErrNoPR) {
+		t.Errorf("uno abierto no cuenta: %v", err)
+	}
+	f.prs[0]["state"] = "closed" // cerrado sin merge
+	if _, err := c.FindMergedPR(ctx, "feature/X-1"); !errors.Is(err, vcs.ErrNoPR) {
+		t.Errorf("cerrado sin merge no cuenta: %v", err)
+	}
+	c.OpenPR(ctx, vcs.PRSpec{Base: "dev", Head: "feature/X-1", Title: "t2"}) // 102
+	f.prs[1]["state"], f.prs[1]["merged_at"] = "closed", "2026-01-02T03:04:05Z"
+	pr, err := c.FindMergedPR(ctx, "feature/X-1")
+	if err != nil || pr.Number != 102 || !pr.Merged || pr.State != "merged" {
+		t.Errorf("mergeado: %+v %v", pr, err)
+	}
+	// FindPR sigue sin tomar PRs cerrados.
+	if _, err := c.FindPR(ctx, "feature/X-1"); !errors.Is(err, vcs.ErrNoPR) {
+		t.Errorf("FindPR no cambia: %v", err)
 	}
 }

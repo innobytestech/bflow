@@ -51,11 +51,22 @@ type PanelItem struct {
 
 // PanelReport es el resultado de bflow panel.
 type PanelReport struct {
-	Items    []PanelItem `json:"items"`
-	More     int         `json:"more,omitempty"`
-	Closed   []string    `json:"closed,omitempty"`   // in_review → done por merge
-	Reminded []string    `json:"reminded,omitempty"` // comentarios de SLA/vencimiento publicados
-	Warnings []string    `json:"warnings,omitempty"`
+	Items  []PanelItem `json:"items"`
+	More   int         `json:"more,omitempty"`
+	Closed []string    `json:"closed,omitempty"` // in_review → done por merge
+	// ClosedOutside son las tareas cerradas en local porque se terminaron fuera
+	// de esta copia (el tracker las da por hechas o su PR se mergeó).
+	ClosedOutside []ClosedOutside `json:"closed_outside,omitempty"`
+	Reminded      []string        `json:"reminded,omitempty"` // comentarios de SLA/vencimiento publicados
+	Warnings      []string        `json:"warnings,omitempty"`
+}
+
+// ClosedOutside describe una tarea que panel cerró desde afuera del flujo.
+type ClosedOutside struct {
+	ID     string     `json:"id"`
+	From   flow.Phase `json:"from"`
+	Reason string     `json:"reason"`       // "tracker" | "pr"
+	PR     int        `json:"pr,omitempty"` // número, con motivo "pr"
 }
 
 const panelMax = 9
@@ -71,9 +82,13 @@ func (e *Engine) Panel(ctx context.Context, sla bool) (PanelReport, error) {
 		return rep, err
 	}
 	due := map[string]*time.Time{}
+	open := map[string]tracker.Task{}
+	listed := false
 	if tasks, err := e.Tracker.List(ctx, tracker.Filter{OpenOnly: true}); err == nil {
+		listed = true
 		for _, t := range tasks {
 			due[t.ID] = t.Due
+			open[t.ID] = t
 		}
 	} else {
 		rep.Warnings = append(rep.Warnings, "tracker no disponible: "+err.Error())
@@ -85,13 +100,22 @@ func (e *Engine) Panel(ctx context.Context, sla bool) (PanelReport, error) {
 			continue
 		}
 		id := rec.Flow.ID
+		// Primero el cierre desde afuera: un efecto pendiente viejo no debe
+		// regresar en el tracker lo que ya se terminó.
+		if co, warns := e.reconcile(ctx, rec, open, listed); co != nil || len(warns) > 0 {
+			rep.Warnings = append(rep.Warnings, warns...)
+			if co != nil {
+				rep.ClosedOutside = append(rep.ClosedOutside, *co)
+				continue
+			}
+		}
 		if len(rec.Pending) > 0 {
 			if _, err := e.Sync(ctx, id); err != nil {
 				rep.Warnings = append(rep.Warnings, id+": "+err.Error())
 			}
 		}
 		if rec.Flow.Phase == flow.InReview {
-			closed, warn := e.checkMerged(ctx, rec)
+			closed, warn := e.checkMerged(ctx, e.reload(rec))
 			if warn != "" {
 				rep.Warnings = append(rep.Warnings, warn)
 			}
@@ -140,6 +164,136 @@ func (e *Engine) Panel(ctx context.Context, sla bool) (PanelReport, error) {
 		rep.Items = rep.Items[:panelMax]
 	}
 	return rep, nil
+}
+
+// reload devuelve el registro al día (el Sync previo pudo cambiarlo).
+func (e *Engine) reload(rec store.Record) store.Record {
+	if r, err := e.Store.Load(rec.Flow.ID); err == nil {
+		return r
+	}
+	return rec
+}
+
+// reconcile revisa si una tarea no cerrada ya se terminó fuera de esta copia:
+// el tracker la da por hecha o cerrada, o el PR de su rama se mergeó. Las
+// tareas en in_review con PR mergeado siguen el cierre normal (checkMerged).
+// Los errores de red solo dan avisos.
+func (e *Engine) reconcile(ctx context.Context, rec store.Record, open map[string]tracker.Task, listed bool) (*ClosedOutside, []string) {
+	id := rec.Flow.ID
+	var warns []string
+	t, ok := open[id]
+	if !ok && listed {
+		got, err := e.Tracker.Get(ctx, id)
+		if err != nil {
+			warns = append(warns, id+": no se pudo consultar el tracker: "+err.Error())
+		} else {
+			t, ok = got, true
+		}
+	}
+	if ok && (t.Phase == flow.Done || t.Closed) {
+		state := t.State
+		if state == "" {
+			state = string(t.Phase)
+		}
+		if co, w := e.closeOutside(ctx, rec, "tracker", nil, state); co {
+			if w != "" {
+				warns = append(warns, w)
+			}
+			return &ClosedOutside{ID: id, From: rec.Flow.Phase, Reason: "tracker"}, warns
+		} else if w != "" {
+			warns = append(warns, w)
+		}
+		return nil, warns
+	}
+	if rec.Flow.Phase == flow.InReview || e.Host == nil {
+		return nil, warns
+	}
+	var (
+		pr  vcs.PR
+		err error
+		n   int
+	)
+	switch {
+	case rec.PR != nil && rec.PR.Number > 0:
+		n = rec.PR.Number
+		pr, err = e.Host.PRStatus(ctx, n)
+	case rec.Branch != "":
+		pr, err = e.Host.FindMergedPR(ctx, rec.Branch)
+	default:
+		return nil, warns
+	}
+	switch {
+	case errors.Is(err, vcs.ErrNoCredentials), errors.Is(err, vcs.ErrNoPR):
+		return nil, warns
+	case err != nil:
+		return nil, append(warns, fmt.Sprintf("%s: no se pudo consultar el PR de %s: %v", id, rec.Flow.Phase, err))
+	case pr.Merged:
+		if co, w := e.closeOutside(ctx, rec, "pr", &pr, ""); co {
+			if w != "" {
+				warns = append(warns, w)
+			}
+			return &ClosedOutside{ID: id, From: rec.Flow.Phase, Reason: "pr", PR: pr.Number}, warns
+		} else if w != "" {
+			warns = append(warns, w)
+		}
+	case pr.State == "closed":
+		num := pr.Number
+		if n > 0 {
+			num = n
+		}
+		warns = append(warns, fmt.Sprintf("%s: el PR #%d se cerró sin merge", id, num))
+	}
+	return nil, warns
+}
+
+// closeOutside cierra en local una tarea que se terminó fuera de esta copia.
+// Con motivo "tracker" no toca el tracker y descarta los efectos pendientes
+// (un estado viejo regresaría el issue); con "pr" lo mueve a done como un merge.
+func (e *Engine) closeOutside(ctx context.Context, rec store.Record, reason string, pr *vcs.PR, trackerState string) (bool, string) {
+	id := rec.Flow.ID
+	var entry store.Entry
+	var warns []string
+	_, err := e.Store.Update(id, func(r *store.Record, exists bool) error {
+		if !exists {
+			return store.ErrNotFound
+		}
+		before := r.Flow
+		res, err := flow.Apply(e.flowCfg(), r.Flow, flow.Event{Kind: flow.EvClosedOutside, Reason: reason})
+		if err != nil {
+			return err
+		}
+		r.Flow = res.State
+		r.GateSince = time.Time{}
+		r.Nudges = nil
+		data := map[string]any{"reason": reason}
+		if reason == "tracker" {
+			r.Pending = nil
+			if trackerState != "" {
+				data["tracker_state"] = trackerState
+			}
+		} else if pr != nil {
+			r.PR = &store.PR{Number: pr.Number, URL: pr.URL, Merged: true}
+			data["pr"] = pr.Number
+		}
+		w, err := e.runEffects(ctx, r, res.Effects)
+		if err != nil {
+			r.Flow = before
+			return err
+		}
+		warns = w
+		entry = store.Entry{TS: e.now(), ID: id, Event: string(flow.EvClosedOutside), From: before.Phase, To: flow.Done, By: e.User, Data: data}
+		return nil
+	})
+	if err != nil {
+		return false, fmt.Sprintf("%s: no se pudo cerrar desde afuera: %v", id, err)
+	}
+	if err := e.Store.Append(entry); err != nil {
+		warns = append(warns, "no se pudo escribir log.jsonl: "+err.Error())
+	}
+	if len(warns) > 0 {
+		return true, strings.Join(warns, "; ")
+	}
+	return true, ""
 }
 
 // checkMerged consulta el PR de una tarea en in_review y la cierra si se mergeó.

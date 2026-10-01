@@ -52,15 +52,15 @@ En el carril light, los criterios van en cada tarea de **Tasks**.
 
 ## Tasks
 
-- [ ] T1 · Evento `closed_outside` en `flow` (R1-R3)
+- [x] T1 · Evento `closed_outside` en `flow` (R1-R3)
   - R1: CUANDO llega `EvClosedOutside` en cualquier fase empezada que no sea `done` (incluidas `blocked` y una con gate abierto), el sistema DEBE dejar `phase=done`, `gate=nil` y `block=nil`.
   - R2: CUANDO `Reason == "tracker"`, el sistema NO DEBE emitir `FxTrackerState`; CUANDO `Reason == "pr"`, DEBE emitirlo hacia `done`.
   - R3: CUANDO la tarea está en `backlog` o en `done`, el sistema DEBE rechazar con `not_started` o `task_done`.
   - Pruebas en `internal/flow/machine_test.go`: `TestClosedOutsideFromAnyPhase`, `TestClosedOutsideTrackerEmitsNoEffect`, `TestClosedOutsideRejectsBacklogAndDone`.
-- [ ] T2 · `FindMergedPR` en `vcs.Host`, el adaptador de GitHub y `fakeHost` (R4)
+- [x] T2 · `FindMergedPR` en `vcs.Host`, el adaptador de GitHub y `fakeHost` (R4)
   - R4: CUANDO la rama tiene un PR cerrado y mergeado, `FindMergedPR` DEBE devolverlo; CUANDO solo hay PRs abiertos o cerrados sin merge, DEBE devolver `ErrNoPR`.
   - Prueba en `internal/adapters/vcs/github/github_test.go`: `TestFindMergedPR`. Se agrega `FindMergedPR` al mapa de credenciales/acceso que ya existe.
-- [ ] T3 · `closeOutside` y la reconciliación en `Panel` (R5-R10)
+- [x] T3 · `closeOutside` y la reconciliación en `Panel` (R5-R10)
   - R5: CUANDO el tracker da la tarea por `done` o cerrada y la copia local está en otra fase, `panel` DEBE cerrarla con motivo `tracker` y listarla en `closed_outside`.
   - R6: CUANDO el PR de la rama (por número guardado o por `FindMergedPR`) está mergeado y la tarea no está en `in_review`, `panel` DEBE cerrarla con motivo `pr`, guardar el número y mover el tracker a `done`.
   - R7: CUANDO el PR está cerrado sin merge, `panel` NO DEBE cerrar la tarea y DEBE dar el aviso de hoy.
@@ -68,9 +68,9 @@ En el carril light, los criterios van en cada tarea de **Tasks**.
   - R9: CUANDO cierra desde afuera, el log DEBE tener una entrada `closed_outside` con `from`, `to: done` y `data.reason`.
   - R10: CUANDO el tracker o el host fallan, `panel` NO DEBE cerrar nada y DEBE dar un aviso. El cierre de `in_review` por merge sigue igual (`merged`).
   - Pruebas en `internal/engine/vcs_test.go`: `TestPanelClosesTaskDoneInTracker`, `TestPanelClosesTaskWithMergedPRInAnyPhase`, `TestPanelDropsPendingWhenTrackerDone`, `TestPanelKeepsTaskWhenPRClosedUnmerged`. `TestPanelClosesMergedAndRemindsSLA` debe seguir verde.
-- [ ] T4 · `stats` distingue el cierre de afuera (R11)
+- [x] T4 · `stats` distingue el cierre de afuera (R11)
   - R11: CUANDO el log tiene `closed_outside`, `metrics.Compute` NO DEBE sumar a ninguna fase el tramo previo y DEBE poner `ClosedOutside` con el motivo.
   - Prueba en `internal/metrics/metrics_test.go`: `TestClosedOutsideNotCountedAsWork`.
-- [ ] T5 · Salida del CLI y documentación (R12)
+- [x] T5 · Salida del CLI y documentación (R12)
   - R12: CUANDO `panel` cierra tareas desde afuera, el texto DEBE mostrar una línea por tarea con el motivo y el JSON DEBE traer `closed_outside`. Esto también aplica al hook de sesión, que usa `renderPanel`.
   - Actualizar `internal/cli/flowcmds.go` (resumen del comando y `renderPanel`), `docs/guia.md` (línea 34), la fila de `panel` en `README.md` y `CHANGELOG.md`.

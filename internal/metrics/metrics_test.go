@@ -274,3 +274,21 @@ func TestComputeByAgent(t *testing.T) {
 		}
 	}
 }
+
+func TestClosedOutsideNotCountedAsWork(t *testing.T) {
+	reason := func(r string) func(*store.Entry) {
+		return func(en *store.Entry) { en.Data = map[string]any{"reason": r} }
+	}
+	st := Compute("T-1", []store.Entry{
+		e(0, "start", flow.Backlog, flow.Implementing),
+		e(60, "report", flow.Implementing, flow.Implementing, verdict("implementer", "NEEDS_DECISION"), gateOpened("decision")),
+		// días después, otra máquina la terminó
+		e(5000, "closed_outside", flow.Implementing, flow.Done, reason("pr")),
+	}, at(6000))
+	if st.ClosedOutside != "pr" || st.Phase != flow.Done {
+		t.Errorf("motivo/fase: %+v", st)
+	}
+	if st.Agent != 60*time.Minute || st.Human != 0 || st.Blocked != 0 {
+		t.Errorf("el tramo previo al cierre no es trabajo: agent=%v human=%v blocked=%v", st.Agent, st.Human, st.Blocked)
+	}
+}

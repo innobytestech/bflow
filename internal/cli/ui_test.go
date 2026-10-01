@@ -80,3 +80,15 @@ func TestBrowserCmd(t *testing.T) {
 		t.Errorf("CI: %v", err)
 	}
 }
+
+func TestRenderPanelClosedOutside(t *testing.T) {
+	got := renderPanel(engine.PanelReport{ClosedOutside: []engine.ClosedOutside{
+		{ID: "GH-13", From: flow.Implementing, Reason: "tracker"},
+		{ID: "GH-14", From: flow.Implementing, Reason: "pr", PR: 30},
+	}})
+	for _, want := range []string{"GH-13 cerrada: terminada fuera de esta copia (tracker)", "GH-14 cerrada: terminada fuera de esta copia (PR #30 mergeado)"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("falta %q en:\n%s", want, got)
+		}
+	}
+}

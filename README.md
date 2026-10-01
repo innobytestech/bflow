@@ -360,7 +360,7 @@ La validación junta todos los problemas en un solo mensaje, indica la línea de
 |---|---|
 | Flujo | `status [ID] [--brief]` · `start <ID> --lane [--fixes ID]` · `approve` · `reject --note` · `report --agent --verdict` · `block` / `unblock` · `freeze` · `show` · `new --lane --title [--file]` · `task add` · `task list` · `sync` · `import --from harness` |
 | Agentes | `render [--check]` |
-| Git y PR | `pr` · `panel [--sla]` (cierra lo mergeado, recuerda gates vencidos) |
+| Git y PR | `pr` · `panel [--sla]` (cierra lo mergeado o lo que el tracker ya dio por hecho, aunque esté en otra fase; recuerda gates vencidos) |
 | Calidad | `check [--quick pkg] [--verify]` · `env check` · `guard` |
 | Métricas | `stats [ID]` · `statusline` · `watch [--open] [--web]` (panel en vivo) · `ui` (panel en el navegador, con todos tus repos) |
 | Configuración | `init` · `doctor` · `connect plane\|github` · `profile add\|list\|use` · `tracker setup` · `tracker states` |

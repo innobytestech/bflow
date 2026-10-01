@@ -606,3 +606,60 @@ func TestDefaultQualityIsReviewerAlone(t *testing.T) {
 		t.Errorf("rechazo del reviewer: %v ronda %d %v", res.State.Phase, res.State.Round, err)
 	}
 }
+
+func closedOutside(reason string) Event { return Event{Kind: EvClosedOutside, Reason: reason} }
+
+func TestClosedOutsideFromAnyPhase(t *testing.T) {
+	cfg := testConfig()
+	for _, r := range table() {
+		if r.err != "" || r.from == Backlog || r.from == Done {
+			continue
+		}
+		s := stateFor(r)
+		res, err := Apply(cfg, s, closedOutside("pr"))
+		if err != nil {
+			t.Fatalf("%s: %v", r.name(), err)
+		}
+		if res.State.Phase != Done || res.State.Gate != nil || res.State.Block != nil {
+			t.Errorf("%s: quedó %+v", r.name(), res.State)
+		}
+		// Bloqueada (con o sin gate previo) también cierra.
+		b, err := Apply(cfg, s, Event{Kind: EvBlock, Note: "falta acceso"})
+		if err != nil {
+			continue
+		}
+		res, err = Apply(cfg, b.State, closedOutside("tracker"))
+		if err != nil || res.State.Phase != Done || res.State.Block != nil || res.State.Gate != nil {
+			t.Errorf("%s: bloqueada no cerró: %+v %v", r.name(), res.State, err)
+		}
+	}
+	s := State{ID: "T-1", Slug: "x", Lane: Light, Phase: Implementing, Gate: &PendingGate{Name: GateDecision, Options: []string{"a", "b"}}}
+	res, err := Apply(cfg, s, closedOutside("tracker"))
+	if err != nil || res.State.Phase != Done || res.State.Gate != nil {
+		t.Errorf("con gate decision abierto: %+v %v", res.State, err)
+	}
+}
+
+func TestClosedOutsideTrackerEmitsNoEffect(t *testing.T) {
+	cfg := testConfig()
+	s := State{ID: "T-1", Slug: "x", Lane: Light, Phase: Implementing}
+	res, err := Apply(cfg, s, closedOutside("tracker"))
+	if err != nil || len(res.Effects) != 0 {
+		t.Errorf("tracker: efectos %v %v", res.Effects, err)
+	}
+	res, err = Apply(cfg, s, closedOutside("pr"))
+	if err != nil || len(res.Effects) != 1 || res.Effects[0].Kind != FxTrackerState || res.Effects[0].Phase != Done {
+		t.Errorf("pr: efectos %v %v", res.Effects, err)
+	}
+}
+
+func TestClosedOutsideRejectsBacklogAndDone(t *testing.T) {
+	cfg := testConfig()
+	for phase, code := range map[Phase]string{Backlog: "not_started", Done: "task_done"} {
+		_, err := Apply(cfg, State{ID: "T-1", Slug: "x", Lane: Light, Phase: phase}, closedOutside("pr"))
+		var rj *Rejection
+		if !errors.As(err, &rj) || rj.Code != code {
+			t.Errorf("%s: %v, want %s", phase, err, code)
+		}
+	}
+}
