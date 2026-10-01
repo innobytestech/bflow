@@ -1,6 +1,6 @@
 // Package opencode es el adaptador de OpenCode: agentes en .opencode/agents,
 // comando /bflow en la carpeta de configuración del usuario y alias de modelos.
-// Hooks, guard y tokens de OpenCode llegan con GH-14.
+// El plugin .opencode/plugins/bflow.js da el guard y el conteo de tokens.
 package opencode
 
 import (
@@ -23,6 +23,9 @@ import (
 
 // agentsDir es donde OpenCode busca los subagentes del proyecto.
 const agentsDir = ".opencode/agents"
+
+// pluginFile es el plugin de guard y tokens que bflow render escribe.
+const pluginFile = ".opencode/plugins/bflow.js"
 
 // Agent implementa cli.ToolAdapter para OpenCode.
 type Agent struct{}
@@ -73,6 +76,7 @@ func (Agent) RenderAgents(specs []agents.Spec) (map[string][]byte, error) {
 		b.WriteString("\n")
 		out[agentsDir+"/"+s.Subagent+".md"] = b.Bytes()
 	}
+	out[pluginFile] = files.Plugin
 	return out, nil
 }
 
@@ -84,6 +88,9 @@ func (Agent) GeneratedAgents(root string) []string {
 		if b, err := os.ReadFile(m); err == nil && bytes.Contains(b, []byte(agents.GeneratedMark)) {
 			out = append(out, agentsDir+"/"+filepath.Base(m))
 		}
+	}
+	if b, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(pluginFile))); err == nil && bytes.Contains(b, []byte(agents.GeneratedMark)) {
+		out = append(out, pluginFile)
 	}
 	return out
 }

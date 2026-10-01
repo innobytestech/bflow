@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -23,6 +24,9 @@ import (
 
 func init() {
 	Register(&Command{Name: "guard", Summary: "hook PreToolUse: lee la acción por stdin y la bloquea (exit 2) si rompe una regla",
+		Setup: func(fs *flag.FlagSet) {
+			fs.String("tool", "", "herramienta cuya entrada se lee (opencode); vacío: Claude Code")
+		},
 		Run: runGuard})
 	Register(&Command{Name: "hook session-start", Summary: "hook de inicio de sesión: entorno, compromisos y tarea activa en pocas líneas",
 		Run: runSessionStart})
@@ -65,13 +69,28 @@ func runSubagentStop(c *Ctx) output.Envelope {
 
 func runGuard(c *Ctx) output.Envelope {
 	raw, _ := io.ReadAll(c.Stdin)
-	var a guard.Action
-	cwd, ok := "", false
-	if c.Agent != nil {
-		a, cwd, ok = c.Agent.ParsePreToolUse(raw)
-	}
-	if !ok && json.Unmarshal(raw, &a) != nil {
-		return output.Fail("bad_input", fmt.Errorf("entrada de guard no reconocida"))
+	allowed := output.Envelope{OK: true, Code: "allowed", Quiet: true}
+	var acts []guard.Action
+	cwd := ""
+	if tool := str(c.Flags, "tool"); tool != "" {
+		h := c.hooks(tool)
+		if h == nil {
+			return allowed
+		}
+		var ok bool
+		if acts, cwd, ok = h.ParseActions(raw); !ok {
+			return allowed // sin la forma esperada no se bloquea: el guard es abierto
+		}
+	} else {
+		var a guard.Action
+		ok := false
+		if c.Agent != nil {
+			a, cwd, ok = c.Agent.ParsePreToolUse(raw)
+		}
+		if !ok && json.Unmarshal(raw, &a) != nil {
+			return output.Fail("bad_input", fmt.Errorf("entrada de guard no reconocida"))
+		}
+		acts = []guard.Action{a}
 	}
 	dir := c.Dir
 	if cwd != "" {
@@ -80,8 +99,36 @@ func runGuard(c *Ctx) output.Envelope {
 	cfg, err := config.Load(dir)
 	if err != nil {
 		// Con la config rota no se bloquea al agente: lo reporta cualquier otro comando.
-		return output.Envelope{OK: true, Code: "allowed", Quiet: true}
+		return allowed
 	}
+	// Las acciones se evalúan en orden: la primera rechazada da el registro y el motivo.
+	for _, a := range acts {
+		gc := guardContext(cfg)
+		if needsTask(a, cfg) && c.Build != nil {
+			if e, err := c.Build(cfg.Root); err == nil {
+				if id, err := e.Active(context.Background()); err == nil {
+					if v, err := e.Status(context.Background(), id); err == nil {
+						gc.Phase = v.Phase
+					}
+					gc.Frozen = e.Frozen(id)
+				}
+			}
+		}
+		d := guard.Evaluate(a, gc)
+		if d.Allow {
+			continue
+		}
+		fmt.Fprintln(c.Stderr, "bflow guard: "+d.Reason)
+		logGuard(c, cfg.Root, d.Rule, a)
+		env := output.Rejected(d.Rule, d.Reason)
+		env.Quiet = !c.JSON
+		return env
+	}
+	return allowed
+}
+
+// guardContext arma lo que el guard sabe del repo, sin la fase de la tarea.
+func guardContext(cfg *config.Config) guard.Context {
 	gc := guard.Context{Root: cfg.Root, Protected: cfg.VCS.ProtectedBranches, ProtectedPaths: cfg.Guard.ProtectedPaths,
 		TestPatterns: cfg.Guard.TestPatterns, ForbidCoauthor: cfg.Guard.ForbidCoauthor, StrictLeader: cfg.Guard.StrictLeader,
 		MaxDiffLines: cfg.Guard.MaxDiffLines, DiffLines: func() (int, error) { return diffLines(cfg) }}
@@ -90,25 +137,7 @@ func runGuard(c *Ctx) output.Envelope {
 			gc.HumanFiles = append(gc.HumanFiles, filepath.ToSlash(filepath.Clean(st.Accept)))
 		}
 	}
-	if needsTask(a, cfg) && c.Build != nil {
-		if e, err := c.Build(cfg.Root); err == nil {
-			if id, err := e.Active(context.Background()); err == nil {
-				if v, err := e.Status(context.Background(), id); err == nil {
-					gc.Phase = v.Phase
-				}
-				gc.Frozen = e.Frozen(id)
-			}
-		}
-	}
-	d := guard.Evaluate(a, gc)
-	if d.Allow {
-		return output.Envelope{OK: true, Code: "allowed", Quiet: true}
-	}
-	fmt.Fprintln(c.Stderr, "bflow guard: "+d.Reason)
-	logGuard(c, cfg.Root, d.Rule, a)
-	env := output.Rejected(d.Rule, d.Reason)
-	env.Quiet = !c.JSON
-	return env
+	return gc
 }
 
 // logGuard registra el bloqueo en la tarea activa para medir la fricción. Solo

@@ -71,8 +71,8 @@ func TestRenderMultiTool(t *testing.T) {
 
 	code, out, raw := runJSON(t, env, "render")
 	d := dataOf(out)
-	if code != 0 || out["code"] != "rendered" || d["total"] != float64(8) || len(stringsOf(d["changed"])) != 8 {
-		t.Fatalf("4 agentes del flujo por cada herramienta: %d %s", code, raw)
+	if code != 0 || out["code"] != "rendered" || d["total"] != float64(9) || len(stringsOf(d["changed"])) != 9 {
+		t.Fatalf("4 agentes del flujo por cada herramienta y el plugin de OpenCode: %d %s", code, raw)
 	}
 	if un, _ := d["unresolved"].([]any); len(un) != 0 {
 		t.Errorf("con la tabla completa no queda nada sin resolver: %v", un)
@@ -126,11 +126,11 @@ func TestRenderStaleInactiveTool(t *testing.T) {
 
 	setAgent("agent: claude\n")
 	code, out, raw := runJSON(t, env, "render", "--check")
-	if code == 0 || out["code"] != "render_outdated" || len(stringsOf(dataOf(out)["stale"])) != 4 {
+	if code == 0 || out["code"] != "render_outdated" || len(stringsOf(dataOf(out)["stale"])) != 5 {
 		t.Fatalf("lo generado de una herramienta que ya no está en agent: sale stale: %d %s", code, raw)
 	}
 	code, out, raw = runJSON(t, env, "render")
-	if code != 0 || out["code"] != "rendered" || len(stringsOf(dataOf(out)["stale"])) != 4 {
+	if code != 0 || out["code"] != "rendered" || len(stringsOf(dataOf(out)["stale"])) != 5 {
 		t.Fatalf("render borra lo stale: %d %s", code, raw)
 	}
 	if exists(env, ".opencode/agents/bflow-implementer.md") {
@@ -532,8 +532,8 @@ func TestDoctorOpenCode(t *testing.T) {
 			t.Errorf("modelos: falta %q en %q", w, mod[0]["detail"])
 		}
 	}
-	if g := checks["guard"]; len(g) != 1 || g[0]["status"] != "warn" || !strings.Contains(g[0]["detail"].(string), "GH-14") {
-		t.Errorf("guard y tokens de OpenCode llegan con GH-14: %v", g)
+	if g := checks["guard"]; len(g) != 0 {
+		t.Errorf("ya no hay aviso de que el guard llega con GH-14: %v", g)
 	}
 
 	if err := os.MkdirAll(filepath.Dir(command), 0o755); err != nil {
