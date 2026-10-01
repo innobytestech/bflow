@@ -4,6 +4,7 @@
 package metrics
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 	"sort"
@@ -121,6 +122,7 @@ func addTo(m *map[string]Usage, k string, u Usage) {
 func Compute(id string, entries []store.Entry, now time.Time) TaskStats {
 	st := TaskStats{ID: id}
 	var evs []store.Entry
+	var lastReview time.Time
 	per := map[flow.Phase]*PhaseStats{}
 	get := func(p flow.Phase) *PhaseStats {
 		if per[p] == nil {
@@ -155,6 +157,11 @@ func Compute(id string, entries []store.Entry, now time.Time) TaskStats {
 			continue
 		case "nudge":
 			st.Nudged++
+			continue
+		case "review_coverage":
+			if c, ok := coverageOf(e.Data); ok && (st.Review == nil || !e.TS.Before(lastReview)) {
+				st.Review, lastReview = &c, e.TS
+			}
 			continue
 		}
 		if e.To != "" {
@@ -400,4 +407,14 @@ func Duration(d time.Duration) string {
 type Cursor struct {
 	Offsets map[string]int64 `json:"offsets"`
 	Seen    map[string]Usage `json:"seen"` // id de mensaje → uso ya contado
+}
+
+// coverageOf lee la cobertura de un evento review_coverage.
+func coverageOf(data map[string]any) (review.Coverage, bool) {
+	var c review.Coverage
+	b, err := json.Marshal(data)
+	if err != nil || json.Unmarshal(b, &c) != nil {
+		return c, false
+	}
+	return c, true
 }

@@ -601,6 +601,8 @@ func runDoctor(c *Ctx) output.Envelope {
 			add("agente", "warn", "claude: falta .claude/settings.json con los hooks de bflow (corre bflow install claude)")
 		case len(missing) > 0:
 			add("agente", "warn", "claude: .claude/settings.json no llama a %s (corre bflow install claude)", strings.Join(missing, ", "))
+		case !strings.Contains(string(b), "bflow guard --reads"):
+			add("agente", "warn", "claude: el guard no ve Read; la cobertura del reviewer no se mide (corre bflow install claude)")
 		default:
 			add("agente", "ok", "claude: hooks de bflow instalados")
 		}

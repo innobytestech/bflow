@@ -31,6 +31,8 @@ Lo que necesitas para decidir llega escrito en el chat: bflow le entrega a la se
 
 El walkthrough va en dos pasos que controla bflow. Primero contestas qué esperas que haga el cambio, sin ver el código. Después la sesión compara tus respuestas con lo que el código hace, señala las diferencias y recorre contigo los cambios 🔴 uno por uno. Es la forma de revisar sin leer todo el diff.
 
+Antes de tus respuestas, el walkthrough te dice cuánto del diff abrió el reviewer: "el reviewer leyó N de M archivos del diff", los archivos que no abrió y que no son pruebas ni docs (hasta 20), y las rutas 🔴 del review-map que no están en el diff. bflow lo mide con el hook de `Read` y de Bash del reviewer; con APPROVED rechaza si algún archivo de una viñeta 🔴 del diff quedó sin abrir, si una viñeta 🔴 no empieza con la ruta en backticks o si el review-map no trae `## Docs`. Si el hook no ve los `Read` (`bflow doctor` lo avisa), dice "cobertura del reviewer: no medida" y no se exige. El documenter, por su lado, no cierra mientras una ruta de `## Docs` no cambie en la rama ni conste en `reports/docs.md` como "sin cambio" con su motivo.
+
 Nadie marca una tarea como terminada a mano: bflow la cierra cuando detecta el merge (`bflow panel`). Si la terminaste en otra máquina o sesión, `bflow panel` también cierra la copia local cuando el tracker ya la da por hecha o cerrada, o cuando el PR de su rama está mergeado, en cualquier fase en que haya quedado, y lo dice ("terminada fuera de esta copia").
 
 ## Ajustar a los agentes
@@ -118,6 +120,7 @@ Si prefieres el navegador, `bflow ui` abre lo mismo en una página local. En ell
 
 - **Calidad:** rechazos por gate, rondas de calidad y hotfixes ligados (`bflow start <ID> --lane hotfix --fixes <feature>`).
 - **Fricción:** pedidos que el flujo rechazó, bloqueos de `guard` y agentes que terminaron sin reportar. Si sube en un repo, algo del entorno está confundiendo a los agentes: revisa sus skills y reglas.
+- **Revisión:** una línea `revisión:` con la última cobertura del reviewer ("el reviewer leyó N de M archivos del diff", o "no medida"). En `--json` está en `data.stats.review`. Si la tarea no tiene cobertura, la salida no cambia.
 - **Costo:** tokens nuevos y de caché por fase, por agente y por modelo.
 
 Antes de quitar un paso del flujo para ahorrar tokens, compara varias features: si las métricas de calidad no empeoran, ese paso sobraba.

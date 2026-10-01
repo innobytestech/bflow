@@ -170,16 +170,16 @@ func DocsPending(listed, diff []string, docsReport string) []string // R15
 
 ## Tasks
 
-- [ ] **T1 Contrato** (R1-R18): tipos y firmas sin lógica (`internal/review` completo, `guard.Read`, `guard.Segments`, `vcs.Git.DiffLines`, `TaskStats.Review`, flag `--reads`) y estas pruebas, que deben fallar:
+- [x] **T1 Contrato** (R1-R18): tipos y firmas sin lógica (`internal/review` completo, `guard.Read`, `guard.Segments`, `vcs.Git.DiffLines`, `TaskStats.Review`, flag `--reads`) y estas pruebas, que deben fallar:
   - review: `TestNormalize`, `TestFromActionRead`, `TestFromActionBash`, `TestFromActionGitWhole`, `TestParseReadsSkipsBadLines`, `TestParseMap`, `TestMeasure`, `TestMeasureWholeDiffLimit`, `TestMeasureUnmeasured`, `TestDocsPending`
   - adaptadores: `TestParsePreToolUseRead` (claude), `TestParseActionsRead` (opencode), `TestPluginReadsOnlyReviewer`, `TestSettingsGuardSeesRead`
   - git: `TestDiffLines`
   - cli: `TestGuardRecordsReviewerReads`, `TestGuardIgnoresOtherReads`, `TestGuardRecordNeverBlocks`, `TestStatsReviewCoverage`, `TestDoctorWarnsGuardWithoutReads`
   - engine: `TestReviewerApprovedNeedsRedRead`, `TestReviewerApprovedWholeSmallDiff`, `TestReviewerRejectedNotBlocked`, `TestReviewerUnmeasuredNotBlocked`, `TestReviewerNeedsRedPathsAndDocs`, `TestReviewCoverageLogged`, `TestWalkthroughShowsCoverage`, `TestDocumenterDocsPending`
   - metrics: `TestComputeReviewCoverage`; agents: `TestDocumenterWritesDocsReport`
-- [ ] **T2 review** (R2-R4, R6, R10, R11, R15): `Normalize`, `FromAction`, `ParseReads`, `IsDoc`, `ParseMap`, `Measure`, `Lines`, `DocsPending` y `guard.Segments`. Pasan las pruebas de review y las de guard que ya existen.
-- [ ] **T3 Captura** (R1, R5, R17): `guard.Read`, adaptadores claude y opencode, `plugin.js`, `settings.json`, flag `--reads`, atajo y `recordReads`. Pasan las pruebas de adaptadores y `TestGuard*`.
-- [ ] **T4 Exigencia** (R6-R12, R15): `DiffLines` (git y fake), `diffBase`, `reviewCoverage`, chequeos en `apply` para reviewer y documenter, y el evento `review_coverage`. Pasan `TestDiffLines` y las de engine menos `TestWalkthroughShowsCoverage`.
-- [ ] **T5 Visibilidad** (R13, R14): `withDisplay`, `TaskStats.Review`, `renderStats`. Pasan `TestWalkthroughShowsCoverage`, `TestComputeReviewCoverage` y `TestStatsReviewCoverage`, y las de stats que ya existen.
-- [ ] **T6 Oficios y doctor** (R16, R18): `craft/reviewer.md`, `craft/documenter.md`, `writes` del documenter, aviso de doctor, `bflow render` y `bflow install claude` en este repo (`.claude/agents/*`, `.claude/settings.json`). Pasan `TestDocumenterWritesDocsReport` y `TestDoctorWarnsGuardWithoutReads`.
-- [ ] **T7 Docs** (R13-R17): `docs/guia.md` (gates: la cobertura del walkthrough; Medir: la línea `revisión:`), README (Qué garantiza, hooks), `adapters/claude/README.md` y `adapters/opencode/README.md` (Read y `--reads`), `CHANGELOG.md`.
+- [x] **T2 review** (R2-R4, R6, R10, R11, R15): `Normalize`, `FromAction`, `ParseReads`, `IsDoc`, `ParseMap`, `Measure`, `Lines`, `DocsPending` y `guard.Segments`. Pasan las pruebas de review y las de guard que ya existen.
+- [x] **T3 Captura** (R1, R5, R17): `guard.Read`, adaptadores claude y opencode, `plugin.js`, `settings.json`, flag `--reads`, atajo y `recordReads`. Pasan las pruebas de adaptadores y `TestGuard*`.
+- [x] **T4 Exigencia** (R6-R12, R15): `DiffLines` (git y fake), `diffBase`, `reviewCoverage`, chequeos en `apply` para reviewer y documenter, y el evento `review_coverage`. Pasan `TestDiffLines` y las de engine menos `TestWalkthroughShowsCoverage`.
+- [x] **T5 Visibilidad** (R13, R14): `withDisplay`, `TaskStats.Review`, `renderStats`. Pasan `TestWalkthroughShowsCoverage`, `TestComputeReviewCoverage` y `TestStatsReviewCoverage`, y las de stats que ya existen.
+- [x] **T6 Oficios y doctor** (R16, R18): `craft/reviewer.md`, `craft/documenter.md`, `writes` del documenter, aviso de doctor, `bflow render` y `bflow install claude` en este repo (`.claude/agents/*`, `.claude/settings.json`). Pasan `TestDocumenterWritesDocsReport` y `TestDoctorWarnsGuardWithoutReads`.
+- [x] **T7 Docs** (R13-R17): `docs/guia.md` (gates: la cobertura del walkthrough; Medir: la línea `revisión:`), README (Qué garantiza, hooks), `adapters/claude/README.md` y `adapters/opencode/README.md` (Read y `--reads`), `CHANGELOG.md` (lo escribe el documenter, no el implementer).
