@@ -49,6 +49,8 @@ func (Agent) ParseActions(raw []byte) ([]guard.Action, string, bool) {
 		acts = append(acts, a)
 	case "edit", "multiedit":
 		acts = append(acts, mk(guard.Edit, args.FilePath))
+	case "read":
+		acts = append(acts, mk(guard.Read, args.FilePath))
 	case "write":
 		acts = append(acts, mk(guard.Write, args.FilePath))
 	case "patch", "apply_patch":

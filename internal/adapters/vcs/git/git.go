@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os/exec"
 	"slices"
+	"strconv"
 	"strings"
 
 	"innobytes.tech/bflow/internal/vcs"
@@ -175,6 +176,21 @@ func (g *Git) UserName(ctx context.Context) string {
 // ParseRemote se mantiene por compatibilidad; la implementación vive en vcs.
 func ParseRemote(url string) (host, repo string, ok bool) { return vcs.ParseRemote(url) }
 
-// DiffLines suma líneas agregadas y borradas entre base y HEAD.
-// STUB (GH-20 T1): lo implementa T4.
-func (g *Git) DiffLines(ctx context.Context, base string) (int, error) { return 0, nil }
+// DiffLines suma líneas agregadas y borradas entre base y HEAD; los binarios cuentan 0.
+func (g *Git) DiffLines(ctx context.Context, base string) (int, error) {
+	out, err := g.run(ctx, "diff", "--numstat", "--no-renames", base+"...HEAD")
+	if err != nil {
+		return 0, err
+	}
+	total := 0
+	for _, l := range lines(out) {
+		f := strings.Fields(l)
+		if len(f) < 2 {
+			continue
+		}
+		add, _ := strconv.Atoi(f[0]) // "-" en binarios: 0
+		del, _ := strconv.Atoi(f[1])
+		total += add + del
+	}
+	return total, nil
+}

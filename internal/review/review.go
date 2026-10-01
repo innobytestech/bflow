@@ -418,7 +418,9 @@ var sinCambioRe = regexp.MustCompile("^\\s*[-*]\\s+`([^`]+)`\\s*:\\s*sin cambio\
 // DocsPending devuelve las rutas de listed que no están en diff ni constan en
 // docsReport como "- `ruta`: sin cambio: <motivo>" con motivo (R15).
 func DocsPending(listed, diff []string, docsReport string) []string {
-	clean := func(p string) string { return strings.TrimPrefix(strings.ReplaceAll(strings.TrimSpace(p), `\`, "/"), "./") }
+	clean := func(p string) string {
+		return strings.TrimPrefix(strings.ReplaceAll(strings.TrimSpace(p), `\`, "/"), "./")
+	}
 	justified := map[string]bool{}
 	for _, line := range strings.Split(docsReport, "\n") {
 		if m := sinCambioRe.FindStringSubmatch(strings.TrimRight(line, " \t\r")); m != nil {

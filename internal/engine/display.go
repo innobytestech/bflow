@@ -24,6 +24,11 @@ func (e *Engine) withDisplay(ctx context.Context, rec store.Record, n output.Nex
 		return n
 	}
 	var parts []string
+	if g := rec.Flow.Gate; g != nil && g.Name == flow.GateWalkthrough {
+		if cov, ok := e.lastCoverage(rec.Flow.ID); ok {
+			parts = append(parts, "**Cobertura del reviewer:**\n"+strings.Join(cov.Lines(), "\n"))
+		}
+	}
 	if g := rec.Flow.Gate; g != nil && g.Name == flow.GateWalkthrough && rec.Flow.Note != "" {
 		parts = append(parts, "**Tus respuestas a las preguntas de producto:**\n"+rec.Flow.Note)
 	}

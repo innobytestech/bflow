@@ -34,6 +34,8 @@ func ParsePreToolUse(raw []byte) (a guard.Action, cwd string, ok bool) {
 		a = guard.Action{Tool: guard.Bash, Command: in.ToolInput.Command, Subagent: sub, Agent: in.AgentType}
 	case "Edit", "MultiEdit":
 		a = guard.Action{Tool: guard.Edit, Path: in.ToolInput.FilePath, Subagent: sub, Agent: in.AgentType}
+	case "Read":
+		a = guard.Action{Tool: guard.Read, Path: in.ToolInput.FilePath, Subagent: sub, Agent: in.AgentType}
 	case "Write":
 		a = guard.Action{Tool: guard.Write, Path: in.ToolInput.FilePath, Subagent: sub, Agent: in.AgentType}
 	case "NotebookEdit":

@@ -45,10 +45,7 @@ func (e *Engine) taskTests(ctx context.Context) []string {
 	if e.Git == nil {
 		return nil
 	}
-	base := e.Cfg.VCS.BaseBranch
-	if base != "" && e.Cfg.VCS.Remote != "" {
-		base = e.Cfg.VCS.Remote + "/" + base
-	}
+	base := e.diffBase()
 	var files []string
 	if base != "" {
 		if d, err := e.Git.DiffNames(ctx, base); err == nil {
