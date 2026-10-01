@@ -23,7 +23,10 @@ import (
 )
 
 func init() {
-	Register(&Command{Name: "stats", Summary: "tiempo por fase (agente, humano, bloqueada), iteraciones y tokens: stats [ID]", Run: runStats})
+	Register(&Command{Name: "stats", Summary: "tiempo por fase (agente, humano, bloqueada), iteraciones y tokens: stats [ID]", Run: runStats,
+		Setup: func(fs *flag.FlagSet) {
+			fs.Bool("calls", false, "una tabla por llamada del modelo, por corrida (requiere ID)")
+		}})
 	Register(&Command{Name: "statusline", Summary: "una línea para la barra de estado (lee una caché: milisegundos)", Run: runStatusline})
 	Register(&Command{Name: "hook tokens", Summary: "hook Stop/SubagentStop: suma los tokens nuevos a la fase y, al terminar el turno, avisa si la tarea espera a la persona", Run: runHookTokens,
 		Setup: func(fs *flag.FlagSet) {

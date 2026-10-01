@@ -38,6 +38,7 @@ func (u Usage) New() int64 { return u.Input + u.Output + u.CacheWrite }
 type Sample struct {
 	TS    time.Time
 	Model string
+	Msg   string // id de mensaje: claude e.Message.ID; opencode "opencode:"+l.ID (la misma llave de cur.Seen)
 	Usage
 }
 

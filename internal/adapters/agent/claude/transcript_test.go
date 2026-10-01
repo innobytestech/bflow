@@ -100,3 +100,21 @@ func TestTokenSource(t *testing.T) {
 		}
 	}
 }
+
+func TestReadUsageSetsMsg(t *testing.T) {
+	path := filepath.Join(testutil.TempDir(t), "sess-1.jsonl")
+	appendTo(t, path, line("msg_a", opus, 2, 10, 1000, 300))
+	appendTo(t, path, line("msg_b", opus, 1, 5, 2000, 0))
+	appendTo(t, path, line("msg_a", opus, 2, 40, 1000, 300)) // el mismo mensaje, con más salida
+	got, err := Agent{}.ReadUsage(path, &metrics.Cursor{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ids []string
+	for _, s := range got {
+		ids = append(ids, s.Msg)
+	}
+	if !reflect.DeepEqual(ids, []string{"msg_a", "msg_b", "msg_a"}) {
+		t.Errorf("cada muestra lleva el id del mensaje (el delta de msg_a conserva el mismo): %v", ids)
+	}
+}

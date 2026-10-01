@@ -86,6 +86,18 @@ type panelTask struct {
 	Agents   []map[string]string `json:"agents,omitempty"` // name, tokens, share (0-100 del gasto nuevo)
 	Friction string              `json:"friction,omitempty"`
 	Events   []map[string]string `json:"events,omitempty"`
+	// Runs es el detalle por llamada (calls.jsonl), una corrida por bloque.
+	Runs      []panelRun `json:"runs,omitempty"`
+	CallsNote string     `json:"calls_note,omitempty"`
+}
+
+type panelRun struct {
+	Key     string     `json:"key"` // Run.Run: el JS recuerda abierto/cerrado con él
+	Label   string     `json:"label"`
+	Summary string     `json:"summary"` // "9 llamadas · contexto final 60,079 · releído 344,086 · nuevo 61,204"
+	Open    bool       `json:"open"`    // la corrida con la llamada más reciente
+	Rows    [][]string `json:"rows"`    // celdas ya formateadas, mismo orden de columnas que R7
+	Total   []string   `json:"total"`
 }
 
 // panelRepo es una fila del tablero de la red: un repo y su tarea activa.

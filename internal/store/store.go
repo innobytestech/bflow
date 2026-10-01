@@ -294,6 +294,12 @@ func (s *Store) ReadFile(id, rel string) ([]byte, error) {
 	return os.ReadFile(p)
 }
 
+// AppendFile agrega líneas a un archivo de trabajo de la tarea, en un solo
+// Write y sin lock propio: el único escritor es el hook bajo el lock del cursor.
+func (s *Store) AppendFile(id, rel string, lines [][]byte) error {
+	return errors.New("GH-29: sin implementar")
+}
+
 // Append agrega entradas a log.jsonl. Cada entrada es una línea escrita con
 // una sola llamada, bajo el lock del log.
 func (s *Store) Append(entries ...Entry) error {

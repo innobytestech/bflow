@@ -43,6 +43,9 @@ type watchData struct {
 	Events []store.Entry // de la tarea activa, en orden del log
 	Others []engine.View
 	WebURL string // la página del panel, si esta ventana la sirve
+	// Calls son las corridas de calls.jsonl de la tarea activa; CallsFile dice si el archivo existe.
+	Calls     []metrics.Run
+	CallsFile bool
 }
 
 func runWatch(c *Ctx) output.Envelope {
