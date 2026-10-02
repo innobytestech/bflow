@@ -116,8 +116,57 @@ type panelRun struct {
 }
 
 // tokenTable arma la tabla de Tokens (R5-R7).
-// TODO(T4): sin lógica todavía.
-func tokenTable(st metrics.TaskStats, runs []metrics.Run) []panelAgent { return nil }
+func tokenTable(st metrics.TaskStats, runs []metrics.Run) []panelAgent {
+	byAgent := map[string][]metrics.Run{}
+	sums := map[string]metrics.Usage{}
+	for _, r := range runs {
+		byAgent[r.Agent] = append(byAgent[r.Agent], r)
+		u := sums[r.Agent]
+		u.Add(r.Total)
+		sums[r.Agent] = u
+	}
+	usage := map[string]metrics.Usage{}
+	for k, u := range st.Agents {
+		usage[k] = u
+	}
+	for k, u := range sums {
+		if _, ok := usage[k]; !ok {
+			usage[k] = u // solo está en calls.jsonl
+		}
+	}
+	var latest string
+	var latestAt time.Time
+	for _, r := range runs {
+		if r.Last.After(latestAt) {
+			latest, latestAt = r.Agent, r.Last
+		}
+	}
+	total := st.Tokens.New()
+	var out []panelAgent
+	for _, k := range byNew(usage) {
+		u := usage[k]
+		a := panelAgent{Key: k, Name: agentName(k), Calls: u.Calls, New: metrics.Human(u.New())}
+		if total > 0 {
+			a.Share = int(u.New() * 100 / total)
+		}
+		for _, r := range byAgent[k] {
+			a.Runs = append(a.Runs, panelRun{Key: r.Run, Stage: r.Stage, Label: r.Label, Summary: runSummary(r),
+				Calls: r.Total.Calls, Context: metrics.Human(r.FinalContext), Read: metrics.Human(r.Total.CacheRead),
+				New: metrics.Human(r.Total.New()), Total: callTotal(r)})
+			pr := &a.Runs[len(a.Runs)-1]
+			for _, row := range r.Rows {
+				pr.Rows = append(pr.Rows, callCells(row))
+			}
+			if a.Last == nil || r.Last.After(*a.Last) {
+				l := r.Last
+				a.Last = &l
+			}
+		}
+		a.Latest = len(a.Runs) > 0 && k == latest
+		out = append(out, a)
+	}
+	return out
+}
 
 // panelRepo es una fila del tablero de la red: un repo y su tarea activa.
 type panelRepo struct {
