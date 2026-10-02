@@ -108,8 +108,12 @@ func TestReviewerApprovedNeedsRedRead(t *testing.T) {
 		t.Errorf("un reporte rechazado no registra cobertura: %d", n)
 	}
 
-	// Una carpeta que contiene el archivo lo cubre; un Read de otra ruta no.
+	// Con el diff sobre el tope una carpeta no cubre; la ruta exacta sí.
 	addReads(t, v, id, review.Read{Tool: guard.Bash, Paths: []string{"internal"}, ReadHook: true})
+	if _, err := approve(v, id); err == nil {
+		t.Fatal("una carpeta no cubre con el diff sobre el tope")
+	}
+	addReads(t, v, id, readOf("internal/b.go"))
 	o, err := approve(v, id)
 	if err != nil || o.To != flow.Documenting {
 		t.Fatalf("con b.go leído pasa: %+v %v", o, err)
