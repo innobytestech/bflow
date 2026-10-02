@@ -504,3 +504,55 @@ func TestPanelKeepsTaskWhenPRClosedUnmerged(t *testing.T) {
 		t.Errorf("host caído: %+v %v", rep.ClosedOutside, rep.Warnings)
 	}
 }
+
+// GH-49: el issue se cierra por el merge del PR pero conserva la fase in_review;
+// la tarea debe terminar en done también en el tracker.
+func TestPanelMergedPRWithIssueClosedByMergeMovesTracker(t *testing.T) {
+	v := newEnv(t, "vcs: { base_branch: dev }\n")
+	h := newHost()
+	v.e.Git, v.e.Host = &fakeGit{branch: "dev"}, h
+	ctx := context.Background()
+	id := v.task(t, "Cerrada por merge")
+	toWalkthrough(t, v, id)
+	mustT(t)(v.e.Approve(ctx, id, ApproveOpts{}))
+	h.merge("hotfix/" + id + "-cerrada-por-merge")
+	v.tr.CloseKeepingPhase(id)
+	v.tr.Calls = nil
+
+	rep, err := v.e.Panel(ctx, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(rep.Closed, ",") != id || len(rep.ClosedOutside) != 0 {
+		t.Fatalf("debe cerrar por merge: %+v %+v", rep.Closed, rep.ClosedOutside)
+	}
+	task, _ := v.tr.Get(ctx, id)
+	if task.Phase != flow.Done {
+		t.Errorf("el tracker debe quedar en done: %s", task.Phase)
+	}
+	if phaseOf(t, v, id) != flow.Done {
+		t.Error("local en done")
+	}
+}
+
+func TestPanelIssueClosedWithoutMergeKeepsClosedOutside(t *testing.T) {
+	v := newEnv(t, "vcs: { base_branch: dev }\n")
+	v.e.Git, v.e.Host = &fakeGit{branch: "dev"}, newHost()
+	ctx := context.Background()
+	id := v.task(t, "Cerrada a mano")
+	toWalkthrough(t, v, id)
+	mustT(t)(v.e.Approve(ctx, id, ApproveOpts{}))
+	v.tr.CloseKeepingPhase(id)
+	v.tr.Calls = nil
+
+	rep, err := v.e.Panel(ctx, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.Closed) != 0 || len(rep.ClosedOutside) != 1 || rep.ClosedOutside[0].Reason != "tracker" {
+		t.Fatalf("sin merge sigue el cierre por tracker: %+v %+v", rep.Closed, rep.ClosedOutside)
+	}
+	if len(v.tr.Calls) != 0 {
+		t.Errorf("no se escribe en el tracker: %v", v.tr.Calls)
+	}
+}
