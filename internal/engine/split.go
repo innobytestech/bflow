@@ -81,6 +81,9 @@ func ParseSplit(brief string) ([]SplitPart, error) {
 			scope = append(scope, strings.TrimSpace(l))
 			continue
 		}
+		if !strings.HasPrefix(l, "-") {
+			break // un párrafo sin sangría cierra la lista (p. ej. **Riesgos** después)
+		}
 		m := splitBullet.FindStringSubmatch(l)
 		if m == nil {
 			return nil, splitInvalid("la línea %d no tiene el formato `- **<título>**: <alcance>`", n)
@@ -134,8 +137,10 @@ func (e *Engine) createChildren(ctx context.Context, id string) ([]string, error
 		return nil, err
 	}
 	ids := map[string]string{}
+	var order []string // títulos en el orden en que se crearon, para el mensaje de error
 	for _, c := range rec.Split {
 		ids[c.Title] = c.ID
+		order = append(order, c.Title)
 	}
 	for _, p := range parts {
 		if _, done := ids[p.Title]; done {
@@ -144,14 +149,15 @@ func (e *Engine) createChildren(ctx context.Context, id string) ([]string, error
 		task, err := cr.Create(ctx, p.Title, p.Scope+"\n\nParte de "+id+" · "+rec.Title)
 		if err != nil {
 			return nil, fmt.Errorf("no se pudo crear la hija %q de %s: %w; hijas ya creadas: %s; reintenta con: bflow approve %s --gate split",
-				p.Title, id, err, createdList(ids), id)
+				p.Title, id, err, createdList(ids, order), id)
 		}
 		ids[p.Title] = task.ID
+		order = append(order, p.Title)
 		if _, err := e.Store.Update(id, func(r *store.Record, _ bool) error {
 			r.Split = append(r.Split, store.SplitChild{Title: p.Title, ID: task.ID})
 			return nil
 		}); err != nil {
-			return nil, fmt.Errorf("la hija %q se creó como %s pero no se pudo guardar: %w; hijas ya creadas: %s", p.Title, task.ID, err, createdList(ids))
+			return nil, fmt.Errorf("la hija %q se creó como %s pero no se pudo guardar: %w; hijas ya creadas: %s", p.Title, task.ID, err, createdList(ids, order))
 		}
 	}
 	lines := make([]string, 0, len(parts))
@@ -161,13 +167,13 @@ func (e *Engine) createChildren(ctx context.Context, id string) ([]string, error
 	return lines, nil
 }
 
-func createdList(ids map[string]string) string {
-	if len(ids) == 0 {
+func createdList(ids map[string]string, order []string) string {
+	if len(order) == 0 {
 		return "ninguna"
 	}
-	var out []string
-	for t, i := range ids {
-		out = append(out, i+" · "+t)
+	out := make([]string, 0, len(order))
+	for _, t := range order {
+		out = append(out, ids[t]+" · "+t)
 	}
 	return strings.Join(out, ", ")
 }
