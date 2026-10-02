@@ -46,7 +46,7 @@ Carril light: los criterios van dentro de Tasks.
 
 ## Tasks
 
-- [ ] T1 Desenvolver `bash|sh|zsh -c` en `guard.Segments` (internal/guard/guard.go) y sus pruebas en internal/guard/guard_test.go.
+- [x] T1 Desenvolver `bash|sh|zsh -c` en `guard.Segments` (internal/guard/guard.go) y sus pruebas en internal/guard/guard_test.go.
   - C1 CUANDO un subagente corre `bash -c "bflow approve X"`, el guard DEBE negarlo con `human_only`; CUANDO lo corre la sesión principal, DEBE permitirlo.
   - C2 CUANDO el segmento es `sh -c 'git reset --hard'`, `bash -lc "git push -f origin x"` o `/usr/bin/zsh -c "git push origin main"` (main protegida), el guard DEBE negarlo con `git_destructive`, `force_push` y `protected_branch` respectivamente.
   - C3 El guard DEBE reconocer el shell con ruta `/` o `\`, `.exe`, mayúsculas, comillas en el token, prefijos `VAR=x`/`env`, flags agrupados (`-ec`) y `-o pipefail` antes de `-c`.
@@ -54,4 +54,4 @@ Carril light: los criterios van dentro de Tasks.
   - C5 `TaskScoped("bash -c \"gh pr create\"")` DEBE ser true.
   - C6 CUANDO el segmento no es un shell con `-c` (`bash script.sh`, `bashx -c x`, `echo bash -c x`, `bash -x script.sh`), `Segments` DEBE devolverlo sin cambios; los casos actuales de `TestBflowSubcommand`, `TestHumanOnlySubagent` y `TestBashRules` siguen pasando.
   - Pruebas: `TestShellWrapped` (C1, C2, C4, C5) y `TestSegmentsUnwrap` (C3, C6).
-- [ ] T2 Quitar la regex `bflowFreeze` de internal/guard/guard.go. C7: `go vet ./...` y `go test ./internal/guard/...` pasan.
+- [x] T2 Quitar la regex `bflowFreeze` de internal/guard/guard.go. C7: `go vet ./...` y `go test ./internal/guard/...` pasan.

@@ -79,14 +79,96 @@ func Evaluate(a Action, c Context) Decision {
 
 // Segments separa un comando en sus segmentos (&&, ||, ; y |), recortados y sin
 // vacíos. Lo usan TaskScoped, bash y review.FromAction.
-func Segments(cmd string) []string {
+func Segments(cmd string) []string { return segments(cmd, 0) }
+
+func segments(cmd string, depth int) []string {
 	var out []string
 	for _, seg := range segSplit.Split(cmd, -1) {
-		if s := strings.TrimSpace(seg); s != "" {
-			out = append(out, s)
+		s := strings.TrimSpace(seg)
+		if s == "" {
+			continue
 		}
+		if depth < 3 {
+			if inner, ok := unwrapShell(s); ok {
+				out = append(out, segments(inner, depth+1)...)
+				continue
+			}
+		}
+		out = append(out, s)
 	}
 	return out
+}
+
+var groupedFlags = regexp.MustCompile(`^-[A-Za-z]+$`)
+
+// unwrapShell devuelve <cmd> de `bash|sh|zsh [-flags] -c "<cmd>"`.
+func unwrapShell(seg string) (string, bool) {
+	fields := strings.Fields(seg)
+	t := skipPrefix(slices.Clone(fields))
+	if len(t) == 0 {
+		return "", false
+	}
+	switch exeName(t[0]) {
+	case "bash", "sh", "zsh":
+	default:
+		return "", false
+	}
+	i := 1
+	found := false
+	for ; i < len(t) && (t[i][0] == '-' || t[i][0] == '+'); i++ {
+		switch t[i] {
+		case "-o", "+o", "-O", "+O":
+			i++
+			continue
+		}
+		if groupedFlags.MatchString(t[i]) && strings.Contains(t[i], "c") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return "", false
+	}
+	// texto original tras el token -c
+	rest := seg
+	for k := 0; k <= i+len(fields)-len(t); k++ {
+		rest = strings.TrimSpace(rest)
+		rest = rest[len(strings.Fields(rest)[0]):]
+	}
+	rest = strings.TrimSpace(rest)
+	if rest != "" && (rest[0] == '"' || rest[0] == '\'') {
+		q := rest[0]
+		rest = rest[1:]
+		if n := len(rest); n > 0 && rest[n-1] == q {
+			rest = rest[:n-1]
+		}
+	}
+	return rest, true
+}
+
+// exeName es el nombre base en minúsculas, sin comillas, ruta ni .exe.
+func exeName(w string) string {
+	w = strings.TrimRight(strings.ReplaceAll(strings.Trim(w, `"'`), `\`, "/"), "/")
+	return strings.TrimSuffix(strings.ToLower(w[strings.LastIndex(w, "/")+1:]), ".exe")
+}
+
+// skipPrefix quita asignaciones VAR=x y `env [flags] VAR=x` del inicio, y
+// las comillas de cada token.
+func skipPrefix(t []string) []string {
+	for i := range t {
+		t[i] = strings.Trim(t[i], `"'`)
+	}
+	isAssign := func(w string) bool { return strings.Contains(w, "=") && !strings.HasPrefix(w, "-") }
+	for len(t) > 0 && isAssign(t[0]) {
+		t = t[1:]
+	}
+	if len(t) > 0 && strings.ToLower(t[0]) == "env" {
+		t = t[1:]
+		for len(t) > 0 && (strings.HasPrefix(t[0], "-") || isAssign(t[0])) {
+			t = t[1:]
+		}
+	}
+	return t
 }
 
 var (
@@ -107,7 +189,6 @@ var (
 	checkoutNew = regexp.MustCompile(`^git\s+(-\S+\s+)*checkout\s+(.*\s)?-[bB](\s|$)`)
 	switchNew   = regexp.MustCompile(`^git\s+(-\S+\s+)*switch\s+(.*\s)?(-[cC]|--create|--force-create)(\s|$)`)
 	branchNew   = regexp.MustCompile(`^git\s+(-\S+\s+)*branch\s+[^-\s]`)
-	bflowFreeze = regexp.MustCompile(`^bflow(\.exe)?\s+freeze\b`)
 )
 
 // HumanOnly son los subcomandos que responden una decisión humana: un
@@ -118,20 +199,7 @@ var HumanOnly = []string{"approve", "reject", "unblock", "start", "new"}
 // ("approve" en `./bin/bflow.exe --json approve X`), o "" si el segmento no
 // invoca a bflow.
 func BflowSubcommand(seg string) string {
-	t := strings.Fields(seg)
-	for i := range t {
-		t[i] = strings.Trim(t[i], `"'`)
-	}
-	isAssign := func(w string) bool { return strings.Contains(w, "=") && !strings.HasPrefix(w, "-") }
-	for len(t) > 0 && isAssign(t[0]) {
-		t = t[1:]
-	}
-	if len(t) > 0 && strings.ToLower(t[0]) == "env" {
-		t = t[1:]
-		for len(t) > 0 && (strings.HasPrefix(t[0], "-") || isAssign(t[0])) {
-			t = t[1:]
-		}
-	}
+	t := skipPrefix(strings.Fields(seg))
 	if len(t) == 0 {
 		return ""
 	}
