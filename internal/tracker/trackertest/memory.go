@@ -123,3 +123,13 @@ func (m *Memory) Comments(_ context.Context, id string) ([]tracker.Comment, erro
 	defer m.mu.Unlock()
 	return append([]tracker.Comment(nil), m.comments[id]...), nil
 }
+
+// CloseKeepingPhase simula un cierre hecho fuera de bflow (p. ej. "Closes #N"
+// de un PR): la tarea queda cerrada pero conserva su fase y estado.
+func (m *Memory) CloseKeepingPhase(id string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if t, ok := m.tasks[id]; ok {
+		t.Closed = true
+	}
+}

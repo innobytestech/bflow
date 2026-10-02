@@ -100,6 +100,18 @@ func (e *Engine) Panel(ctx context.Context, sla bool) (PanelReport, error) {
 			continue
 		}
 		id := rec.Flow.ID
+		// Un PR mergeado manda sobre el estado del tracker: "Closes #N" cierra el
+		// issue sin mover su etiqueta, y el cierre normal sí la deja en done.
+		if rec.Flow.Phase == flow.InReview {
+			closed, warn := e.checkMerged(ctx, e.reload(rec))
+			if warn != "" {
+				rep.Warnings = append(rep.Warnings, warn)
+			}
+			if closed {
+				rep.Closed = append(rep.Closed, id)
+				continue
+			}
+		}
 		// Primero el cierre desde afuera: un efecto pendiente viejo no debe
 		// regresar en el tracker lo que ya se terminó.
 		if co, warns := e.reconcile(ctx, rec, open, listed); co != nil || len(warns) > 0 {
@@ -112,16 +124,6 @@ func (e *Engine) Panel(ctx context.Context, sla bool) (PanelReport, error) {
 		if len(rec.Pending) > 0 {
 			if _, err := e.Sync(ctx, id); err != nil {
 				rep.Warnings = append(rep.Warnings, id+": "+err.Error())
-			}
-		}
-		if rec.Flow.Phase == flow.InReview {
-			closed, warn := e.checkMerged(ctx, e.reload(rec))
-			if warn != "" {
-				rep.Warnings = append(rep.Warnings, warn)
-			}
-			if closed {
-				rep.Closed = append(rep.Closed, id)
-				continue
 			}
 		}
 		it := PanelItem{ID: id, Title: rec.Title, Phase: rec.Flow.Phase}
