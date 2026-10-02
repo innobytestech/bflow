@@ -486,7 +486,7 @@ func TestPanelTokensTable(t *testing.T) {
 	if len(task.Agents) != 4 {
 		t.Fatalf("una fila por agente de st.Agents y una por el que solo está en calls.jsonl: %v", order)
 	}
-	if i, j, k := slices.Index(order, ""), slices.Index(order, "implementer"), slices.Index(order, "main"); !(i < j && j < k) {
+	if i, j, k := slices.Index(order, ""), slices.Index(order, "implementer"), slices.Index(order, "main"); i >= j || j >= k {
 		t.Errorf("orden por nuevo de mayor a menor: %v", order)
 	}
 	impl, main, none, rev := by["implementer"], by["main"], by[""], by["reviewer"]
