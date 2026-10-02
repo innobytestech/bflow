@@ -130,6 +130,8 @@ type ReportOpts struct {
 	Note    string
 	File    string
 	Options []string
+	// Content es el reporte por stdin (solo el scout); nil = sin --stdin.
+	Content *string
 }
 
 // Report registra el veredicto de un agente.

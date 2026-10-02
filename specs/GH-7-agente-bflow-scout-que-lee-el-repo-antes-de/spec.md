@@ -112,7 +112,7 @@ Scout de solo lectura (haiku/low) que corre una vez al entrar a la primera fase 
 
 ## Tasks
 
-- [ ] T1 Contrato: tipos, firmas y stubs (`ScoutStatus`, `State.Scout`, `Config.Scout`, `ScoutAgent`, `ScoutVerdicts`, `ReportOpts.Content`, `Flow.Scout`, `catalog["scout"]` y `craft/scout.md` vacío) y estas pruebas, que fallan contra los stubs:
+- [x] T1 Contrato: tipos, firmas y stubs (`ScoutStatus`, `State.Scout`, `Config.Scout`, `ScoutAgent`, `ScoutVerdicts`, `ReportOpts.Content`, `Flow.Scout`, `catalog["scout"]` y `craft/scout.md` vacío) y estas pruebas, que fallan contra los stubs:
   - flow: `TestScoutPendingOnStart`, `TestScoutDefersDiscoveryGate`, `TestScoutNextSpawn`, `TestScoutReportOpensDiscoveryGate`, `TestScoutReportLightThenSpecAuthor`, `TestScoutHotfixBeforeImplementer`, `TestScoutRejections` (already_reported, scout_not_due, unexpected_verdict, scout_pending), `TestScoutNotInAgentNames`, `TestScoutOncePerTask` (rechazo a spec en light), `TestScoutOffSkips`, `TestUpcomingWhileScoutPending`.
   - engine: `TestReportScoutWritesFile`, `TestReportScoutEmpty`, `TestReportScoutTooLong`, `TestReportStdinOnlyScout`, `TestShowScoutMissing`, `TestNudgeScout`.
   - config: `TestFlowScoutDefaultOnAndOff`, `TestAgentsScoutNoWarning`, `TestFlowAgentsScoutReserved`.

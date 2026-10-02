@@ -324,6 +324,9 @@ var verdictsFor = map[Phase][]Verdict{
 	Documenting:  {DoneV, BlockedV},
 }
 
+// ScoutVerdicts son los veredictos que el scout puede reportar.
+var ScoutVerdicts = []Verdict{DoneV}
+
 // Verdicts devuelve los veredictos que un agente puede reportar en la fase.
 func Verdicts(p Phase) []Verdict { return verdictsFor[p] }
 

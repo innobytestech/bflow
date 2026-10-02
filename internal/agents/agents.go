@@ -93,6 +93,7 @@ var catalog = map[string]base{
 	"reviewer":         {"Revisa trazabilidad, pruebas, arquitectura y seguridad del diff y escribe el review-map.", "sonnet", "medium", []string{"reports/review-map.md"}, false, false},
 	"security-auditor": {"Audita seguridad, resiliencia y rendimiento del código nuevo de la rama.", "sonnet", "medium", []string{"reports/security.md"}, false, false},
 	"ux-auditor":       {"Audita la interfaz nueva contra el UI blueprint y las guías del repo.", "sonnet", "medium", []string{"reports/ux.md"}, false, false},
+	"scout":            {"Lee el repo y resume lo que toca la tarea antes del discovery o la spec.", "haiku", "low", nil, false, false},
 	"documenter":       {"Documenta el cambio y escribe el walkthrough del PR.", "haiku", "low", []string{"walkthrough.md", "reports/docs.md"}, false, true},
 }
 

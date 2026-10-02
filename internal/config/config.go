@@ -125,6 +125,7 @@ type Flow struct {
 	SLAHours         int                 `yaml:"sla_hours,omitempty"`
 	SecurityAudit    *bool               `yaml:"security_audit,omitempty"` // true: security-auditor aparte, además del reviewer
 	UI               *bool               `yaml:"ui,omitempty"`             // por defecto lo decide el stack
+	Scout            *bool               `yaml:"scout,omitempty"`          // false apaga el scout
 	// ConsumerChangelog: dónde va el único changelog para consumidores, con
 	// {id} y {slug}. Por defecto, junto a la spec.
 	ConsumerChangelog string `yaml:"consumer_changelog,omitempty"`
