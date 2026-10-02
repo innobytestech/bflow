@@ -239,18 +239,42 @@ type Map struct {
 	RedNoPath []string // viñetas 🔴 sin ruta inicial, recortadas a 80 runas
 	Docs      []string // rutas de ## Docs
 	HasDocs   bool
+	// QuestionTells son las opciones de ## Preguntas de producto que delatan
+	// cuál hace el código, recortadas a 80 runas.
+	QuestionTells []string
 }
 
 var (
-	headingRe = regexp.MustCompile(`^(#+)\s+(.*)$`)
-	bulletRe  = regexp.MustCompile(`^(?:[-*]|\d+\.)\s+(.*)$`)
-	lineSufRe = regexp.MustCompile(`:\d+(-\d+)?$`)
+	headingRe  = regexp.MustCompile(`^(#+)\s+(.*)$`)
+	bulletRe   = regexp.MustCompile(`^(?:[-*]|\d+\.)\s+(.*)$`)
+	lineSufRe  = regexp.MustCompile(`:\d+(-\d+)?$`)
+	optionRe   = regexp.MustCompile(`^(\s*)[-*]\s+(.*)$`)
+	numberedRe = regexp.MustCompile(`^\d+\.\s`)
+
+	// tellRe encuentra las marcas que delatan la opción que hace el código.
+	tellRe        = regexp.MustCompile(`(?i)(?:(?:^|[^\pL\pN_])(?:el código|lo que hace|implementad[oa]s?|implementación|actual(?:mente)?|hoy|correct[oa]s?|recomendad[oa]s?|esperad[oa]s?)(?:$|[^\pL\pN_])|[✓✔✅←])`)
+	codeAnswersRe = regexp.MustCompile(`(?i)^el código responde\s*:`)
 )
+
+// Option dice si la línea es una opción de respuesta de una pregunta y da su
+// texto: viñeta -/* con sangría, o viñeta debajo de una pregunta numerada.
+// underNumbered dice si hubo un ítem numerado de pregunta en la sección.
+func Option(line string, underNumbered bool) (string, bool) {
+	m := optionRe.FindStringSubmatch(strings.TrimRight(line, " \t\r"))
+	if m == nil || (m[1] == "" && !underNumbered) {
+		return "", false
+	}
+	if codeAnswersRe.MatchString(strings.TrimSpace(m[2])) {
+		return "", false
+	}
+	return m[2], true
+}
 
 // ParseMap lee las secciones 🔴 y Docs del review-map.
 func ParseMap(md string) Map {
 	var m Map
-	redLvl, docsLvl := 0, 0
+	redLvl, docsLvl, qLvl := 0, 0, 0
+	underNumbered := false
 	for _, line := range strings.Split(strings.ReplaceAll(md, "\r\n", "\n"), "\n") {
 		line = strings.TrimRight(line, " \t\r")
 		if h := headingRe.FindStringSubmatch(line); h != nil {
@@ -261,6 +285,12 @@ func ParseMap(md string) Map {
 			if docsLvl > 0 && lvl <= docsLvl {
 				docsLvl = 0
 			}
+			if qLvl > 0 && lvl <= qLvl {
+				qLvl = 0
+			}
+			if strings.Contains(strings.ToLower(h[2]), "preguntas") {
+				qLvl, underNumbered = lvl, false
+			}
 			if strings.Contains(h[2], "🔴") {
 				redLvl = lvl
 			}
@@ -268,6 +298,18 @@ func ParseMap(md string) Map {
 				docsLvl, m.HasDocs = lvl, true
 			}
 			continue
+		}
+		if qLvl > 0 {
+			if numberedRe.MatchString(line) {
+				underNumbered = true
+			}
+			if t, ok := Option(line, underNumbered); ok && tellRe.MatchString(t) {
+				r := []rune(strings.TrimSpace(t))
+				if len(r) > 80 {
+					r = r[:80]
+				}
+				m.QuestionTells = append(m.QuestionTells, string(r))
+			}
 		}
 		b := bulletRe.FindStringSubmatch(line)
 		if b == nil || (redLvl == 0 && docsLvl == 0) {

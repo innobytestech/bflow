@@ -40,7 +40,7 @@ Carril light: el diseño está en cada tarea.
 
 ## Tasks
 
-- [ ] **T1 · Detectar las opciones que delatan la respuesta** (`internal/review/review.go`).
+- [x] **T1 · Detectar las opciones que delatan la respuesta** (`internal/review/review.go`).
   - `Map` gana el campo `QuestionTells []string`: cada opción delatora, recortada a 80 runas.
   - `ParseMap` reconoce como sección de preguntas el encabezado que contiene "preguntas" (sin distinguir mayúsculas), con el mismo cierre por nivel que 🔴 y Docs. Dentro de esa sección, una opción es una viñeta `-`/`*` con sangría o que va debajo de un ítem de pregunta. Las líneas `el código responde:` no son opciones.
   - `var tellRe` es una regex sin distinguir mayúsculas. Busca, como palabras completas: `el código`, `lo que hace`, `implementad[oa]s?`, `implementación`, `actual(mente)?`, `hoy`, `correct[oa]s?`, `recomendad[oa]s?`, `esperad[oa]s?`. También busca los símbolos `✓`, `✔`, `✅` y `←`.
@@ -49,20 +49,20 @@ Carril light: el diseño está en cada tarea.
   - R3: Las viñetas de otras secciones y la línea `el código responde:` NO DEBEN contar como opciones.
   - Pruebas: `TestParseMapQuestionTells` (con el caso de GH-29 literal) y `TestParseMapQuestionTellsIgnoresOtherSections`.
 
-- [ ] **T2 · Rechazar el APPROVED con opciones delatoras** (`internal/engine/review.go`).
+- [x] **T2 · Rechazar el APPROVED con opciones delatoras** (`internal/engine/review.go`).
   - `reviewIncomplete` agrega un bloque cuando `len(m.QuestionTells) > 0`: "Estas opciones de `## Preguntas de producto` delatan cuál hace el código; reescríbelas neutras, sin marcas ni menciones al código:\n- …".
   - R4: CUANDO el reviewer reporta APPROVED y el review-map tiene opciones delatoras, bflow DEBE rechazar con el código `review_incomplete` y listar esas opciones.
   - R5: CUANDO no hay opciones delatoras, el rechazo NO DEBE cambiar respecto de hoy.
   - Pruebas: `TestReviewIncompleteQuestionTells` en `internal/engine` (función directa), y un caso en la prueba del flujo de reporte del reviewer si ya existe una para RedNoPath.
 
-- [ ] **T3 · Mezclar las opciones al mostrarlas** (`internal/engine/display.go`).
+- [x] **T3 · Mezclar las opciones al mostrarlas** (`internal/engine/display.go`).
   - `productQuestions` junta cada bloque contiguo de viñetas de opción que va debajo de una pregunta y lo reordena con `shuffleOptions(seed uint64, opts []string)`. La función usa `math/rand/v2` con `rand.NewPCG(seed, seed)`. La semilla sale de `hash/fnv` 64a sobre `id + "\n" + texto de la pregunta`. El texto de la pregunta y su numeración no se tocan.
   - R6: CUANDO se muestran las preguntas, el orden de las opciones de cada pregunta DEBE ser una permutación de las originales y DEBE ser el mismo en dos llamadas para la misma tarea.
   - R7: Las líneas `el código responde` DEBEN seguir ocultas (no se rompe `TestProductQuestionsHideAnswers`: se ajusta el `want` al orden determinista o se compara como conjunto por pregunta).
   - R8: CUANDO hay varias preguntas, cada una se mezcla con su propia semilla. Con un review-map de 4 preguntas de prueba, al menos una DEBE quedar en un orden distinto al original. La prueba fija ese caso.
   - Pruebas: `TestProductQuestionsShuffleStable`, `TestShuffleOptionsPermutation`.
 
-- [ ] **T4 · Oficio del reviewer y changelog** (`internal/agents/craft/reviewer.md`, `CHANGELOG.md`).
+- [x] **T4 · Oficio del reviewer y changelog** (`internal/agents/craft/reviewer.md`, `CHANGELOG.md`).
   - En la viñeta de `## Preguntas de producto`, hay que reemplazar "en orden neutro (una es lo que hace el código, las otras alternativas razonables)" por: las preguntas tratan sobre comportamiento que no quedó fijado en el discovery ni en las decisiones [N] del brief (casos borde, errores, interacción con otras funciones); una opción es lo que hace el código y las otras son alternativas razonables del mismo largo y tono; ninguna opción menciona el código ni marca cuál es la respuesta ("actual", "implementado", ✓…); bflow mezcla el orden y rechaza las opciones con marcas.
   - Correr `bflow render` para regenerar `.claude/agents/bflow-reviewer.md`.
   - R9: El oficio renderizado DEBE pedir preguntas fuera de lo fijado en el discovery y en las [N], y DEBE prohibir las marcas en las opciones.
