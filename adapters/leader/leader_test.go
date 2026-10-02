@@ -38,3 +38,16 @@ func TestLeaderRender(t *testing.T) {
 		t.Errorf("los marcadores también se reemplazan en head: %v", err)
 	}
 }
+
+func TestSkillReglaClear(t *testing.T) {
+	raw, err := os.ReadFile("bflow.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(raw)
+	for _, w := range []string{"clear", "/clear", "sesión nueva", "--note"} {
+		if !strings.Contains(s, w) {
+			t.Errorf("la skill no menciona %q", w)
+		}
+	}
+}

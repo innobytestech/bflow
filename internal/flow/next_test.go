@@ -292,3 +292,19 @@ func TestIntakeNext(t *testing.T) {
 		t.Errorf("solo carriles configurados: %q", d)
 	}
 }
+
+func TestSuggestClear(t *testing.T) {
+	ask := output.Next{Action: output.ActionAsk}
+	if !SuggestClear(Contract, ask) {
+		t.Error("cambio de fase con next ask: clear")
+	}
+	if !SuggestClear(Implementing, output.Next{Action: output.ActionSpawn}) {
+		t.Error("cambio de fase con spawn: clear")
+	}
+	if SuggestClear("", ask) {
+		t.Error("sin cambio de fase: no clear")
+	}
+	if SuggestClear(Done, output.Next{Action: output.ActionDone}) {
+		t.Error("next done: no clear")
+	}
+}

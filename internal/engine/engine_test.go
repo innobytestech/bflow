@@ -449,3 +449,91 @@ func TestNewStartFailureKeepsTask(t *testing.T) {
 		t.Errorf("la tarea sigue en el tracker: %v", l)
 	}
 }
+
+// toSpecGate lleva una tarea full hasta el gate del spec.
+func toSpecGate(t *testing.T, v *env, id string) {
+	t.Helper()
+	ctx := context.Background()
+	mustT(t)(v.e.Start(ctx, id, flow.Full, "", ""))
+	mustT(t)(v.e.Approve(ctx, id, ApproveOpts{Gate: "discovery", Attachment: "# Discovery\n- entra: X"}))
+	mustT(t)(v.e.Report(ctx, id, ReportOpts{Agent: "spec-author", Verdict: flow.Ready}))
+}
+
+func TestApproveClearSoloAlAvanzar(t *testing.T) {
+	v := newEnv(t, "")
+	ctx := context.Background()
+	id := v.task(t, "Demo clear")
+	toSpecGate(t, v, id)
+	o := mustT(t)(v.e.Approve(ctx, id, ApproveOpts{}))
+	if o.To != flow.Contract || !o.Next.Clear {
+		t.Errorf("spec -> contract debe traer clear: %+v", o)
+	}
+
+	// decision: la fase no cambia.
+	h := v.task(t, "Demo decision")
+	mustT(t)(v.e.Start(ctx, h, flow.Hotfix, "", ""))
+	mustT(t)(v.e.Report(ctx, h, ReportOpts{Agent: "implementer", Verdict: flow.NeedsDecision,
+		Note: "¿A o B?", Options: []string{"A", "B"}}))
+	o = mustT(t)(v.e.Approve(ctx, h, ApproveOpts{Choice: 1}))
+	if o.Next.Clear {
+		t.Errorf("decision no trae clear: %+v", o.Next)
+	}
+
+	// questions: pasa al gate walkthrough en la misma fase.
+	q := v.task(t, "Demo questions")
+	mustT(t)(v.e.Start(ctx, q, flow.Hotfix, "", ""))
+	if _, err := v.e.Store.Update(q, func(r *store.Record, _ bool) error {
+		r.Flow.Phase = flow.Walkthrough
+		r.Flow.Gate = &flow.PendingGate{Name: flow.GateQuestions}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	o = mustT(t)(v.e.Approve(ctx, q, ApproveOpts{Note: "que rechace el RFC"}))
+	if o.To != "" || o.Next.Clear {
+		t.Errorf("questions no trae clear: %+v", o)
+	}
+
+	// reject no sugiere clear.
+	r := v.task(t, "Demo reject")
+	toSpecGate(t, v, r)
+	o = mustT(t)(v.e.Reject(ctx, r, RejectOpts{Note: "falta detalle"}))
+	if o.Next.Clear {
+		t.Errorf("reject no trae clear: %+v", o.Next)
+	}
+}
+
+func TestApproveNoteEnDecisions(t *testing.T) {
+	v := newEnv(t, "")
+	ctx := context.Background()
+
+	id := v.task(t, "Con nota")
+	toSpecGate(t, v, id)
+	mustT(t)(v.e.Approve(ctx, id, ApproveOpts{Note: "ratifico\nel brief   tal cual"}))
+	b, err := v.e.Store.ReadFile(id, "decisions.md")
+	want := "- 2026-09-25 · gate spec: ratifico el brief tal cual (dev)\n"
+	if err != nil || !strings.Contains(string(b), want) {
+		t.Fatalf("decisions.md debe traer %q: %q %v", want, b, err)
+	}
+
+	sin := v.task(t, "Sin nota")
+	toSpecGate(t, v, sin)
+	mustT(t)(v.e.Approve(ctx, sin, ApproveOpts{Note: "  "}))
+	if b, err := v.e.Store.ReadFile(sin, "decisions.md"); err == nil {
+		t.Errorf("sin nota no se escribe decisions.md: %q", b)
+	}
+
+	q := v.task(t, "Preguntas")
+	mustT(t)(v.e.Start(ctx, q, flow.Hotfix, "", ""))
+	if _, err := v.e.Store.Update(q, func(r *store.Record, _ bool) error {
+		r.Flow.Phase = flow.Walkthrough
+		r.Flow.Gate = &flow.PendingGate{Name: flow.GateQuestions}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	mustT(t)(v.e.Approve(ctx, q, ApproveOpts{Note: "que rechace el RFC"}))
+	if b, err := v.e.Store.ReadFile(q, "decisions.md"); err == nil {
+		t.Errorf("la nota de questions no va a decisions.md: %q", b)
+	}
+}

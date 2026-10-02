@@ -93,3 +93,27 @@ func TestPluginReadsOnlyReviewer(t *testing.T) {
 		t.Errorf("el plugin tiene %d líneas, máximo 100", n)
 	}
 }
+
+// GH-15 R8, R9: al crearse una sesión raíz, el plugin inyecta session-start sin pedir respuesta.
+func TestPluginSessionStart(t *testing.T) {
+	src := string(files.Plugin)
+	for _, w := range []string{`"session-start"`, "noReply", "session.prompt", "parentID"} {
+		if !strings.Contains(src, w) {
+			t.Errorf("el plugin no trae %q", w)
+		}
+	}
+	if !strings.Contains(src, "noReply: true") {
+		t.Error("la inyección no pide respuesta al modelo (noReply: true)")
+	}
+	iEvt := strings.Index(src, `"session.created"`)
+	iHook := strings.Index(src, `"session-start"`)
+	if iEvt < 0 || iHook < 0 {
+		t.Fatalf("faltan session.created o session-start")
+	}
+	if !regexp.MustCompile(`!\s*p\.info\.parentID`).MatchString(src) {
+		t.Error("solo se inyecta en sesiones sin parentID")
+	}
+	if n := strings.Count(strings.TrimRight(src, "\n"), "\n") + 1; n > 100 {
+		t.Errorf("el plugin tiene %d líneas, máximo 100", n)
+	}
+}

@@ -319,3 +319,8 @@ func truncateCmd(s string) string {
 	}
 	return s
 }
+
+// compactNext serializa el next en una línea y sin display, para el hook de inicio.
+func compactNext(n output.Next) string {
+	return "" // stub del contrato (GH-15 T4)
+}

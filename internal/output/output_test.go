@@ -82,3 +82,14 @@ func TestTextMode(t *testing.T) {
 		t.Errorf("modo texto: %q", buf.String())
 	}
 }
+
+func TestNextClearOmitempty(t *testing.T) {
+	b, _ := json.Marshal(Next{Action: ActionAsk})
+	if strings.Contains(string(b), "clear") {
+		t.Errorf("clear falso se omite: %s", b)
+	}
+	b, _ = json.Marshal(Next{Action: ActionAsk, Clear: true})
+	if !strings.Contains(string(b), `"clear":true`) {
+		t.Errorf("clear verdadero se serializa: %s", b)
+	}
+}
