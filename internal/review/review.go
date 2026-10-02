@@ -357,7 +357,7 @@ func Measure(diff []string, diffLines int, reads []Read, red []string, isTest fu
 		}
 		for _, r := range hooked {
 			for _, p := range r.Paths {
-				if p == f || p == "." || strings.HasPrefix(f, p+"/") {
+				if p == f || (diffLines < WholeDiffMax && (p == "." || strings.HasPrefix(f, p+"/"))) {
 					return true
 				}
 			}
