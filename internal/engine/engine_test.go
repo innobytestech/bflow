@@ -46,6 +46,10 @@ func newEnv(t *testing.T, yaml string) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !strings.Contains(t.Name(), "Scout") && cfg.Flow.Scout == nil {
+		off := false // el scout es opt-out en la config; solo sus pruebas lo quieren activo
+		cfg.Flow.Scout = &off
+	}
 	ev := &env{tr: trackertest.NewMemory(), ver: &fakeVerifier{ok: true}, now: time.Date(2026, 9, 25, 9, 0, 0, 0, time.UTC)}
 	st := store.Open(root)
 	st.Now = func() time.Time { return ev.now }

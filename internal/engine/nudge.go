@@ -35,11 +35,17 @@ func (e *Engine) Nudge(ctx context.Context, agent string) (string, error) {
 			return store.ErrNotFound
 		}
 		s := rec.Flow
-		if s.Gate != nil || !slices.Contains(fc.Agents[s.Phase], agent) {
-			return nil
-		}
-		if _, reported := s.Reports[agent]; reported {
-			return nil
+		if agent == flow.ScoutAgent {
+			if s.Scout != flow.ScoutPending || s.Phase == flow.Blocked {
+				return nil
+			}
+		} else {
+			if s.Gate != nil || !slices.Contains(fc.Agents[s.Phase], agent) {
+				return nil
+			}
+			if _, reported := s.Reports[agent]; reported {
+				return nil
+			}
 		}
 		if rec.Nudges == nil {
 			rec.Nudges = map[string]int{}
@@ -70,6 +76,10 @@ func (e *Engine) Nudge(ctx context.Context, agent string) (string, error) {
 
 func (e *Engine) nudgeReason(rec store.Record, agent string, n int) string {
 	s := rec.Flow
+	if agent == flow.ScoutAgent {
+		return fmt.Sprintf("Terminaste sin reportar a bflow (aviso %d de %d). Si ya acabaste, reporta con `bflow report %s --agent scout --verdict DONE --stdin` (contenido por stdin, 40 líneas como máximo). Si no, sigue con tu parte.\nTu respuesta final es solo la salida de `bflow report`.",
+			n, MaxNudges, s.ID)
+	}
 	vs := flow.Verdicts(s.Phase)
 	names := make([]string, len(vs))
 	for i, v := range vs {

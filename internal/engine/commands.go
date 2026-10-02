@@ -123,6 +123,9 @@ func (e *Engine) Reject(ctx context.Context, id string, o RejectOpts) (Outcome, 
 	return e.apply(ctx, id, flow.Event{Kind: flow.EvReject, Gate: flow.Gate(o.Gate), To: flow.Phase(o.To), Note: o.Note}, "")
 }
 
+// ScoutMaxLines es el tope de líneas del reporte del scout.
+const ScoutMaxLines = 40
+
 // ReportOpts son las opciones de report.
 type ReportOpts struct {
 	Agent   string
@@ -137,7 +140,24 @@ type ReportOpts struct {
 // Report registra el veredicto de un agente.
 func (e *Engine) Report(ctx context.Context, id string, o ReportOpts) (Outcome, error) {
 	ev := flow.Event{Kind: flow.EvReport, Agent: o.Agent, Verdict: flow.Verdict(strings.ToUpper(string(o.Verdict))), Note: o.Note, Options: o.Options}
-	out, err := e.apply(ctx, id, ev, "")
+	var after func() error
+	if o.Content != nil && o.Agent != flow.ScoutAgent {
+		return Outcome{ID: id}, &flow.Rejection{Code: "stdin_scout_only", Reason: "--stdin solo lo usa el scout; los demás reportan con --file o --note"}
+	}
+	if o.Agent == flow.ScoutAgent {
+		c := ""
+		if o.Content != nil {
+			c = *o.Content
+		}
+		if strings.TrimSpace(c) == "" {
+			return Outcome{ID: id}, &flow.Rejection{Code: "scout_empty", Reason: "el reporte del scout llega por stdin y no puede ir vacío"}
+		}
+		if n := strings.Count(strings.TrimRight(c, "\n"), "\n") + 1; n > ScoutMaxLines {
+			return Outcome{ID: id}, &flow.Rejection{Code: "scout_too_long", Reason: fmt.Sprintf("el reporte trae %d líneas y el máximo es %d; recórtalo y reporta otra vez", n, ScoutMaxLines)}
+		}
+		after = func() error { return e.Store.WriteFile(id, "reports/scout.md", []byte(c)) }
+	}
+	out, err := e.applyWith(ctx, id, ev, "", after)
 	if err == nil && o.File != "" {
 		_ = e.Store.Append(store.Entry{TS: e.now(), ID: id, Event: "report_file", Agent: o.Agent, By: e.User, Data: map[string]any{"file": o.File}})
 	}

@@ -63,6 +63,7 @@ var artifacts = map[string]string{
 	"decisions":  "decisions.md",
 	"discovery":  "discovery.md",
 	"check":      "check.md",
+	"scout":      "reports/scout.md",
 }
 
 // Show devuelve un artefacto: una sección del spec (brief, spec --section X) o
@@ -93,9 +94,12 @@ func (e *Engine) Show(ctx context.Context, id, what, section string) (string, er
 	}
 	rel, ok := artifacts[what]
 	if !ok {
-		return "", fmt.Errorf("no sé mostrar %q (disponibles: task, brief, spec, contract, review-map, questions, decisions, discovery, check)", what)
+		return "", fmt.Errorf("no sé mostrar %q (disponibles: task, brief, spec, contract, review-map, questions, decisions, discovery, check, scout)", what)
 	}
 	b, err := e.Store.ReadFile(id, rel)
+	if errors.Is(err, os.ErrNotExist) && what == "scout" {
+		return "(" + id + " no tiene reporte del scout)", nil
+	}
 	if errors.Is(err, os.ErrNotExist) {
 		return "", fmt.Errorf("%s todavía no tiene %s (%s/%s)", id, what, ".bflow/tasks/"+id, rel)
 	}
