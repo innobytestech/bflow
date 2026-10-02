@@ -2,6 +2,12 @@
 
 Los cambios de bflow que ve quien lo usa. Las versiones siguen [semver](https://semver.org/lang/es/) desde la v0.1.0; antes de la 1.0, la API de comandos puede cambiar entre versiones menores.
 
+## Unreleased
+
+### Cambiado
+
+- **Las preguntas de producto ya no delatan la respuesta.** Si una opción de `## Preguntas de producto` marca cuál hace el código ("(lo que hace el código)", "(actual)", "(implementado)", ✓…), bflow rechaza el APPROVED del reviewer con `review_incomplete` y lista la opción para que la reescriba. `bflow show <ID> questions` muestra las opciones en un orden mezclado que no cambia entre llamadas.
+
 ## v0.1.0
 
 ### Agregado

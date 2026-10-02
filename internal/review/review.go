@@ -256,16 +256,36 @@ var (
 	codeAnswersRe = regexp.MustCompile(`(?i)^el código responde\s*:`)
 )
 
-// Option dice si la línea es una opción de respuesta de una pregunta y da su
-// texto: viñeta -/* con sangría, o viñeta debajo de una pregunta numerada.
-// underNumbered dice si hubo un ítem numerado de pregunta en la sección.
-func Option(line string, underNumbered bool) (string, bool) {
-	m := optionRe.FindStringSubmatch(strings.TrimRight(line, " \t\r"))
-	if m == nil || (m[1] == "" && !underNumbered) {
+// OptionScanner reconoce, línea a línea, las opciones de respuesta de las
+// preguntas de producto. Una opción es una viñeta -/* con sangría, o sin ella si
+// sigue a una pregunta escrita como línea suelta o numerada. Una viñeta sin
+// sangría que abre la pregunta ("- ¿…?") es la pregunta, no una opción.
+type OptionScanner struct {
+	plain    bool // la última línea con contenido es una pregunta suelta o sus opciones
+	numbered bool // hubo un ítem numerado de pregunta
+}
+
+// Next lee la línea y, si es una opción, devuelve su texto.
+func (o *OptionScanner) Next(line string) (string, bool) {
+	line = strings.TrimRight(line, " 	")
+	if strings.TrimSpace(line) == "" {
+		return "", false
+	}
+	if numberedRe.MatchString(line) {
+		o.numbered, o.plain = true, false
+		return "", false
+	}
+	m := optionRe.FindStringSubmatch(line)
+	if m == nil {
+		o.plain = !codeAnswersRe.MatchString(strings.TrimSpace(line))
 		return "", false
 	}
 	if codeAnswersRe.MatchString(strings.TrimSpace(m[2])) {
+		o.plain = false
 		return "", false
+	}
+	if m[1] == "" && !o.numbered && !o.plain {
+		return "", false // viñeta que abre una pregunta
 	}
 	return m[2], true
 }
@@ -274,7 +294,7 @@ func Option(line string, underNumbered bool) (string, bool) {
 func ParseMap(md string) Map {
 	var m Map
 	redLvl, docsLvl, qLvl := 0, 0, 0
-	underNumbered := false
+	var scan OptionScanner
 	for _, line := range strings.Split(strings.ReplaceAll(md, "\r\n", "\n"), "\n") {
 		line = strings.TrimRight(line, " \t\r")
 		if h := headingRe.FindStringSubmatch(line); h != nil {
@@ -289,7 +309,7 @@ func ParseMap(md string) Map {
 				qLvl = 0
 			}
 			if strings.Contains(strings.ToLower(h[2]), "preguntas") {
-				qLvl, underNumbered = lvl, false
+				qLvl, scan = lvl, OptionScanner{}
 			}
 			if strings.Contains(h[2], "🔴") {
 				redLvl = lvl
@@ -300,10 +320,7 @@ func ParseMap(md string) Map {
 			continue
 		}
 		if qLvl > 0 {
-			if numberedRe.MatchString(line) {
-				underNumbered = true
-			}
-			if t, ok := Option(line, underNumbered); ok && tellRe.MatchString(t) {
+			if t, ok := scan.Next(line); ok && tellRe.MatchString(t) {
 				r := []rune(strings.TrimSpace(t))
 				if len(r) > 80 {
 					r = r[:80]

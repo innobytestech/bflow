@@ -37,3 +37,23 @@ func TestParseMapQuestionTellsIgnoresOtherSections(t *testing.T) {
 		t.Errorf("tells = %q, want vacío", got)
 	}
 }
+
+// Formato que pide el oficio: pregunta en una línea, opciones '- …' sin sangría.
+const flatQuestions = "## Preguntas de producto\n" +
+	"¿Qué pasa si una opción legítima dice \"hoy\"?\n" +
+	"- Se rechaza el APPROVED y el reviewer la reescribe (actual)\n" +
+	"- Se muestra con una advertencia\n" +
+	"el código responde: rechaza (internal/engine/review.go:104)\n\n" +
+	"¿Cambia el orden entre dos llamadas?\n" +
+	"- No, depende del id\n" +
+	"- Sí, es al azar\n" +
+	"el código responde: estable (internal/engine/display.go:81)\n\n" +
+	"## Seguimiento\n- algo actual\n"
+
+func TestParseMapQuestionTellsFlatFormat(t *testing.T) {
+	got := ParseMap(flatQuestions).QuestionTells
+	want := []string{"Se rechaza el APPROVED y el reviewer la reescribe (actual)"}
+	if !slices.Equal(got, want) {
+		t.Errorf("tells = %q, want %q", got, want)
+	}
+}

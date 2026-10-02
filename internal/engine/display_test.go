@@ -130,3 +130,32 @@ func TestShuffleOptionsPermutation(t *testing.T) {
 		t.Errorf("no es permutación o muta la entrada: %v", a)
 	}
 }
+
+func TestProductQuestionsShuffleFlatFormat(t *testing.T) {
+	v := newEnv(t, "")
+	md := "## Preguntas de producto\n"
+	for _, q := range []string{"uno", "dos", "tres", "cuatro"} {
+		md += "¿Pregunta " + q + "?\n- " + q + " A\n- " + q + " B\n- " + q + " C\nel código responde: A (x.go:1)\n\n"
+	}
+	if err := v.e.Store.WriteFile("T-1", "reports/review-map.md", []byte(md)); err != nil {
+		t.Fatal(err)
+	}
+	q1, _ := v.e.productQuestions("T-1")
+	q2, _ := v.e.productQuestions("T-1")
+	if q1 != q2 || strings.Contains(q1, "código responde") {
+		t.Fatalf("inestable o con respuesta:\n%s", q1)
+	}
+	ordered := "- uno A\n- uno B\n- uno C\n"
+	changed := !strings.Contains(q1, ordered)
+	for _, q := range []string{"dos", "tres", "cuatro"} {
+		changed = changed || !strings.Contains(q1, "- "+q+" A\n- "+q+" B\n- "+q+" C\n")
+	}
+	if !changed {
+		t.Errorf("ningún orden cambió:\n%s", q1)
+	}
+	for _, q := range []string{"uno", "dos", "tres", "cuatro"} {
+		if strings.Count(q1, "- "+q+" ") != 3 || !strings.Contains(q1, "¿Pregunta "+q+"?") {
+			t.Errorf("pregunta %s mal: %s", q, q1)
+		}
+	}
+}

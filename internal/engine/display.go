@@ -74,7 +74,8 @@ func (e *Engine) productQuestions(id string) (string, error) {
 		return "", err
 	}
 	var out, block []string
-	in, level, underNumbered, question := false, 0, false, ""
+	var scan review.OptionScanner
+	in, level, question := false, 0, ""
 	// flush mezcla el bloque de opciones pendiente con la semilla de su pregunta.
 	flush := func() {
 		if len(block) == 0 {
@@ -91,20 +92,21 @@ func (e *Engine) productQuestions(id string) (string, error) {
 			switch {
 			case strings.Contains(strings.ToLower(t), "preguntas"):
 				flush()
-				in, level, underNumbered = true, h, false
+				in, level, scan = true, h, review.OptionScanner{}
 				continue
 			case in && h <= level:
 				flush()
 				in = false
 			}
 		}
-		if !in || strings.Contains(strings.ToLower(t), "el código responde") {
+		if !in {
 			continue
 		}
-		if l != "" && l[0] >= '0' && l[0] <= '9' {
-			underNumbered = true
+		if strings.Contains(strings.ToLower(t), "el código responde") {
+			scan.Next(l)
+			continue
 		}
-		if _, ok := review.Option(l, underNumbered); ok {
+		if _, ok := scan.Next(l); ok {
 			block = append(block, l)
 			continue
 		}
