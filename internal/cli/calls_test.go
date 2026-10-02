@@ -564,3 +564,114 @@ func TestPanelTokensTable(t *testing.T) {
 		t.Errorf("sin nada: %+v", ps.Task)
 	}
 }
+
+// agentTokens agrega tokens de un agente ("" = registrados antes de separarlos) con modelo.
+func agentTokens(t *testing.T, e *engine.Engine, id, agent string, cw int64) {
+	t.Helper()
+	err := e.Store.Append(store.Entry{TS: time.Now(), ID: id, Event: "tokens", Agent: agent, By: "dev",
+		Data: map[string]any{"phase": "implementing", "tool": "claude", "model": "opus", "input": 1, "output": 1, "cache_read": 10, "cache_write": cw}})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// tail2 son las dos últimas columnas de la fila que empieza con name.
+func tail2(out, name string) []string {
+	for _, l := range strings.Split(out, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(l), name) {
+			if f := strings.Fields(l); len(f) >= 2 {
+				return f[len(f)-2:]
+			}
+		}
+	}
+	return nil
+}
+
+func TestStatsAgentCacheColumns(t *testing.T) {
+	env, e, id := callsFixture(t, true)
+	p, _ := e.Store.Path(id, metrics.CallsFile)
+	// Segunda corrida del implementer: su 1a llamada escribió 1701 (la 1a corrida, 300).
+	appendText(t, p, callLine("claude:agent-b", "implementer", "m5", "opus", t4.Add(time.Minute), 1, 1701, 100, 5))
+	agentTokens(t, e, id, "implementer", 2001)
+	agentTokens(t, e, id, "main", 50)
+	agentTokens(t, e, id, "", 700)
+	code, out := textOf(t, env, "stats", id)
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	var agentHdr, modelHdr string
+	for _, l := range strings.Split(out, "\n") {
+		switch {
+		case strings.HasPrefix(strings.TrimSpace(l), "por agente"):
+			agentHdr = l
+		case strings.HasPrefix(strings.TrimSpace(l), "por modelo"):
+			modelHdr = l
+		}
+	}
+	if !strings.HasSuffix(strings.TrimSpace(agentHdr), "ctx final escrita prefijo") {
+		t.Errorf("por agente termina en escrita y prefijo: %q", agentHdr)
+	}
+	if modelHdr == "" || strings.Contains(modelHdr, "escrita") || strings.Contains(modelHdr, "prefijo") {
+		t.Errorf("por modelo no cambia: %q", modelHdr)
+	}
+	for name, want := range map[string][]string{
+		"implementer":      {"2.0k", "1.0k"}, // (300 + 1701 + 1) / 2 = 1001
+		"sesión principal": {"50", "-"},      // su 1a llamada escribió 0
+		"sin desglose":     {"700", "-"},     // sin corridas en calls.jsonl
+	} {
+		if got := tail2(out, name); !reflect.DeepEqual(got, want) {
+			t.Errorf("fila %q: escrita y prefijo %v, want %v\n%s", name, got, want, out)
+		}
+	}
+}
+
+func TestStatsPrefixJSON(t *testing.T) {
+	env, e, id := callsFixture(t, true)
+	p, _ := e.Store.Path(id, metrics.CallsFile)
+	appendText(t, p, callLine("claude:agent-b", "implementer", "m5", "opus", t4.Add(time.Minute), 1, 1701, 100, 5))
+	agentTokens(t, e, id, "implementer", 2001)
+	want := map[string]any{"runs": float64(2), "sum": float64(2001), "avg": float64(1001)}
+	for _, args := range [][]string{{"stats", id}, {"stats", id, "--calls"}} {
+		_, out, raw := runJSON(t, env, args...)
+		st := out["data"].(map[string]any)["stats"].(map[string]any)
+		prefix, _ := st["prefix"].(map[string]any)
+		if !reflect.DeepEqual(prefix["implementer"], want) {
+			t.Errorf("%v: prefix.implementer = %v, want %v\n%s", args, prefix["implementer"], want, raw)
+		}
+		if m, _ := prefix["main"].(map[string]any); m["runs"] != float64(1) || m["sum"] != float64(0) {
+			t.Errorf("%v: la sesión principal es un agente más: %v", args, prefix)
+		}
+		ag := st["agents"].(map[string]any)["implementer"].(map[string]any)
+		if ag["cache_write"] != float64(2001) {
+			t.Errorf("%v: agents.implementer.cache_write sigue igual: %v", args, ag)
+		}
+	}
+	// Sin calls.jsonl, o vacío, prefix se omite.
+	env2, e2, id2 := callsFixture(t, false)
+	agentTokens(t, e2, id2, "implementer", 2001)
+	for i := range 2 {
+		if i == 1 {
+			p2, _ := e2.Store.Path(id2, metrics.CallsFile)
+			appendText(t, p2, "")
+		}
+		_, out, raw := runJSON(t, env2, "stats", id2)
+		if _, ok := out["data"].(map[string]any)["stats"].(map[string]any)["prefix"]; ok {
+			t.Errorf("sin calls.jsonl (o vacío) no hay prefix: %s", raw)
+		}
+	}
+}
+
+func TestStatsPrefixWithoutCallsFile(t *testing.T) {
+	env, e, id := callsFixture(t, false)
+	agentTokens(t, e, id, "implementer", 2001)
+	agentTokens(t, e, id, "main", 50)
+	code, out := textOf(t, env, "stats", id)
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, out)
+	}
+	for name, want := range map[string][]string{"implementer": {"2.0k", "-"}, "sesión principal": {"50", "-"}} {
+		if got := tail2(out, name); !reflect.DeepEqual(got, want) {
+			t.Errorf("fila %q: escrita del log y prefijo \"-\": %v, want %v\n%s", name, got, want, out)
+		}
+	}
+}

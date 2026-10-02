@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -12,6 +13,7 @@ import (
 
 	files "innobytes.tech/bflow/adapters/opencode"
 	"innobytes.tech/bflow/internal/agents"
+	"innobytes.tech/bflow/internal/flow"
 )
 
 // frontmatterOf separa el frontmatter YAML del resto del archivo.
@@ -199,5 +201,69 @@ func TestOpenCodeSkillStateCRLF(t *testing.T) {
 	}
 	if _, state := (Agent{}).SkillState(home); state != "stale" {
 		t.Errorf("distinto: %s", state)
+	}
+}
+
+// allSpecs construye todos los agentes del catálogo y el scout.
+func allSpecs(t *testing.T, root string) []agents.Spec {
+	t.Helper()
+	fc := flow.DefaultConfig()
+	fc.Agents = map[flow.Phase][]string{
+		flow.Spec:         {"spec-author", "ui-designer"},
+		flow.Contract:     {"implementer"},
+		flow.Implementing: {"implementer"},
+		flow.Quality:      {"reviewer", "security-auditor", "ux-auditor"},
+		flow.Documenting:  {"documenter"},
+	}
+	fc.Scout = "scout"
+	specs, err := agents.Build(fc, nil, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return specs
+}
+
+// variable: lo que cambia entre tareas o máquinas y rompe el prefijo de caché (GH-19).
+func variable(root string) []*regexp.Regexp {
+	return []*regexp.Regexp{
+		regexp.MustCompile(`[A-Z][A-Z0-9]*-[0-9]+`),
+		regexp.MustCompile(`[0-9]{4}-[0-9]{2}-[0-9]{2}`),
+		regexp.MustCompile(`\.bflow/tasks/[^<\s]`),
+		regexp.MustCompile(regexp.QuoteMeta(root)),
+	}
+}
+
+func TestOpenCodeRenderedAgentsStablePrefix(t *testing.T) {
+	root := t.TempDir()
+	specs := allSpecs(t, root)
+	first, err := Agent{}.RenderAgents(specs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := Agent{}.RenderAgents(specs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for path, doc := range first {
+		if !bytes.Equal(doc, second[path]) {
+			t.Errorf("%s: dos renders seguidos difieren", path)
+		}
+		if !strings.HasPrefix(path, ".opencode/agents/") {
+			continue // el plugin no lleva cuerpo de agente
+		}
+		n++
+		for _, re := range variable(root) {
+			if loc := re.FindIndex(doc); loc != nil {
+				t.Errorf("%s: %q aparece en el archivo: %q", path, re, doc[loc[0]:loc[1]])
+			}
+		}
+		_, body := frontmatterOf(t, doc)
+		if !strings.HasPrefix(body, agents.GeneratedMark+"\n\n## Contrato con bflow") {
+			t.Errorf("%s: el cuerpo empieza con la marca y el contrato: %q", path, body[:min(len(body), 80)])
+		}
+	}
+	if n != len(specs) {
+		t.Errorf("un archivo por agente: %d de %d", n, len(specs))
 	}
 }

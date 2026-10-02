@@ -212,3 +212,30 @@ func Phases(entries []store.Entry, id, agent string, samples []Sample) []flow.Ph
 	}
 	return out
 }
+
+// PrefixCost es la caché escrita en la primera llamada de cada corrida de un agente.
+type PrefixCost struct {
+	Runs int   `json:"runs"`
+	Sum  int64 `json:"sum"`
+	Avg  int64 `json:"avg"`
+}
+
+// PrefixByAgent agrupa por Run.Agent (MainSession o nombre sin prefijo) la
+// CacheWrite de Rows[0] de cada corrida. Corridas sin filas se saltan.
+func PrefixByAgent(runs []Run) map[string]PrefixCost {
+	var out map[string]PrefixCost
+	for _, r := range runs {
+		if len(r.Rows) == 0 {
+			continue
+		}
+		if out == nil {
+			out = map[string]PrefixCost{}
+		}
+		p := out[r.Agent]
+		p.Runs++
+		p.Sum += r.Rows[0].CacheWrite
+		p.Avg = (p.Sum + int64(p.Runs)/2) / int64(p.Runs)
+		out[r.Agent] = p
+	}
+	return out
+}
