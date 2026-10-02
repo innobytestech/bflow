@@ -115,7 +115,7 @@ func unwrapShell(seg string) (string, bool) {
 	}
 	i := 1
 	found := false
-	for ; i < len(t) && (t[i][0] == '-' || t[i][0] == '+'); i++ {
+	for ; i < len(t) && t[i] != "" && (t[i][0] == '-' || t[i][0] == '+'); i++ {
 		switch t[i] {
 		case "-o", "+o", "-O", "+O":
 			i++
@@ -133,7 +133,11 @@ func unwrapShell(seg string) (string, bool) {
 	rest := seg
 	for k := 0; k <= i+len(fields)-len(t); k++ {
 		rest = strings.TrimSpace(rest)
-		rest = rest[len(strings.Fields(rest)[0]):]
+		f := strings.Fields(rest)
+		if len(f) == 0 {
+			return "", false
+		}
+		rest = rest[len(f[0]):]
 	}
 	rest = strings.TrimSpace(rest)
 	if rest != "" && (rest[0] == '"' || rest[0] == '\'') {

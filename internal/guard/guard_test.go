@@ -308,3 +308,9 @@ func TestSegmentsUnwrap(t *testing.T) {
 		}
 	}
 }
+
+func TestShellEmptyTokens(t *testing.T) {
+	for _, cmd := range []string{`bash "" -c x`, `bash '' -c "bflow approve X"`, `sh ""`, `bash -c`} {
+		_ = segments(cmd, 0) // no debe entrar en pánico
+	}
+}
