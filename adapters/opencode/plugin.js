@@ -41,8 +41,15 @@ export const BflowPlugin = async ({ client, directory }) => {
     const proc = Bun.spawn(["bflow", "hook", "session-start"], { cwd: directory, stdin: "pipe", stdout: "pipe", stderr: "ignore" })
     proc.stdin.write("{}")
     proc.stdin.end()
-    const text = (await new Response(proc.stdout).text()).trim()
-    if (!text) return
+    const timer = setTimeout(() => proc.kill(), 10000)
+    let text = "", code = -1
+    try {
+      text = (await new Response(proc.stdout).text()).trim()
+      code = await proc.exited
+    } finally {
+      clearTimeout(timer)
+    }
+    if (code !== 0 || !text) return
     await client.session.prompt({ path: { id }, body: { noReply: true, parts: [{ type: "text", text }] } })
   }
 

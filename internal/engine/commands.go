@@ -108,7 +108,7 @@ func (e *Engine) Approve(ctx context.Context, id string, o ApproveOpts) (Outcome
 			out.Warnings = append(out.Warnings, "no se pudo guardar decisions.md: "+err.Error())
 		}
 	}
-	if pending != nil && pending.Name == flow.GateSpec && strings.TrimSpace(o.Note) != "" {
+	if pending != nil && pending.Name != flow.GateDecision && pending.Name != flow.GateQuestions && strings.TrimSpace(o.Note) != "" {
 		line := fmt.Sprintf("- %s · gate %s: %s (%s)\n", e.now().Format("2006-01-02"), pending.Name, oneLine(o.Note), e.User)
 		if err := e.appendFile(id, "decisions.md", "# Decisiones en vuelo\n\n", line); err != nil {
 			out.Warnings = append(out.Warnings, "no se pudo guardar decisions.md: "+err.Error())
