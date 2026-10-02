@@ -194,3 +194,19 @@ func (g *Git) DiffLines(ctx context.Context, base string) (int, error) {
 	}
 	return total, nil
 }
+
+// DiffBinaries lista los binarios del diff de base...HEAD (numstat con "-" en las dos primeras columnas).
+func (g *Git) DiffBinaries(ctx context.Context, base string) ([]string, error) {
+	out, err := g.run(ctx, "diff", "--numstat", "--no-renames", base+"...HEAD")
+	if err != nil {
+		return nil, err
+	}
+	var bins []string
+	for _, l := range lines(out) {
+		f := strings.SplitN(l, "\t", 3)
+		if len(f) == 3 && f[0] == "-" && f[1] == "-" {
+			bins = append(bins, f[2])
+		}
+	}
+	return bins, nil
+}

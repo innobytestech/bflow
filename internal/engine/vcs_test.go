@@ -23,6 +23,7 @@ type fakeGit struct {
 	calls  []string
 	diff   []string // DiffNames
 	lines  int      // DiffLines
+	binary []string // DiffBinaries
 }
 
 func (g *fakeGit) CurrentBranch(context.Context) (string, error) { return g.branch, nil }
@@ -31,10 +32,11 @@ func (g *fakeGit) EnsureBranch(_ context.Context, name, base string) (string, er
 	g.branch = name
 	return "created", nil
 }
-func (g *fakeGit) Dirty(context.Context, []string) ([]string, error)   { return g.dirty, nil }
-func (g *fakeGit) HeadSHA(context.Context) (string, error)             { return "abc", nil }
-func (g *fakeGit) DiffNames(context.Context, string) ([]string, error) { return g.diff, nil }
-func (g *fakeGit) DiffLines(context.Context, string) (int, error)      { return g.lines, nil }
+func (g *fakeGit) Dirty(context.Context, []string) ([]string, error)      { return g.dirty, nil }
+func (g *fakeGit) HeadSHA(context.Context) (string, error)                { return "abc", nil }
+func (g *fakeGit) DiffNames(context.Context, string) ([]string, error)    { return g.diff, nil }
+func (g *fakeGit) DiffLines(context.Context, string) (int, error)         { return g.lines, nil }
+func (g *fakeGit) DiffBinaries(context.Context, string) ([]string, error) { return g.binary, nil }
 func (g *fakeGit) ChangedSince(context.Context, string, []string) ([]string, error) {
 	return nil, nil
 }

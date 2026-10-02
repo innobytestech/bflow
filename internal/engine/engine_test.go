@@ -46,6 +46,9 @@ func newEnv(t *testing.T, yaml string) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if cfg.VCS.BaseBranch == "" {
+		cfg.VCS.BaseBranch, cfg.VCS.Remote = "main", "origin" // diffBase() da origin/main
+	}
 	if !strings.Contains(t.Name(), "Scout") && cfg.Flow.Scout == nil {
 		off := false // el scout es opt-out en la config; solo sus pruebas lo quieren activo
 		cfg.Flow.Scout = &off

@@ -245,3 +245,29 @@ func TestDiffLines(t *testing.T) {
 		t.Error("una base que no existe es un error")
 	}
 }
+
+// R11: DiffBinaries lista solo los binarios del diff base...HEAD.
+func TestDiffBinaries(t *testing.T) {
+	work, _ := fixture(t)
+	g := New(work)
+	ctx := context.Background()
+	if _, err := g.EnsureBranch(ctx, "feature/X-3", "dev"); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := g.DiffBinaries(ctx, "origin/dev"); err != nil || len(got) != 0 {
+		t.Fatalf("sin cambios: %v %v", got, err)
+	}
+	write(t, work, "internal/b.go", "package a\nvar B = 1\n")
+	write(t, work, "img/logo.png", "\x89PNG\x00\x01\x02\x00")
+	write(t, work, "sin-extension", "\x00\x00\x01\x00")
+	sh(t, work, "add", ".")
+	sh(t, work, "commit", "-m", "cambios")
+	got, err := g.DiffBinaries(ctx, "origin/dev")
+	slices.Sort(got)
+	if err != nil || !slices.Equal(got, []string{"img/logo.png", "sin-extension"}) {
+		t.Errorf("DiffBinaries = %v, %v; quiero los dos binarios y no el .go", got, err)
+	}
+	if _, err := g.DiffBinaries(ctx, "origin/no-existe"); err == nil {
+		t.Error("una base que no existe es un error")
+	}
+}

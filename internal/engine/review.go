@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -79,7 +80,14 @@ func (e *Engine) reviewCoverage(ctx context.Context, id string) (cov review.Cove
 		}
 	}
 	isTest := func(p string) bool { return guard.MatchesTest(e.Cfg.Guard.TestPatterns, p) }
-	return review.Measure(diff, lines, reads, m.Red, isTest), m, hasMap
+	binary, err := e.Git.DiffBinaries(ctx, base)
+	if err != nil {
+		binary = nil // R11: se mide sin exentar binarios
+	}
+	for i := range binary {
+		binary[i] = strings.ReplaceAll(binary[i], `\`, "/")
+	}
+	return review.Measure(diff, lines, reads, m.Red, isTest, binary), m, hasMap
 }
 
 // isReviewer dice si el agente del reporte es el reviewer (con o sin prefijo).
@@ -89,7 +97,7 @@ func isReviewer(agent string) bool {
 
 // reviewIncomplete arma el rechazo de APPROVED cuando falta cobertura o formato
 // en el review-map (R7, R8); nil si no falta nada.
-func reviewIncomplete(cov review.Coverage, m review.Map, hasMap bool) *flow.Rejection {
+func reviewIncomplete(cov review.Coverage, m review.Map, hasMap bool, base string) *flow.Rejection {
 	if !hasMap {
 		return nil
 	}
@@ -97,6 +105,24 @@ func reviewIncomplete(cov review.Coverage, m review.Map, hasMap bool) *flow.Reje
 	if cov.Measured && len(cov.RedMissing) > 0 {
 		blocks = append(blocks, "El review-map marca como 🔴 archivos del diff que no abriste:\n- "+strings.Join(cov.RedMissing, "\n- ")+
 			"\nÁbrelos (Read o `git diff -- <ruta>`) antes de aprobar.")
+	}
+	if cov.Measured && len(cov.Pending) > 0 {
+		if base == "" {
+			base = "<base>"
+		}
+		shown, more := cov.Pending, 0
+		if len(shown) > 20 {
+			shown, more = shown[:20], len(shown)-20
+		}
+		b := "Archivos del diff (código y pruebas) que no abriste:\n- " + strings.Join(shown, "\n- ")
+		if more > 0 {
+			b += fmt.Sprintf("\n- y %d más", more)
+		}
+		b += "\nÁbrelos con Read o `git diff " + base + "...HEAD -- <ruta>`"
+		if cov.DiffLines < review.WholeDiffMax {
+			b += "; con menos de 1,500 líneas basta un `git diff " + base + "...HEAD` completo"
+		}
+		blocks = append(blocks, b+".")
 	}
 	if len(m.RedNoPath) > 0 {
 		blocks = append(blocks, "Estas viñetas 🔴 no empiezan con la ruta del archivo en backticks (`ruta`: razón):\n- "+strings.Join(m.RedNoPath, "\n- "))

@@ -37,6 +37,8 @@ type Git interface {
 	// DiffLines suma las líneas agregadas y borradas entre base y HEAD (triple
 	// punto); los archivos binarios cuentan 0.
 	DiffLines(ctx context.Context, base string) (int, error)
+	// DiffBinaries lista los archivos binarios del diff de tres puntos contra base.
+	DiffBinaries(ctx context.Context, base string) ([]string, error)
 	// Commit hace commit solo de paths con msg, aunque haya otras cosas en
 	// stage. Devuelve false si esos archivos no tenían cambios.
 	Commit(ctx context.Context, paths []string, msg string) (bool, error)

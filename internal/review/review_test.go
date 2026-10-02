@@ -94,7 +94,7 @@ func TestFromActionBash(t *testing.T) {
 		{"git -c core.pager=cat diff -- internal/a.go", []string{"internal/a.go"}},
 		{"git show HEAD:internal/a.go", []string{"internal/a.go"}},
 		{"git show HEAD -- internal/b.go", []string{"internal/b.go"}},
-		{"git diff -- no/existe.go", nil},
+		{"git diff -- no/existe.go", []string{"no/existe.go"}},
 		{"git diff --stat -- internal/a.go", nil},
 		{"git diff --numstat -- internal/a.go", nil},
 		{"git diff --shortstat -- internal/a.go", nil},
@@ -242,7 +242,7 @@ func rd(paths ...string) Read { return Read{TS: now, Tool: guard.Read, Paths: pa
 func TestMeasure(t *testing.T) {
 	diff := []string{"internal/a.go", "internal/b.go", "internal/c_test.go", "docs/g.md"}
 	reads := []Read{rd("internal/a.go"), {TS: now, Tool: guard.Bash, Paths: []string{"docs"}, ReadHook: true}}
-	c := Measure(diff, 300, reads, []string{"internal/a.go", "internal/b.go", "gone/x.go"}, isTest)
+	c := Measure(diff, 300, reads, []string{"internal/a.go", "internal/b.go", "gone/x.go"}, isTest, nil)
 	if !c.Measured || c.Total != 4 || c.Read != 2 || c.Whole {
 		t.Errorf("conteo: %+v", c)
 	}
@@ -262,7 +262,7 @@ func TestMeasure(t *testing.T) {
 	}
 
 	// Una carpeta cubre solo lo que contiene: "internal/a" no es "internal/ab.go".
-	if c := Measure([]string{"internal/ab.go"}, 10, []Read{rd("internal/a")}, nil, isTest); c.Read != 0 {
+	if c := Measure([]string{"internal/ab.go"}, 10, []Read{rd("internal/a")}, nil, isTest, nil); c.Read != 0 {
 		t.Errorf("prefijo de texto no es carpeta: %+v", c)
 	}
 
@@ -271,7 +271,7 @@ func TestMeasure(t *testing.T) {
 	for i := 0; i < 25; i++ {
 		many = append(many, fmt.Sprintf("pkg/f%02d.go", i))
 	}
-	big := Measure(many, 100, []Read{rd("otra/cosa.go")}, nil, isTest)
+	big := Measure(many, 100, []Read{rd("otra/cosa.go")}, nil, isTest, nil)
 	if len(big.Unread) != 25 {
 		t.Errorf("Unread guarda todos: %d", len(big.Unread))
 	}
@@ -284,11 +284,11 @@ func TestMeasure(t *testing.T) {
 func TestMeasureWholeDiffLimit(t *testing.T) {
 	diff := []string{"a.go", "b.go", "c.go"}
 	whole := []Read{{TS: now, Tool: guard.Bash, Whole: true, ReadHook: true}}
-	c := Measure(diff, WholeDiffMax-1, whole, []string{"a.go"}, isTest)
+	c := Measure(diff, WholeDiffMax-1, whole, []string{"a.go"}, isTest, nil)
 	if !c.Measured || c.Read != 3 || !c.Whole || len(c.Unread) != 0 || len(c.RedMissing) != 0 {
 		t.Errorf("con %d líneas un diff entero cubre todo: %+v", WholeDiffMax-1, c)
 	}
-	c = Measure(diff, WholeDiffMax, whole, []string{"a.go"}, isTest)
+	c = Measure(diff, WholeDiffMax, whole, []string{"a.go"}, isTest, nil)
 	if !c.Measured || c.Read != 0 || c.Whole || len(c.Unread) != 3 || !slices.Equal(c.RedMissing, []string{"a.go"}) {
 		t.Errorf("con %d líneas ya no cubre nada: %+v", WholeDiffMax, c)
 	}
@@ -300,16 +300,16 @@ func TestMeasureDirsRespectLimit(t *testing.T) {
 		return []Read{{TS: now, Tool: guard.Bash, Paths: []string{p}, ReadHook: true}}
 	}
 	for _, p := range []string{".", "internal"} {
-		c := Measure(diff, WholeDiffMax-1, rd(p), []string{"internal/a.go"}, isTest)
+		c := Measure(diff, WholeDiffMax-1, rd(p), []string{"internal/a.go"}, isTest, nil)
 		if c.Read == 0 || len(c.RedMissing) != 0 {
 			t.Errorf("ruta %q bajo el tope cubre: %+v", p, c)
 		}
-		c = Measure(diff, WholeDiffMax, rd(p), []string{"internal/a.go"}, isTest)
+		c = Measure(diff, WholeDiffMax, rd(p), []string{"internal/a.go"}, isTest, nil)
 		if c.Read != 0 || !slices.Equal(c.RedMissing, []string{"internal/a.go"}) {
 			t.Errorf("ruta %q en el tope no cubre: %+v", p, c)
 		}
 	}
-	c := Measure(diff, 5000, rd("internal/a.go"), nil, isTest)
+	c := Measure(diff, 5000, rd("internal/a.go"), nil, isTest, nil)
 	if c.Read != 1 {
 		t.Errorf("ruta exacta cubre sobre el tope: %+v", c)
 	}
@@ -321,7 +321,7 @@ func TestMeasureUnmeasured(t *testing.T) {
 		"sin lecturas": nil,
 		"sin hook":     {{TS: now, Tool: guard.Bash, Paths: []string{"a.go"}, ReadHook: false}},
 	} {
-		c := Measure(diff, 10, reads, []string{"a.go", "gone.go"}, isTest)
+		c := Measure(diff, 10, reads, []string{"a.go", "gone.go"}, isTest, nil)
 		if c.Measured || c.Read != 0 || len(c.RedMissing) != 0 {
 			t.Errorf("%s: %+v", name, c)
 		}
@@ -352,5 +352,93 @@ func TestDocsPending(t *testing.T) {
 	}
 	if got := DocsPending([]string{"docs/guia.md"}, diff, "- `docs/otra.md`: sin cambio: x\n"); !slices.Equal(got, []string{"docs/guia.md"}) {
 		t.Errorf("el motivo es de otra ruta: %v", got)
+	}
+}
+
+// R4: solo los lockfiles de la lista fija son generados.
+func TestIsGenerated(t *testing.T) {
+	yes := []string{"go.sum", "sub/go.sum", "go.work.sum", "package-lock.json", "web/package-lock.json", "npm-shrinkwrap.json",
+		"pnpm-lock.yaml", "bun.lockb", "Cargo.lock", "poetry.lock", "a/b/Gemfile.lock"}
+	no := []string{"go.mod", "package.json", "internal/a.go", "lock.go", "locks/a.go", "docs/lock", "pnpm-lock.yml"}
+	for _, p := range yes {
+		if !IsGenerated(p) {
+			t.Errorf("%q es un lockfile", p)
+		}
+	}
+	for _, p := range no {
+		if IsGenerated(p) {
+			t.Errorf("%q no es un lockfile", p)
+		}
+	}
+}
+
+// R4: docs, specs/ y lockfiles son exentos; el código y las pruebas no.
+func TestExempt(t *testing.T) {
+	for _, p := range []string{"README.md", "docs/guia.md", "specs/GH-1-x/spec.md", "specs/a.go", "go.sum", "web/package-lock.json"} {
+		if !Exempt(p) {
+			t.Errorf("%q es exento", p)
+		}
+	}
+	for _, p := range []string{"internal/a.go", "internal/a_test.go", "myspecs/a.go", "internal/specs/a.go", "go.mod"} {
+		if Exempt(p) {
+			t.Errorf("%q no es exento", p)
+		}
+	}
+}
+
+// R1, R3, R4, R5, R6: Pending son el código y las pruebas sin abrir que no son exentos ni binarios.
+func TestMeasurePending(t *testing.T) {
+	diff := []string{"internal/a.go", "internal/b.go", "internal/c.go", "internal/c_test.go", "docs/g.md", "specs/X/spec.md", "go.sum", "img/logo.png", "internal/d_test.go"}
+	reads := []Read{rd("internal/a.go", "internal/d_test.go")}
+	c := Measure(diff, 300, reads, []string{"internal/b.go"}, isTest, []string{"img/logo.png"})
+	if !slices.Equal(c.Pending, []string{"internal/c.go", "internal/c_test.go"}) {
+		t.Errorf("Pending = %v; quiero c.go y c_test.go en orden del diff (b.go va en RedMissing, no se repite)", c.Pending)
+	}
+	if !slices.Equal(c.RedMissing, []string{"internal/b.go"}) || !slices.Equal(c.Unread, []string{"internal/b.go", "internal/c.go", "go.sum", "img/logo.png"}) || c.UnreadOther != 3 {
+		t.Errorf("lo existente no cambia: red %v unread %v other %d", c.RedMissing, c.Unread, c.UnreadOther)
+	}
+	if c.DiffLines != 300 {
+		t.Errorf("DiffLines = %d", c.DiffLines)
+	}
+	// Sin 🔴, b.go también es pendiente.
+	if c := Measure(diff, 300, reads, nil, isTest, []string{"img/logo.png"}); !slices.Equal(c.Pending, []string{"internal/b.go", "internal/c.go", "internal/c_test.go"}) {
+		t.Errorf("sin 🔴: %v", c.Pending)
+	}
+	// Un git diff entero cubre todo con menos de WholeDiffMax; con más, no.
+	whole := []Read{{TS: now, Tool: guard.Bash, Whole: true, ReadHook: true}}
+	if c := Measure(diff, WholeDiffMax-1, whole, nil, isTest, nil); len(c.Pending) != 0 {
+		t.Errorf("diff entero y chico: %v", c.Pending)
+	}
+	if c := Measure(diff, WholeDiffMax, whole, nil, isTest, []string{"img/logo.png"}); len(c.Pending) != 5 {
+		t.Errorf("con %d líneas el diff entero no cubre: %v", WholeDiffMax, c.Pending)
+	}
+	// Sin medir no hay pendientes.
+	if c := Measure(diff, 300, nil, nil, isTest, nil); c.Measured || len(c.Pending) != 0 {
+		t.Errorf("sin medir: %+v", c)
+	}
+}
+
+// R7: lo que va después de -- cuenta como leído aunque el archivo ya no exista.
+func TestFromActionGitDeleted(t *testing.T) {
+	root := repoWith(t, "internal/a.go")
+	cases := []struct {
+		cmd  string
+		want []string
+	}{
+		{"git diff origin/main...HEAD -- internal/borrado.go", []string{"internal/borrado.go"}},
+		{"git show HEAD -- internal/borrado.go internal/a.go", []string{"internal/borrado.go", "internal/a.go"}},
+		{"git diff -- no/existe/", []string{"no/existe"}},
+		{"git diff -- ../../fuera.go", nil},
+	}
+	for _, c := range cases {
+		r := FromAction(guard.Action{Tool: guard.Bash, Command: c.cmd}, root, root, true, now)
+		if !slices.Equal(r.Paths, c.want) || r.Whole {
+			t.Errorf("%q: paths %v whole=%v; quiero %v", c.cmd, r.Paths, r.Whole, c.want)
+		}
+	}
+	// Antes del -- sigue pidiendo que exista.
+	r := FromAction(guard.Action{Tool: guard.Bash, Command: "git diff internal/borrado.go"}, root, root, true, now)
+	if len(r.Paths) != 0 {
+		t.Errorf("sin --, una ruta inexistente no cuenta: %v", r.Paths)
 	}
 }

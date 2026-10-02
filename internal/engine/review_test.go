@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -113,7 +114,7 @@ func TestReviewerApprovedNeedsRedRead(t *testing.T) {
 	if _, err := approve(v, id); err == nil {
 		t.Fatal("una carpeta no cubre con el diff sobre el tope")
 	}
-	addReads(t, v, id, readOf("internal/b.go"))
+	addReads(t, v, id, readOf("internal/b.go", "internal/c.go"))
 	o, err := approve(v, id)
 	if err != nil || o.To != flow.Documenting {
 		t.Fatalf("con b.go leído pasa: %+v %v", o, err)
@@ -226,7 +227,7 @@ func TestReviewerNeedsRedPathsAndDocs(t *testing.T) {
 func TestReviewCoverageLogged(t *testing.T) {
 	v, id, _ := inQuality(t, mapRed, diff4, 3000)
 	addReads(t, v, id, readOf("internal/a.go", "internal/b.go", "README.md"))
-	if _, err := approve(v, id); err != nil {
+	if _, err := v.e.Report(context.Background(), id, ReportOpts{Agent: "reviewer", Verdict: flow.RejectedV, Note: "falta c.go"}); err != nil {
 		t.Fatal(err)
 	}
 	evs := coverageEvents(t, v, id)
@@ -267,14 +268,14 @@ func qualityToWalkthrough(t *testing.T, v *env, id string) Outcome {
 func TestWalkthroughShowsCoverage(t *testing.T) {
 	t.Run("medida", func(t *testing.T) {
 		v, id, _ := inQuality(t, mapRed, diff4, 3000)
-		addReads(t, v, id, readOf("internal/a.go", "internal/b.go", "README.md"))
+		addReads(t, v, id, readOf("internal/a.go", "internal/b.go", "internal/c.go", "README.md"))
 		o := qualityToWalkthrough(t, v, id)
 		d := o.Next.Display
-		if !strings.HasPrefix(d, "**Cobertura del reviewer:**\nel reviewer leyó 3 de 4 archivos del diff") {
+		if !strings.HasPrefix(d, "**Cobertura del reviewer:**\nel reviewer leyó 4 de 4 archivos del diff") {
 			t.Fatalf("empieza con la cobertura:\n%s", d)
 		}
 		head := d[:strings.Index(d, "Tus respuestas")]
-		if !strings.Contains(head, "internal/c.go") || !strings.Contains(head, "gone/x.go") || !strings.Contains(head, "fuera del diff") {
+		if !strings.Contains(head, "gone/x.go") || !strings.Contains(head, "fuera del diff") {
 			t.Errorf("no leídos y 🔴 fuera del diff:\n%s", head)
 		}
 	})
@@ -327,4 +328,162 @@ func TestDocumenterDocsPending(t *testing.T) {
 	if err := done(v, id); err != nil {
 		t.Fatalf("sin review-map no aplica: %v", err)
 	}
+}
+
+// withTests deja que los *_test.go cuenten como pruebas en la cobertura.
+func withTests(v *env) { v.e.Cfg.Guard.TestPatterns = []string{"*_test.go"} }
+
+// R1, R3, R5: caso GH-46: las 🔴 leídas pero una prueba sin abrir se rechaza; lo 🔴 pendiente no se repite.
+func TestReviewerApprovedNeedsAllCode(t *testing.T) {
+	m := "## 🔴 Primero\n- `internal/b.go`: lógica\n## Docs\n- `README.md`\n"
+	v, id, _ := inQuality(t, m, []string{"internal/a.go", "internal/b.go", "internal/b_test.go", "README.md"}, 300)
+	withTests(v)
+	addReads(t, v, id, readOf("internal/a.go"))
+	_, err := approve(v, id)
+	rj := rejection(t, err, "review_incomplete")
+	if n := strings.Count(rj.Reason, "internal/b.go"); n != 1 {
+		t.Errorf("b.go (🔴 y pendiente) aparece una vez, no %d:\n%s", n, rj.Reason)
+	}
+	if !strings.Contains(rj.Reason, "internal/b_test.go") || !strings.Contains(rj.Reason, "no abriste") {
+		t.Errorf("la prueba sin abrir se lista:\n%s", rj.Reason)
+	}
+	if phaseOf(t, v, id) != flow.Quality {
+		t.Error("no avanza")
+	}
+
+	// Con las 🔴 leídas queda la prueba, y solo ella.
+	addReads(t, v, id, readOf("internal/b.go"))
+	rj = rejection(t, func() error { _, err := approve(v, id); return err }(), "review_incomplete")
+	if strings.Contains(rj.Reason, "El review-map marca") || !strings.Contains(rj.Reason, "internal/b_test.go") || strings.Contains(rj.Reason, "README.md") {
+		t.Errorf("solo la prueba pendiente:\n%s", rj.Reason)
+	}
+	addReads(t, v, id, readOf("internal/b_test.go"))
+	if o, err := approve(v, id); err != nil || o.To != flow.Documenting {
+		t.Fatalf("con todo abierto pasa: %+v %v", o, err)
+	}
+}
+
+// R2: con 25 pendientes se listan 20 en orden, "y 5 más" y la sugerencia con la base.
+func TestReviewerPendingListCapped(t *testing.T) {
+	var diff []string
+	for i := 1; i <= 25; i++ {
+		diff = append(diff, fmt.Sprintf("pkg/f%02d.go", i))
+	}
+	diff = append(diff, "README.md")
+	m := "## 🔴 Primero\n- `README.md`: ok\n## Docs\n- `README.md`\n"
+	reject := func(v *env, id string) string {
+		t.Helper()
+		addReads(t, v, id, readOf("README.md"))
+		_, err := approve(v, id)
+		return rejection(t, err, "review_incomplete").Reason
+	}
+
+	v, id, _ := inQuality(t, m, diff, 3000)
+	base := v.e.diffBase()
+	if base == "" {
+		t.Fatal("la config por defecto trae base")
+	}
+	r := reject(v, id)
+	if !strings.Contains(r, "\n- pkg/f01.go\n") || !strings.Contains(r, "\n- pkg/f20.go\n") || strings.Contains(r, "pkg/f21.go") || !strings.Contains(r, "\n- y 5 más") ||
+		strings.Index(r, "pkg/f01.go") > strings.Index(r, "pkg/f02.go") {
+		t.Errorf("20 en orden del diff y luego 'y 5 más':\n%s", r)
+	}
+	if !strings.Contains(r, "`git diff "+base+"...HEAD -- <ruta>`") || strings.Contains(r, "basta un") {
+		t.Errorf("sugiere git diff por ruta, sin el diff completo (3000 líneas):\n%s", r)
+	}
+
+	v, id, _ = inQuality(t, m, diff, 1499)
+	if r := reject(v, id); !strings.Contains(r, "basta un `git diff "+v.e.diffBase()+"...HEAD` completo") {
+		t.Errorf("con menos de 1,500 líneas sugiere el diff completo:\n%s", r)
+	}
+
+	v, id, _ = inQuality(t, m, diff, 3000)
+	v.e.Cfg.VCS.BaseBranch = ""
+	if r := reject(v, id); !strings.Contains(r, "`git diff <base>...HEAD -- <ruta>`") {
+		t.Errorf("sin base el texto dice <base>:\n%s", r)
+	}
+}
+
+// R4, R11: docs, specs/, lockfiles y binarios sin abrir no se exigen.
+func TestReviewerExemptNotRequired(t *testing.T) {
+	m := "## 🔴 Primero\n- `internal/a.go`: ok\n## Docs\n- `README.md`\n"
+	diff := []string{"internal/a.go", "README.md", "docs/guia.md", "specs/GH-1-x/spec.md", "go.sum", "assets/logo.png", "assets/blob"}
+	v, id, g := inQuality(t, m, diff, 3000)
+	g.binary = []string{"assets/logo.png", "assets/blob"}
+	addReads(t, v, id, readOf("internal/a.go"))
+	if o, err := approve(v, id); err != nil || o.To != flow.Documenting {
+		t.Fatalf("lo exento no se exige: %+v %v", o, err)
+	}
+	// Sin la lista de binarios, el que no es exento sí queda pendiente.
+	v, id, g = inQuality(t, m, diff, 3000)
+	g.binary = nil
+	addReads(t, v, id, readOf("internal/a.go"))
+	rj := rejection(t, func() error { _, err := approve(v, id); return err }(), "review_incomplete")
+	if !strings.Contains(rj.Reason, "assets/blob") || strings.Contains(rj.Reason, "README.md") || strings.Contains(rj.Reason, "go.sum") || strings.Contains(rj.Reason, "specs/") {
+		t.Errorf("solo lo no exento:\n%s", rj.Reason)
+	}
+}
+
+// R6: con un diff de 2 archivos y un git diff entero no se pide nada más.
+func TestReviewerSmallDiffWholeCovers(t *testing.T) {
+	m := "## 🔴 Primero\n- `internal/a.go`: ok\n## Docs\n- `README.md`\n"
+	v, id, _ := inQuality(t, m, []string{"internal/a.go", "internal/a_test.go"}, 80)
+	withTests(v)
+	addReads(t, v, id, review.Read{Tool: guard.Bash, Whole: true, ReadHook: true})
+	if o, err := approve(v, id); err != nil || o.To != flow.Documenting {
+		t.Fatalf("diff chico leído entero: %+v %v", o, err)
+	}
+	// Con 1500 líneas el diff entero no cubre; la 🔴 está fuera del diff, así que solo cuentan los pendientes.
+	m = "## 🔴 Primero\n- `gone.go`: ya no está\n## Docs\n- `README.md`\n"
+	v, id, _ = inQuality(t, m, []string{"internal/a.go", "internal/a_test.go"}, review.WholeDiffMax)
+	withTests(v)
+	addReads(t, v, id, review.Read{Tool: guard.Bash, Whole: true, ReadHook: true})
+	_ = rejection(t, func() error { _, err := approve(v, id); return err }(), "review_incomplete")
+}
+
+// R9, R10: REJECTED no se bloquea por pendientes y guarda pending en review_coverage.
+func TestReviewerPendingNotOnRejected(t *testing.T) {
+	v, id, _ := inQuality(t, mapRed, diff4, 3000)
+	addReads(t, v, id, readOf("internal/a.go", "internal/b.go"))
+	o, err := v.e.Report(context.Background(), id, ReportOpts{Agent: "reviewer", Verdict: flow.RejectedV, Note: "falta el caso vacío"})
+	if err != nil || o.To != flow.Implementing {
+		t.Fatalf("REJECTED pasa con c.go sin abrir: %+v %v", o, err)
+	}
+	evs := coverageEvents(t, v, id)
+	if len(evs) != 1 {
+		t.Fatalf("un evento: %+v", evs)
+	}
+	if p, _ := evs[0].Data["pending"].([]any); len(p) != 1 || p[0] != "internal/c.go" {
+		t.Errorf("pending guardado: %+v", evs[0].Data)
+	}
+	// Un evento viejo, sin pending, se lee igual.
+	b, _ := json.Marshal(map[string]any{"measured": true, "total": 4, "read": 3})
+	var c review.Coverage
+	if err := json.Unmarshal(b, &c); err != nil || len(c.Pending) != 0 || c.Read != 3 {
+		t.Errorf("evento viejo: %+v %v", c, err)
+	}
+}
+
+// R8: sin cobertura medida no se rechaza por pendientes.
+func TestReviewerPendingUnmeasured(t *testing.T) {
+	t.Run("sin lecturas", func(t *testing.T) {
+		v, id, _ := inQuality(t, mapRed, diff4, 3000)
+		if o, err := approve(v, id); err != nil || o.To != flow.Documenting {
+			t.Fatalf("%+v %v", o, err)
+		}
+	})
+	t.Run("lecturas que no vienen del hook", func(t *testing.T) {
+		v, id, _ := inQuality(t, mapRed, diff4, 3000)
+		addReads(t, v, id, review.Read{Tool: guard.Bash, Paths: []string{"internal/a.go"}})
+		if o, err := approve(v, id); err != nil || o.To != flow.Documenting {
+			t.Fatalf("%+v %v", o, err)
+		}
+	})
+	t.Run("sin review-map", func(t *testing.T) {
+		v, id, _ := inQuality(t, "", diff4, 3000)
+		addReads(t, v, id, readOf("internal/a.go"))
+		if o, err := approve(v, id); err != nil || o.To != flow.Documenting {
+			t.Fatalf("%+v %v", o, err)
+		}
+	})
 }
