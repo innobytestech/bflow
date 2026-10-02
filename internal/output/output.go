@@ -62,6 +62,7 @@ type Next struct {
 	Options  []Option    `json:"options,omitempty"`
 	Agents   []AgentCall `json:"agents,omitempty"`
 	Parallel bool        `json:"parallel,omitempty"`
+	Clear    bool        `json:"clear,omitempty"` // la gate avanzó la fase: buen momento para /clear
 	Reason   string      `json:"reason,omitempty"`
 }
 

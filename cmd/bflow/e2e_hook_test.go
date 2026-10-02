@@ -164,3 +164,41 @@ func TestGuardHumanOnlySubagent(t *testing.T) {
 		t.Errorf("falta el evento guard en el log:\n%s", raw)
 	}
 }
+
+func TestSessionStartTraeNext(t *testing.T) {
+	r, _ := gitRepo(t, "stack: go\nvcs: { base_branch: dev }\n")
+	out, _, code := r.hook("{}", "hook", "session-start")
+	if code != 0 || strings.Contains(out, "next: ") {
+		t.Fatalf("sin tarea activa no hay next: (%d) %q", code, out)
+	}
+
+	id := r.ok("task", "add", "Demo").Data["id"].(string)
+	r.ok("start", id, "--lane", "full")
+	out, errOut, code := r.hook("{}", "hook", "session-start")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	if len(lines) > 10 {
+		t.Errorf("máximo 10 líneas, hay %d:\n%s", len(lines), out)
+	}
+	var next string
+	for _, l := range lines {
+		if strings.HasPrefix(l, "next: ") {
+			next = strings.TrimPrefix(l, "next: ")
+		}
+	}
+	var n map[string]any
+	if err := json.Unmarshal([]byte(next), &n); err != nil {
+		t.Fatalf("falta línea next: con JSON válido: %v\n%s", err, out)
+	}
+	if _, ok := n["display"]; ok {
+		t.Error("el next compacto no lleva display")
+	}
+	if n["action"] == nil || n["gate"] != "discovery" {
+		t.Errorf("next: %v", n)
+	}
+	if lines[len(lines)-1] != "Sigue con /bflow." {
+		t.Errorf("última línea: %q", lines[len(lines)-1])
+	}
+}

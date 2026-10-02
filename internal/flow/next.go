@@ -322,3 +322,9 @@ func Upcoming(cfg Config, s State) Step {
 	}
 	return Step{}
 }
+
+// SuggestClear dice si, tras un approve que llevó la tarea a la fase to
+// (vacío si no cambió), conviene descartar la conversación.
+func SuggestClear(to Phase, n output.Next) bool {
+	return to != "" && n.Action != output.ActionDone
+}
