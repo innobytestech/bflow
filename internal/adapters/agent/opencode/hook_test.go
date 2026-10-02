@@ -90,7 +90,7 @@ func TestParseActionsRutaRelativa(t *testing.T) {
 }
 
 func TestParseActionsHerramientaIgnorada(t *testing.T) {
-	for _, tool := range []string{"read", "grep", "glob", "task", "webfetch", "inventada"} {
+	for _, tool := range []string{"grep", "glob", "task", "webfetch", "inventada"} {
 		acts, _, ok := Agent{}.ParseActions(input(t, tool, map[string]any{"filePath": "a.go", "command": "git reset --hard"}, nil))
 		if !ok || len(acts) != 0 {
 			t.Errorf("%s no le importa al guard: ok=%v acts=%+v", tool, ok, acts)
