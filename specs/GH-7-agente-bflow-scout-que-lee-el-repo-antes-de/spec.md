@@ -119,8 +119,8 @@ Scout de solo lectura (haiku/low) que corre una vez al entrar a la primera fase 
   - agents: `TestBuildScoutReadOnly`, `TestScoutContractStdin`.
   - cli: `TestReportStdinFlag`.
   (R1–R24)
-- [ ] T2 Flujo en `internal/flow`: start, enter, report/scoutReport, NextFor, Upcoming. Las pruebas existentes siguen verdes, porque `DefaultConfig` no trae scout. Si hace falta, `TestTableCoversEveryReachableTransition` suma el estado del scout. (R1–R11)
-- [ ] T3 Engine y CLI: `--stdin`, validaciones, escritura del archivo en la transacción, `show scout`, nudge. Se ajustan las pruebas de engine/cli que arrancan tareas con la config del repo. (R12–R17)
-- [ ] T4 Config: `flow.scout`, `Core()`, avisos y error de nombre reservado. (R18–R20)
-- [ ] T5 Agents y render: catálogo, `scoutContract`, `craft/scout.md`, Build y la lista de `show` en el contrato. Se comprueba que el render de Claude y el de OpenCode generan `bflow-scout` sin Edit/Write. (R21–R23)
-- [ ] T6 Oficios: spec-author, implementer y la sección discovery de `adapters/leader/bflow.md` parten del reporte del scout. Se re-renderizan los agentes del repo. (R24)
+- [x] T2 Flujo en `internal/flow`: start, enter, report/scoutReport, NextFor, Upcoming. Las pruebas existentes siguen verdes, porque `DefaultConfig` no trae scout. Si hace falta, `TestTableCoversEveryReachableTransition` suma el estado del scout. (R1–R11)
+- [x] T3 Engine y CLI: `--stdin`, validaciones, escritura del archivo en la transacción, `show scout`, nudge. Se ajustan las pruebas de engine/cli que arrancan tareas con la config del repo. (R12–R17)
+- [x] T4 Config: `flow.scout`, `Core()`, avisos y error de nombre reservado. (R18–R20)
+- [x] T5 Agents y render: catálogo, `scoutContract`, `craft/scout.md`, Build y la lista de `show` en el contrato. Se comprueba que el render de Claude y el de OpenCode generan `bflow-scout` sin Edit/Write. (R21–R23)
+- [x] T6 Oficios: spec-author, implementer y la sección discovery de `adapters/leader/bflow.md` parten del reporte del scout. Se re-renderizan los agentes del repo. (R24)

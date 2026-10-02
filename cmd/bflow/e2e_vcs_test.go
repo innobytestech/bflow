@@ -92,7 +92,7 @@ func gitRepo(t *testing.T, bflowYAML string) (*repo, string) {
 	git(t, r.dir, "config", "user.email", "t@t")
 	os.MkdirAll(filepath.Join(r.dir, "internal"), 0o755)
 	os.WriteFile(filepath.Join(r.dir, "internal", "a.go"), []byte("package a\n"), 0o644)
-	os.WriteFile(filepath.Join(r.dir, "bflow.yaml"), []byte(bflowYAML), 0o644)
+	os.WriteFile(filepath.Join(r.dir, "bflow.yaml"), []byte(noScout(bflowYAML)), 0o644)
 	git(t, r.dir, "add", ".")
 	git(t, r.dir, "commit", "-m", "inicio")
 	git(t, r.dir, "remote", "add", "origin", remote)
