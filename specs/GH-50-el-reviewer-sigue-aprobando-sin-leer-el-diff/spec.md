@@ -113,12 +113,12 @@ func Measure(diff []string, diffLines int, reads []Read, red []string, isTest fu
 
 ## Tasks
 
-- [ ] T1 Contrato. Firmas y pruebas nuevas que fallan.
+- [x] T1 Contrato. Firmas y pruebas nuevas que fallan.
   - Firmas: `review.IsGenerated`, `review.Exempt`, `review.ListCapped`, `Coverage.Pending`/`DiffLines`, `Measure(..., binary []string)`, `vcs.Git.DiffBinaries` y `fakeGit.binary`. Las llamadas existentes a `Measure` pasan `nil`.
   - Pruebas en `internal/review/review_test.go`: `TestIsGenerated` (R4), `TestExempt` (R4), `TestMeasurePending` (R1, R3, R4, R5, R6) y `TestFromActionGitDeleted` (R7).
   - Prueba en `internal/adapters/vcs/git/git_test.go`: `TestDiffBinaries` (R11).
   - Pruebas en `internal/engine/review_test.go`: `TestReviewerApprovedNeedsAllCode` (R1, R3; caso GH-46: 🔴 leídos, una prueba sin abrir), `TestReviewerPendingListCapped` (R2; 25 pendientes, 20 y "y 5 más", sugerencia con base), `TestReviewerExemptNotRequired` (R4; docs, `specs/`, `go.sum` y binario sin abrir pasan), `TestReviewerSmallDiffWholeCovers` (R6; 2 archivos y un `git diff` entero pasan), `TestReviewerPendingNotOnRejected` (R9, R10; REJECTED pasa y guarda `pending`) y `TestReviewerPendingUnmeasured` (R8).
-- [ ] T2 `internal/review`: `IsGenerated`, `Exempt`, `ListCapped`, `Pending` en `Measure` y rutas después de `--` sin `exists` en `fromGit`. (R3-R7, R10)
-- [ ] T3 `vcs.Git.DiffBinaries` en la interfaz y el adaptador git. (R11)
-- [ ] T4 Engine: `reviewCoverage` con binarios y `reviewIncomplete` con el bloque de pendientes y la base. Hay que ajustar `TestReviewerApprovedNeedsRedRead`, `TestReviewCoverageLogged` y `TestWalkthroughShowsCoverage/medida`, que aprobaban con `internal/c.go` sin abrir: que lo lean, o que pasen a REJECTED donde se verifica el registro. (R1, R2, R5, R8, R9)
-- [ ] T5 Instrucciones del reviewer en `internal/agents/craft/reviewer.md` y `bflow render` (`render --check` en verde). Además, `docs/guia.md:34` y `CHANGELOG.md`. (R12, R13)
+- [x] T2 `internal/review`: `IsGenerated`, `Exempt`, `ListCapped`, `Pending` en `Measure` y rutas después de `--` sin `exists` en `fromGit`. (R3-R7, R10)
+- [x] T3 `vcs.Git.DiffBinaries` en la interfaz y el adaptador git. (R11)
+- [x] T4 Engine: `reviewCoverage` con binarios y `reviewIncomplete` con el bloque de pendientes y la base. Hay que ajustar `TestReviewerApprovedNeedsRedRead`, `TestReviewCoverageLogged` y `TestWalkthroughShowsCoverage/medida`, que aprobaban con `internal/c.go` sin abrir: que lo lean, o que pasen a REJECTED donde se verifica el registro. (R1, R2, R5, R8, R9)
+- [x] T5 Instrucciones del reviewer en `internal/agents/craft/reviewer.md` y `bflow render` (`render --check` en verde). Además, `docs/guia.md:34` y `CHANGELOG.md`. (R12, R13)

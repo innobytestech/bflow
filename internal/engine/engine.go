@@ -147,7 +147,7 @@ func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug s
 		if ev.Kind == flow.EvReport && rec.Flow.Phase == flow.Quality && isReviewer(ev.Agent) {
 			cov, m, hasMap := e.reviewCoverage(ctx, id)
 			if ev.Verdict == flow.Approved {
-				if rej := reviewIncomplete(cov, m, hasMap); rej != nil {
+				if rej := reviewIncomplete(cov, m, hasMap, e.diffBase()); rej != nil {
 					return rej
 				}
 			}

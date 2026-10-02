@@ -179,9 +179,7 @@ func fromGit(args []string, r *Read, add func(string), exists func(string, bool)
 	}
 	found := len(after) > 0
 	for _, t := range after {
-		if n, ok := exists(t, false); ok {
-			add(n)
-		}
+		add(t) // R7: pueden estar borradas en la rama
 	}
 	if !dashes {
 		for _, t := range before {
@@ -396,13 +394,22 @@ type Coverage struct {
 
 // IsGenerated dice si p es un lockfile conocido: base go.sum, go.work.sum,
 // package-lock.json, npm-shrinkwrap.json, pnpm-lock.yaml, bun.lockb, o extensión .lock.
-func IsGenerated(p string) bool { return false }
+func IsGenerated(p string) bool {
+	b := path.Base(strings.ReplaceAll(p, `\`, "/"))
+	switch b {
+	case "go.sum", "go.work.sum", "package-lock.json", "npm-shrinkwrap.json", "pnpm-lock.yaml", "bun.lockb":
+		return true
+	}
+	return strings.HasSuffix(b, ".lock")
+}
 
 // Exempt dice si p no se exige al reviewer: IsDoc, bajo specs/ o IsGenerated.
-func Exempt(p string) bool { return false }
+func Exempt(p string) bool {
+	return IsDoc(p) || strings.HasPrefix(strings.ReplaceAll(p, `\`, "/"), "specs/") || IsGenerated(p)
+}
 
 // ListCapped lista ps, a lo sumo 20, y agrega "y K más" si hay más.
-func ListCapped(ps []string) string { return "" }
+func ListCapped(ps []string) string { return list(ps) }
 
 // Measure calcula la cobertura de reads contra los archivos del diff (R6, R10, R11).
 func Measure(diff []string, diffLines int, reads []Read, red []string, isTest func(string) bool, binary []string) Coverage {
@@ -435,14 +442,20 @@ func Measure(diff []string, diffLines int, reads []Read, red []string, isTest fu
 		}
 		return false
 	}
+	c.DiffLines = diffLines
+	var pending []string
 	for _, f := range diff {
 		switch {
 		case covered(f):
 			c.Read++
+			continue
 		case (isTest != nil && isTest(f)) || IsDoc(f):
 			c.UnreadOther++
 		default:
 			c.Unread = append(c.Unread, f)
+		}
+		if !Exempt(f) && !slices.Contains(binary, f) {
+			pending = append(pending, f)
 		}
 	}
 	for _, p := range red {
@@ -451,6 +464,11 @@ func Measure(diff []string, diffLines int, reads []Read, red []string, isTest fu
 			c.RedOutside = append(c.RedOutside, p)
 		case !covered(p):
 			c.RedMissing = append(c.RedMissing, p)
+		}
+	}
+	for _, f := range pending {
+		if !slices.Contains(c.RedMissing, f) {
+			c.Pending = append(c.Pending, f)
 		}
 	}
 	return c

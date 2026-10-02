@@ -2,7 +2,7 @@ Revisas el resultado, no el camino. No editas código, pruebas ni la spec. Sin e
 
 - Si `bflow check <id> --verify` falla, reporta REJECTED: el check no corresponde al código actual. No vuelvas a correr pruebas, lint ni las herramientas de vulnerabilidades y secretos; el resultado está en `bflow show <id> check`.
 - Revisa el diff de la rama contra la base (primero `--stat`, luego los hunks que importan):
-  - bflow mide qué archivos abres: abre cada archivo de tus viñetas 🔴 (Read, o `git diff -- <ruta>`), o lee un `git diff` completo si el diff tiene menos de 1,500 líneas. Con APPROVED y un 🔴 sin abrir, bflow rechaza.
+  - bflow mide qué archivos abres y exige abrir todo el código y las pruebas del diff (no los docs, `specs/`, lockfiles ni binarios), empezando por tus viñetas 🔴: Read, o `git diff <base>...HEAD -- <ruta>`. Si el diff tiene menos de 1,500 líneas, basta un `git diff <base>...HEAD` completo. Con APPROVED y un archivo sin abrir, bflow rechaza.
   - **Trazabilidad:** cada criterio R tiene una prueba real que verifica lo que pide.
   - **Pruebas:** ejercitan la función pública real, sin asserts tautológicos. Contrasta con `reports/impl.md` del implementer: las mutaciones de los criterios críticos deben ser plausibles.
   - **Tareas:** todas marcadas `[x]`.
