@@ -176,7 +176,7 @@ func usageTable(b *strings.Builder, title string, m map[string]metrics.Usage, na
 	if _, legacy := m[""]; len(m) == 0 || (len(m) == 1 && legacy) {
 		return
 	}
-	row := "  %-22s %8s %8s %8s %8s\n"
+	row := "  %-22s %8s %8s %8s %8s %9s\n"
 	fmt.Fprintf(b, row, title, "nuevos", "caché", "llamadas", "ctx máx", "ctx final")
 	for _, k := range byNew(m) {
 		name := k
