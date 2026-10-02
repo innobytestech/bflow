@@ -114,7 +114,7 @@ func TestReviewerApprovedNeedsRedRead(t *testing.T) {
 	if _, err := approve(v, id); err == nil {
 		t.Fatal("una carpeta no cubre con el diff sobre el tope")
 	}
-	addReads(t, v, id, readOf("internal/b.go"))
+	addReads(t, v, id, readOf("internal/b.go", "internal/c.go"))
 	o, err := approve(v, id)
 	if err != nil || o.To != flow.Documenting {
 		t.Fatalf("con b.go leído pasa: %+v %v", o, err)
@@ -227,7 +227,7 @@ func TestReviewerNeedsRedPathsAndDocs(t *testing.T) {
 func TestReviewCoverageLogged(t *testing.T) {
 	v, id, _ := inQuality(t, mapRed, diff4, 3000)
 	addReads(t, v, id, readOf("internal/a.go", "internal/b.go", "README.md"))
-	if _, err := approve(v, id); err != nil {
+	if _, err := v.e.Report(context.Background(), id, ReportOpts{Agent: "reviewer", Verdict: flow.RejectedV, Note: "falta c.go"}); err != nil {
 		t.Fatal(err)
 	}
 	evs := coverageEvents(t, v, id)
@@ -268,14 +268,14 @@ func qualityToWalkthrough(t *testing.T, v *env, id string) Outcome {
 func TestWalkthroughShowsCoverage(t *testing.T) {
 	t.Run("medida", func(t *testing.T) {
 		v, id, _ := inQuality(t, mapRed, diff4, 3000)
-		addReads(t, v, id, readOf("internal/a.go", "internal/b.go", "README.md"))
+		addReads(t, v, id, readOf("internal/a.go", "internal/b.go", "internal/c.go", "README.md"))
 		o := qualityToWalkthrough(t, v, id)
 		d := o.Next.Display
-		if !strings.HasPrefix(d, "**Cobertura del reviewer:**\nel reviewer leyó 3 de 4 archivos del diff") {
+		if !strings.HasPrefix(d, "**Cobertura del reviewer:**\nel reviewer leyó 4 de 4 archivos del diff") {
 			t.Fatalf("empieza con la cobertura:\n%s", d)
 		}
 		head := d[:strings.Index(d, "Tus respuestas")]
-		if !strings.Contains(head, "internal/c.go") || !strings.Contains(head, "gone/x.go") || !strings.Contains(head, "fuera del diff") {
+		if !strings.Contains(head, "gone/x.go") || !strings.Contains(head, "fuera del diff") {
 			t.Errorf("no leídos y 🔴 fuera del diff:\n%s", head)
 		}
 	})

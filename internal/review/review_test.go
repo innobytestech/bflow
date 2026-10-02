@@ -401,7 +401,7 @@ func TestMeasurePending(t *testing.T) {
 		t.Errorf("DiffLines = %d", c.DiffLines)
 	}
 	// Sin 🔴, b.go también es pendiente.
-	if c := Measure(diff, 300, reads, nil, isTest, nil); !slices.Equal(c.Pending, []string{"internal/b.go", "internal/c.go", "internal/c_test.go"}) {
+	if c := Measure(diff, 300, reads, nil, isTest, []string{"img/logo.png"}); !slices.Equal(c.Pending, []string{"internal/b.go", "internal/c.go", "internal/c_test.go"}) {
 		t.Errorf("sin 🔴: %v", c.Pending)
 	}
 	// Un git diff entero cubre todo con menos de WholeDiffMax; con más, no.
@@ -409,7 +409,7 @@ func TestMeasurePending(t *testing.T) {
 	if c := Measure(diff, WholeDiffMax-1, whole, nil, isTest, nil); len(c.Pending) != 0 {
 		t.Errorf("diff entero y chico: %v", c.Pending)
 	}
-	if c := Measure(diff, WholeDiffMax, whole, nil, isTest, nil); len(c.Pending) != 4 {
+	if c := Measure(diff, WholeDiffMax, whole, nil, isTest, []string{"img/logo.png"}); len(c.Pending) != 5 {
 		t.Errorf("con %d líneas el diff entero no cubre: %v", WholeDiffMax, c.Pending)
 	}
 	// Sin medir no hay pendientes.
