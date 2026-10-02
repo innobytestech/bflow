@@ -100,6 +100,20 @@ func TestTokenSourcesSessionIDInvalido(t *testing.T) {
 	}
 }
 
+// Un mensaje que se reescribe con más salida: la última muestra lleva el total.
+func TestReadUsageLastContextAccumulated(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ses_1.jsonl")
+	appendTo(t, path, ul("m1", "ses_1", "", "build", 100, 10, 0, 20, 7, 1790877056374))
+	appendTo(t, path, ul("m1", "ses_1", "", "build", 100, 40, 0, 20, 7, 1790877056999))
+	got, err := Agent{}.ReadUsage(path, &metrics.Cursor{})
+	if err != nil || len(got) != 2 {
+		t.Fatalf("%v %+v", err, got)
+	}
+	if got[0].LastContext != 137 || got[1].LastContext != 167 {
+		t.Errorf("contexto final %d, %d; want 137, 167", got[0].LastContext, got[1].LastContext)
+	}
+}
+
 func TestReadUsageMapeo(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "ses_1.jsonl")
 	appendTo(t, path, ul("m1", "ses_1", "", "build", 100, 30, 5, 20, 7, 1790877056374))
@@ -109,7 +123,7 @@ func TestReadUsageMapeo(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []metrics.Sample{{TS: time.UnixMilli(1790877056374), Model: "anthropic/claude-sonnet-4",
-		Usage: metrics.Usage{Input: 100, Output: 35, CacheRead: 20, CacheWrite: 7, Calls: 1, MaxContext: 127}}}
+		Usage: metrics.Usage{Input: 100, Output: 35, CacheRead: 20, CacheWrite: 7, Calls: 1, MaxContext: 127, LastContext: 162}}}
 	if len(got) != 1 || !got[0].TS.Equal(want[0].TS) || got[0].Model != want[0].Model || got[0].Usage != want[0].Usage {
 		t.Fatalf("got %+v, want %+v (output suma reasoning; modelo proveedor/modelo; hora = completed)", got, want)
 	}

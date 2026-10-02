@@ -130,6 +130,8 @@ func (Agent) ReadUsage(path string, cur *metrics.Cursor) ([]metrics.Sample, erro
 		delta := metrics.Usage{Input: max(0, u.Input-prev.Input), Output: max(0, u.Output-prev.Output),
 			CacheRead: max(0, u.CacheRead-prev.CacheRead), CacheWrite: max(0, u.CacheWrite-prev.CacheWrite),
 			MaxContext: u.Input + u.CacheRead + u.CacheWrite}
+		delta.LastContext = max(u.Input, prev.Input) + max(u.CacheRead, prev.CacheRead) +
+			max(u.CacheWrite, prev.CacheWrite) + max(u.Output, prev.Output)
 		if !seen {
 			delta.Calls = 1
 		}

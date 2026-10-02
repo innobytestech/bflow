@@ -163,8 +163,10 @@ func TestUsageTotal(t *testing.T) {
 	if u.Total() != 10 {
 		t.Error("total")
 	}
-	if Human(184_300) != "184k" || Human(1_250_000) != "1.2M" || Human(900) != "900" {
-		t.Errorf("formato: %s %s %s", Human(184_300), Human(1_250_000), Human(900))
+	for n, want := range map[int64]string{15_916: "15.9k", 184_300: "184.3k", 999_960: "1.0M", 1_250_000: "1.2M", 900: "900"} {
+		if got := Human(n); got != want {
+			t.Errorf("Human(%d) = %q, want %q", n, got, want)
+		}
 	}
 }
 
@@ -174,7 +176,7 @@ func TestTokensNewVersusCache(t *testing.T) {
 	if u.New() != 145_100 {
 		t.Errorf("nuevos: %d", u.New())
 	}
-	if s := Tokens(u.New(), u.CacheRead); s != "145k nuevos · 2.9M caché" {
+	if s := Tokens(u.New(), u.CacheRead); s != "145.1k nuevos · 2.9M caché" {
 		t.Errorf("formato: %q", s)
 	}
 	if s := Tokens(900, 0); s != "900 nuevos" {
@@ -191,14 +193,18 @@ func TestSummaryAndDetailExplainCache(t *testing.T) {
 	if impl.Calls != 2 || impl.MaxContext != 140_000 {
 		t.Fatalf("Add suma llamadas y se queda con el contexto mayor: %+v", impl)
 	}
-	if s := Detail(impl); s != "14k nuevos · 2 llamadas de hasta 140k" {
+	if s := Detail(impl); s != "14.0k nuevos · 2 llamadas de hasta 140.0k" {
 		t.Errorf("agente: %q", s)
 	}
-	if s := Summary(impl); s != "14k nuevos · 190k releídos de caché en 2 llamadas" {
+	if s := Summary(impl); s != "14.0k nuevos · 190.0k releídos de caché en 2 llamadas" {
 		t.Errorf("total: %q", s)
 	}
+	impl.Add(Usage{LastContext: 15_916})
+	if s := Detail(impl); s != "14.0k nuevos · 2 llamadas de hasta 140.0k · final 15.9k" {
+		t.Errorf("con contexto final: %q", s)
+	}
 	old := Usage{Output: 1_000, CacheRead: 50_000}
-	if Detail(old) != "1k nuevos · 50k caché" || Summary(old) != "1k nuevos · 50k caché" {
+	if Detail(old) != "1.0k nuevos · 50.0k caché" || Summary(old) != "1.0k nuevos · 50.0k caché" {
 		t.Errorf("sin llamadas: %q %q", Detail(old), Summary(old))
 	}
 }
@@ -254,6 +260,37 @@ func TestAllot(t *testing.T) {
 	}
 	if Allot(log, "T-1", "", nil) != nil || PhaseAt(log, "OTRA-1", at(5)) != "" {
 		t.Error("sin muestras o sin historial no hay reparto")
+	}
+}
+
+// El contexto final es el de la última llamada del agente, no el máximo ni la
+// suma, aunque sus llamadas caigan en dos fases; los datos viejos lo dejan en 0.
+func TestLastContextLastWins(t *testing.T) {
+	log := []store.Entry{
+		e(0, "start", flow.Backlog, flow.Implementing),
+		e(10, "report", flow.Implementing, flow.Quality, verdict("implementer", "DONE")),
+	}
+	sm := func(min int, model string, ctx int64) Sample {
+		return Sample{TS: at(min), Model: model, Usage: Usage{Output: 1, Calls: 1, MaxContext: ctx * 2, LastContext: ctx}}
+	}
+	// Sesión principal: dos fases y dos modelos; la última muestra es de quality.
+	shares := Allot(log, "T-1", "", []Sample{sm(1, "opus", 900), sm(5, "sonnet", 800), sm(12, "opus", 300)})
+	var all []store.Entry
+	for _, sh := range shares {
+		d := map[string]any{"phase": string(sh.Phase), "model": sh.Model, "output": float64(sh.Output)}
+		if sh.LastContext > 0 {
+			d["last_context"] = float64(sh.LastContext)
+		}
+		all = append(all, store.Entry{TS: at(20), ID: "T-1", Event: "tokens", Agent: "implementer", Data: d})
+	}
+	st := Compute("T-1", append(log, all...), at(30))
+	if got := st.Agents["implementer"].LastContext; got != 300 {
+		t.Errorf("contexto final = %d, want 300 (el de la última llamada)", got)
+	}
+	// Datos viejos: sin last_context.
+	old := Compute("T-1", append(log, tokens(flow.Implementing, 1, 1, 1, 1)), at(30))
+	if old.Tokens.LastContext != 0 {
+		t.Errorf("datos viejos: %d", old.Tokens.LastContext)
 	}
 }
 

@@ -41,17 +41,17 @@ Carril light, sin discovery. Formato en `internal/metrics/metrics.go` (`Human`, 
 
 ## Tasks
 
-- [ ] **T1 Redondeo a un decimal.** `metrics.Human(n)`: `n < 1000` → `"900"`; `1000 ≤ n` → `fmt.Sprintf("%.1fk", float64(n)/1e3)`; si el resultado redondeado es ≥ 1000.0k o `n ≥ 1_000_000` → `"%.1fM"`.
+- [x] **T1 Redondeo a un decimal.** `metrics.Human(n)`: `n < 1000` → `"900"`; `1000 ≤ n` → `fmt.Sprintf("%.1fk", float64(n)/1e3)`; si el resultado redondeado es ≥ 1000.0k o `n ≥ 1_000_000` → `"%.1fM"`.
   - CUANDO n = 15,916, `Human` DEBE devolver `15.9k`; con 184,300 → `184.3k`; con 999,960 → `1.0M`; con 1,250,000 → `1.2M`; con 900 → `900`.
   - Actualizar `TestHuman`/las aserciones de `metrics_test.go` y cualquier otra prueba que fije el formato viejo.
-- [ ] **T2 Contexto final en las muestras.** Agregar `LastContext int64 \`json:"last_context,omitempty"\`` a `metrics.Usage` con su comentario. En `claude/transcript.go` y `opencode/transcript.go`, cada muestra lleva `LastContext` = input + cache_read + cache_write + output **acumulados del mensaje** (los mismos que se guardan en `cur.Seen`).
+- [x] **T2 Contexto final en las muestras.** Agregar `LastContext int64 \`json:"last_context,omitempty"\`` a `metrics.Usage` con su comentario. En `claude/transcript.go` y `opencode/transcript.go`, cada muestra lleva `LastContext` = input + cache_read + cache_write + output **acumulados del mensaje** (los mismos que se guardan en `cur.Seen`).
   - CUANDO un mensaje llega en varias líneas, la última muestra de ese mensaje DEBE llevar el contexto con la salida completa.
   - Prueba en cada lector con un mensaje partido en dos líneas.
-- [ ] **T3 Agregación "el último gana".** `Usage.Add`: si `o.LastContext > 0`, `u.LastContext = o.LastContext`. En `Allot`, solo la `Share` que contiene la muestra de índice mayor (la última del transcript) conserva `LastContext`; las demás lo dejan en 0. `addTokens` escribe `last_context` en la entrada `tokens` cuando es > 0, y `usageOf` lo lee.
+- [x] **T3 Agregación "el último gana".** `Usage.Add`: si `o.LastContext > 0`, `u.LastContext = o.LastContext`. En `Allot`, solo la `Share` que contiene la muestra de índice mayor (la última del transcript) conserva `LastContext`; las demás lo dejan en 0. `addTokens` escribe `last_context` en la entrada `tokens` cuando es > 0, y `usageOf` lo lee.
   - CUANDO un agente tiene llamadas en dos fases, `TaskStats.Agents[agente].LastContext` DEBE ser el de su última llamada, no el máximo ni la suma.
   - CUANDO las entradas `tokens` no traen `last_context` (datos viejos), DEBE quedar 0 y nada falla.
   - Pruebas en `metrics_test.go` para `Allot` + `Compute`.
-- [ ] **T4 Mostrarlo.** `metrics.Detail`: con llamadas, `"<nuevos> nuevos · <n> llamadas de hasta <máx> · final <final>"`; el tramo `· final …` se omite si `LastContext == 0`. `usageTable` en `metricscmds.go` agrega la columna `ctx final` (con `tok`, que da `-` si es 0). watch y panel lo heredan de `Detail`.
+- [x] **T4 Mostrarlo.** `metrics.Detail`: con llamadas, `"<nuevos> nuevos · <n> llamadas de hasta <máx> · final <final>"`; el tramo `· final …` se omite si `LastContext == 0`. `usageTable` en `metricscmds.go` agrega la columna `ctx final` (con `tok`, que da `-` si es 0). watch y panel lo heredan de `Detail`.
   - CUANDO un agente tiene `LastContext` = 15,916, watch y panel DEBEN mostrar `final 15.9k` en su línea.
   - Actualizar la prueba de `Detail` (`14.0k nuevos · 2 llamadas de hasta 140.0k`, más el caso con final).
-- [ ] **T5 Docs.** Entrada en `CHANGELOG.md` (redondeo y contexto final) y, si el README describe la línea por agente o la tabla de `bflow metrics`, actualizar el ejemplo. Verificar que `go test ./...` pasa.
+- [x] **T5 Docs.** Entrada en `CHANGELOG.md` (redondeo y contexto final) y, si el README describe la línea por agente o la tabla de `bflow metrics`, actualizar el ejemplo. Verificar que `go test ./...` pasa.

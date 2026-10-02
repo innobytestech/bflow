@@ -6,6 +6,7 @@ Los cambios de bflow que ve quien lo usa. Las versiones siguen [semver](https://
 
 ### Agregado
 
+- **Tokens con un decimal y contexto final.** `bflow watch`, el panel y `bflow metrics` redondean los miles a un decimal (`15.9k`, ya no `15k`) y muestran el contexto final de cada agente (última llamada: entrada, caché y salida), la cifra del agent map de Claude Code: `final 15.9k` en watch y panel, columna `ctx final` en `bflow metrics`. Las tareas ya registradas no lo traen y no lo muestran.
 - **Instalación en un paso (`bflow install claude`).** Escribe la skill en `~/.claude/skills/bflow` y, dentro de un repo con `bflow.yaml`, fusiona en `.claude/settings.json` los hooks, el permiso `Bash(bflow *)`, la barra de estado y `attribution` sin tocar lo tuyo: las entradas de bflow se reemplazan, las demás se conservan con su orden; una `statusLine` ajena se deja y avisa. Correrlo dos veces no cambia nada. Con `agent: claude` también corre `render`. `--skill-only` instala solo la skill. `bflow install opencode` avisa que aún no hay adaptador.
 - **`bflow update` refresca la skill** con el binario nuevo si ya la tenías instalada.
 - **`doctor`** avisa si la skill instalada no coincide con la del binario, sugiere `bflow install claude` cuando faltan hooks, y avisa si el tracker es local en un repo con dos o más autores en 90 días (`.bflow/` no se comparte).

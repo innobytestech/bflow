@@ -42,6 +42,20 @@ func sum(ss []metrics.Sample) map[string]metrics.Usage {
 	return out
 }
 
+// Un mensaje partido en dos líneas: la última muestra lleva la salida completa.
+func TestReadUsageLastContextAccumulated(t *testing.T) {
+	main := filepath.Join(t.TempDir(), "s.jsonl")
+	appendTo(t, main, line("m1", opus, 2, 10, 1000, 300))
+	appendTo(t, main, line("m1", opus, 2, 40, 1000, 300))
+	ss, err := (Agent{}).ReadUsage(main, &metrics.Cursor{})
+	if err != nil || len(ss) != 2 {
+		t.Fatalf("%v %+v", err, ss)
+	}
+	if ss[0].LastContext != 1312 || ss[1].LastContext != 1342 {
+		t.Errorf("contexto final %d, %d; want 1312, 1342", ss[0].LastContext, ss[1].LastContext)
+	}
+}
+
 func TestReadUsageIncrementalWithDuplicates(t *testing.T) {
 	dir := testutil.TempDir(t)
 	main := filepath.Join(dir, "sess-1.jsonl")
@@ -58,7 +72,7 @@ func TestReadUsageIncrementalWithDuplicates(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Dos llamadas (m1 y m2, aunque m1 venga en dos líneas); la más grande leyó 2001.
-	want := map[string]metrics.Usage{opus: {Input: 3, Output: 45, CacheRead: 3000, CacheWrite: 300, Calls: 2, MaxContext: 2001}}
+	want := map[string]metrics.Usage{opus: {Input: 3, Output: 45, CacheRead: 3000, CacheWrite: 300, Calls: 2, MaxContext: 2001, LastContext: 2006}}
 	if got := sum(u); !reflect.DeepEqual(got, want) {
 		t.Fatalf("primera lectura %+v, want %+v", got, want)
 	}
@@ -74,7 +88,7 @@ func TestReadUsageIncrementalWithDuplicates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(u) != 1 || u[0].Usage != (metrics.Usage{Input: 1, Output: 7, Calls: 1, MaxContext: 1}) || !u[0].TS.Equal(time.Date(2026, 9, 28, 22, 40, 0, 0, time.UTC)) {
+	if len(u) != 1 || u[0].Usage != (metrics.Usage{Input: 1, Output: 7, Calls: 1, MaxContext: 1, LastContext: 8}) || !u[0].TS.Equal(time.Date(2026, 9, 28, 22, 40, 0, 0, time.UTC)) {
 		t.Fatalf("segunda lectura %+v: solo m3 completo, con su hora", u)
 	}
 	if u, _ := a.ReadUsage(main, cur); len(u) != 0 {

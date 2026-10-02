@@ -99,11 +99,11 @@ func TestStatsTokensAndStatusline(t *testing.T) {
 	}
 
 	line, _, _ := r.hook(fmt.Sprintf(`{"workspace":{"current_dir":%q}}`, r.dir), "statusline")
-	if !strings.HasPrefix(line, id+" · implementing") || !strings.Contains(line, "ronda 1") || !strings.HasSuffix(strings.TrimSpace(line), "11k nuevos · 88k caché") {
+	if !strings.HasPrefix(line, id+" · implementing") || !strings.Contains(line, "ronda 1") || !strings.HasSuffix(strings.TrimSpace(line), "11.1k nuevos · 88.0k caché") {
 		t.Errorf("statusline: %q", line)
 	}
 	text, _, _ := r.hook("", "stats", id)
-	for _, want := range []string{"11k nuevos · 88k releídos de caché en 4 llamadas", "sesión principal", "implementer", "caché escrita 8k", "ctx máx"} {
+	for _, want := range []string{"11.1k nuevos · 88.0k releídos de caché en 4 llamadas", "sesión principal", "implementer", "caché escrita 8.0k", "ctx máx", "ctx final"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("stats texto sin %q:\n%s", want, text)
 		}
