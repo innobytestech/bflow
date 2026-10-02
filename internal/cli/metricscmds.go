@@ -54,8 +54,9 @@ func runStats(c *Ctx) output.Envelope {
 		if st.Phase == "" {
 			return output.Fail("not_found", fmt.Errorf("%s no tiene historial en .bflow/log.jsonl", id))
 		}
+		runs, _ := readCalls(e, id)
+		st.Prefix = metrics.PrefixByAgent(runs)
 		if wantCalls {
-			runs, _ := readCalls(e, id)
 			env := output.OK("stats", map[string]any{"stats": st, "calls": runs}, nil)
 			env.Text = statsLine(st) + "\n" + renderCalls(runs, callsNote(st, runs))
 			if !st.TokensAvailable {
@@ -144,8 +145,8 @@ func renderStats(st metrics.TaskStats) string {
 			b.WriteString("  revisión: " + l[0] + "\n")
 		}
 	}
-	usageTable(&b, "por agente", st.Agents, map[string]string{metrics.MainSession: "sesión principal", "": "sin desglose"})
-	usageTable(&b, "por modelo", st.Models, map[string]string{"": "sin modelo"})
+	usageTable(&b, "por agente", st.Agents, map[string]string{metrics.MainSession: "sesión principal", "": "sin desglose"}, st.Prefix, true)
+	usageTable(&b, "por modelo", st.Models, map[string]string{"": "sin modelo"}, nil, false)
 	if st.TokensAvailable {
 		t := st.Tokens
 		fmt.Fprintf(&b, "  tokens: %s (entrada %s · salida %s · caché escrita %s)", metrics.Summary(t),
@@ -172,16 +173,26 @@ func tok(n int64) string {
 
 // usageTable desglosa tokens por clave, de mayor a menor gasto nuevo. Se omite
 // si solo hay registros viejos sin esa clave.
-func usageTable(b *strings.Builder, title string, m map[string]metrics.Usage, names map[string]string) {
+func usageTable(b *strings.Builder, title string, m map[string]metrics.Usage, names map[string]string, prefix map[string]metrics.PrefixCost, withCache bool) {
 	if _, legacy := m[""]; len(m) == 0 || (len(m) == 1 && legacy) {
 		return
 	}
 	row := "  %-22s %8s %8s %8s %8s %9s\n"
-	fmt.Fprintf(b, row, title, "nuevos", "caché", "llamadas", "ctx máx", "ctx final")
+	if withCache {
+		row = "  %-22s %8s %8s %8s %8s %9s %7s %7s\n"
+		fmt.Fprintf(b, row, title, "nuevos", "caché", "llamadas", "ctx máx", "ctx final", "escrita", "prefijo")
+	} else {
+		fmt.Fprintf(b, row, title, "nuevos", "caché", "llamadas", "ctx máx", "ctx final")
+	}
 	for _, k := range byNew(m) {
 		name := k
 		if n, ok := names[k]; ok {
 			name = n
+		}
+		if withCache {
+			fmt.Fprintf(b, row, name, tok(m[k].New()), tok(m[k].CacheRead), calls(m[k].Calls), tok(m[k].MaxContext), tok(m[k].LastContext),
+				tok(m[k].CacheWrite), tok(prefix[k].Avg))
+			continue
 		}
 		fmt.Fprintf(b, row, name, tok(m[k].New()), tok(m[k].CacheRead), calls(m[k].Calls), tok(m[k].MaxContext), tok(m[k].LastContext))
 	}

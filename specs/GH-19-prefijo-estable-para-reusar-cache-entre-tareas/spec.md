@@ -104,10 +104,10 @@ Sin superficie nueva: solo lectura de `.bflow/tasks/<id>/calls.jsonl` del propio
 
 ## Tasks
 
-- [ ] **T1 — Contrato** (R1–R11): firmas `metrics.PrefixCost`, `metrics.PrefixByAgent` (stub que devuelve `nil`), campo `TaskStats.Prefix`; pruebas nuevas que fallan hasta T2:
+- [x] **T1 — Contrato** (R1–R11): firmas `metrics.PrefixCost`, `metrics.PrefixByAgent` (stub que devuelve `nil`), campo `TaskStats.Prefix`; pruebas nuevas que fallan hasta T2:
   - `internal/metrics/calls_test.go`: `TestPrefixByAgent` (dos corridas del implementer 8000 y 1701 → runs 2, sum 9701, avg 4851; reviewer 1 corrida; `main`; 1a llamada con muestras fusionadas por `Msg`; vacío → nil) (R2, R3, R5).
   - `internal/cli/calls_test.go`: `TestStatsAgentCacheColumns` (texto: encabezados `escrita` y `prefijo` solo en "por agente"; valores de una fila; "-" en "sin desglose") (R1, R2, R4, R5, R7); `TestStatsPrefixJSON` (`data.stats.prefix` con y sin `--calls`, omitido sin calls.jsonl) (R6, R8); `TestStatsPrefixWithoutCallsFile` (`escrita` del log, `prefijo` "-") (R4).
   - `internal/agents/agents_test.go`: `TestAgentBodiesHaveNoTaskData` (R9) y `TestAgentSpecsSameAcrossRoots` (R10) — pasan ya; protegen el prefijo.
   - `internal/adapters/agent/claude/adapter_render_test.go`: `TestRenderedAgentsStablePrefix`; `internal/adapters/agent/opencode/opencode_test.go`: `TestOpenCodeRenderedAgentsStablePrefix` (R11) — pasan ya.
-- [ ] **T2 — Cálculo y salida** (R1–R8): implementar `PrefixByAgent`; `runStats` lee `calls.jsonl` siempre y llena `st.Prefix`; `usageTable` con columnas `escrita` y `prefijo` solo para "por agente". `TestStatsJSONUnchangedWithoutCalls` sigue en verde.
-- [ ] **T3 — Guía** (R12): actualizar `docs/guia.md` con las columnas nuevas y el hallazgo del prefijo estable / duración de la caché.
+- [x] **T2 — Cálculo y salida** (R1–R8): implementar `PrefixByAgent`; `runStats` lee `calls.jsonl` siempre y llena `st.Prefix`; `usageTable` con columnas `escrita` y `prefijo` solo para "por agente". `TestStatsJSONUnchangedWithoutCalls` sigue en verde.
+- [x] **T3 — Guía** (R12): actualizar `docs/guia.md` con las columnas nuevas y el hallazgo del prefijo estable / duración de la caché.

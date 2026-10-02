@@ -223,5 +223,19 @@ type PrefixCost struct {
 // PrefixByAgent agrupa por Run.Agent (MainSession o nombre sin prefijo) la
 // CacheWrite de Rows[0] de cada corrida. Corridas sin filas se saltan.
 func PrefixByAgent(runs []Run) map[string]PrefixCost {
-	return nil // T2
+	var out map[string]PrefixCost
+	for _, r := range runs {
+		if len(r.Rows) == 0 {
+			continue
+		}
+		if out == nil {
+			out = map[string]PrefixCost{}
+		}
+		p := out[r.Agent]
+		p.Runs++
+		p.Sum += r.Rows[0].CacheWrite
+		p.Avg = (p.Sum + int64(p.Runs)/2) / int64(p.Runs)
+		out[r.Agent] = p
+	}
+	return out
 }
