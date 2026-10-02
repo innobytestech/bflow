@@ -101,4 +101,3 @@ líneas: `"next: " + compactNext(n)` y `"Sigue con /bflow."`. `data` y `next` de
 - [x] **T4** `compactNext` y líneas nuevas de `runSessionStart` (R5-R7).
 - [x] **T5** Plugin de OpenCode con inyección en `session.created` y `bflow render` para regenerar (R8, R9).
 - [x] **T6** Skill bflow y README (R12).
-- [ ] **T7** Prueba de traspaso por dogfooding: tarea con /clear en cada gate, tokens de la sesión principal contra GH-15, anotada para el walkthrough (R13).
