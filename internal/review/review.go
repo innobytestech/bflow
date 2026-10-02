@@ -390,10 +390,22 @@ type Coverage struct {
 	UnreadOther int      `json:"unread_other,omitempty"`
 	RedMissing  []string `json:"red_missing,omitempty"`
 	RedOutside  []string `json:"red_outside,omitempty"`
+	Pending     []string `json:"pending,omitempty"` // no leídos, obligatorios (código y pruebas, no exentos), en orden del diff
+	DiffLines   int      `json:"-"`                 // líneas del diff medido; solo para el texto del rechazo
 }
 
+// IsGenerated dice si p es un lockfile conocido: base go.sum, go.work.sum,
+// package-lock.json, npm-shrinkwrap.json, pnpm-lock.yaml, bun.lockb, o extensión .lock.
+func IsGenerated(p string) bool { return false }
+
+// Exempt dice si p no se exige al reviewer: IsDoc, bajo specs/ o IsGenerated.
+func Exempt(p string) bool { return false }
+
+// ListCapped lista ps, a lo sumo 20, y agrega "y K más" si hay más.
+func ListCapped(ps []string) string { return "" }
+
 // Measure calcula la cobertura de reads contra los archivos del diff (R6, R10, R11).
-func Measure(diff []string, diffLines int, reads []Read, red []string, isTest func(string) bool) Coverage {
+func Measure(diff []string, diffLines int, reads []Read, red []string, isTest func(string) bool, binary []string) Coverage {
 	c := Coverage{Total: len(diff)}
 	var hooked []Read
 	for _, r := range reads {

@@ -79,7 +79,7 @@ func (e *Engine) reviewCoverage(ctx context.Context, id string) (cov review.Cove
 		}
 	}
 	isTest := func(p string) bool { return guard.MatchesTest(e.Cfg.Guard.TestPatterns, p) }
-	return review.Measure(diff, lines, reads, m.Red, isTest), m, hasMap
+	return review.Measure(diff, lines, reads, m.Red, isTest, nil), m, hasMap
 }
 
 // isReviewer dice si el agente del reporte es el reviewer (con o sin prefijo).
