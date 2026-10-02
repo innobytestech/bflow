@@ -310,7 +310,7 @@ func TestDocumenterDocsPending(t *testing.T) {
 	if err := v.e.Store.WriteFile(id, "reports/docs.md", []byte("- `docs/guia.md`: sin cambio:\n")); err != nil {
 		t.Fatal(err)
 	}
-	_ = rejection(t, done(v, id), "docs_pending") // motivo vacío no vale
+	rejection(t, done(v, id), "docs_pending") // motivo vacío no vale
 	if err := v.e.Store.WriteFile(id, "reports/docs.md", []byte("- `docs/guia.md`: sin cambio: la guía no habla de gates nuevos\n")); err != nil {
 		t.Fatal(err)
 	}
