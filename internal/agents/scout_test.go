@@ -51,8 +51,12 @@ func TestBuildScoutReadOnly(t *testing.T) {
 
 	// Ajustes del repo: model, effort, read, extra y omit_claude_md.
 	root := testutil.TempDir(t)
-	os.MkdirAll(filepath.Join(root, "docs"), 0o755)
-	os.WriteFile(filepath.Join(root, "docs", "scout.md"), []byte("Mira primero cmd/.\n"), 0o644)
+	if err := os.MkdirAll(filepath.Join(root, "docs"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "docs", "scout.md"), []byte("Mira primero cmd/.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	no := false
 	specs, err = Build(scoutFlow(), map[string]config.AgentConf{
 		"scout": {Model: "sonnet", Effort: "medium", Read: []string{"docs/architecture/"}, Extra: "docs/scout.md", OmitClaudeMd: &no},
