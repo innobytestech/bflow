@@ -130,7 +130,9 @@ func (t *tx) enter(p Phase) {
 	}
 	switch p {
 	case Discovery:
-		s.Gate = &PendingGate{Name: GateDiscovery}
+		if s.Scout != ScoutPending {
+			s.Gate = &PendingGate{Name: GateDiscovery}
+		}
 	case Spec:
 		s.Round = 0
 	case Paused:
@@ -158,6 +160,9 @@ func (t *tx) start(ev Event) error {
 		return reject("fixes_self", "%s no puede corregirse a sí misma", s.ID)
 	}
 	s.Lane = ev.Lane
+	if t.cfg.Scout != "" {
+		s.Scout = ScoutPending
+	}
 	t.enter(phases[0])
 	return nil
 }
@@ -330,8 +335,35 @@ var ScoutVerdicts = []Verdict{DoneV}
 // Verdicts devuelve los veredictos que un agente puede reportar en la fase.
 func Verdicts(p Phase) []Verdict { return verdictsFor[p] }
 
+// scoutReport registra el reporte del scout: corre una vez por tarea y no
+// cuenta como reporte de fase.
+func (t *tx) scoutReport(ev Event) error {
+	s := &t.s
+	switch s.Scout {
+	case ScoutDone:
+		return reject("already_reported", "el scout ya reportó en %s", s.ID)
+	case ScoutPending:
+	default:
+		return reject("scout_not_due", "%s no lleva scout", s.ID)
+	}
+	if !slices.Contains(ScoutVerdicts, ev.Verdict) {
+		return reject("unexpected_verdict", "el scout no puede reportar %s (válidos: %s)", ev.Verdict, joinVerdicts(ScoutVerdicts))
+	}
+	s.Scout = ScoutDone
+	if s.Phase == Discovery {
+		s.Gate = &PendingGate{Name: GateDiscovery}
+	}
+	return nil
+}
+
 func (t *tx) report(ev Event) error {
 	s := &t.s
+	if ev.Agent == ScoutAgent {
+		return t.scoutReport(ev)
+	}
+	if s.Scout == ScoutPending {
+		return reject("scout_pending", "primero corre el scout (bflow-scout) y reporta; %s espera su reporte", s.ID)
+	}
 	if s.Gate != nil {
 		return reject("gate_pending", "hay una decisión pendiente (%s); resuélvela antes de aceptar reportes", s.Gate.Name)
 	}
