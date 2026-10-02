@@ -63,7 +63,7 @@ func runSummary(r metrics.Run) string {
 func renderCalls(runs []metrics.Run, note string) string {
 	var b strings.Builder
 	for _, r := range runs {
-		fmt.Fprintf(&b, "\n%s · %s · %s\n", r.Label, r.Phase, runSummary(r))
+		fmt.Fprintf(&b, "\n%s · %s\n", r.Label, runSummary(r))
 		rows := [][]string{callHeader}
 		for _, row := range r.Rows {
 			rows = append(rows, callCells(row))
