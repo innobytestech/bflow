@@ -257,12 +257,17 @@ func TestStatsCallsText(t *testing.T) {
 		t.Fatalf("exit %d: %s", code, out)
 	}
 	_, plain := textOf(t, env, "stats", id)
+	// Una segunda corrida del implementer en la misma fase: ambas llevan #N en la etapa (R2, R4).
+	p, _ := e.Store.Path(id, metrics.CallsFile)
+	appendText(t, p, callLine("claude:agent-b", "implementer", "m5", "opus", t4.Add(time.Minute), 1, 0, 100, 5))
+	_, out = textOf(t, env, "stats", id, "--calls")
 	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
 	if lines[0] != strings.Split(plain, "\n")[0] {
 		t.Errorf("la primera línea es el resumen de la tarea:\n%q\n%q", lines[0], strings.Split(plain, "\n")[0])
 	}
 	for _, want := range []string{
-		"implementer · implementing · 2 llamadas · contexto final 2,001 · releído 3,000 · nuevo 348",
+		"implementer · implementing #1 · 2 llamadas · contexto final 2,001 · releído 3,000 · nuevo 348",
+		"implementer · implementing #2 · 1 llamadas · contexto final 101 · releído 100 · nuevo 6",
 		"sesión principal · implementing · 2 llamadas · contexto final 6,051 · releído 11,000 · nuevo 181",
 	} {
 		if !strings.Contains(out, want) {
@@ -344,7 +349,7 @@ func TestStatsCallsJSON(t *testing.T) {
 		t.Fatalf("data.calls: una entrada por corrida: %s", raw)
 	}
 	r0 := runs[0].(map[string]any)
-	if r0["run"] != "claude:agent-a" || r0["label"] != "implementer" || r0["phase"] != "implementing" || r0["final_context"] != float64(2001) {
+	if r0["run"] != "claude:agent-a" || r0["name"] != "implementer" || r0["stage"] != "implementing" || r0["label"] != "implementer · implementing" || r0["phase"] != "implementing" || r0["final_context"] != float64(2001) {
 		t.Errorf("corrida 0: %v", r0)
 	}
 	rows := r0["rows"].([]any)
@@ -443,10 +448,11 @@ func TestStatsCallsPartialNote(t *testing.T) {
 
 // ---- panel ----
 
-func TestPanelRuns(t *testing.T) {
+func TestPanelTokensTable(t *testing.T) {
 	log := []string{
 		callLine("claude:agent-a", "implementer", "m1", "opus", t1, 2, 300, 1000, 40),
 		callLine("claude:agent-a", "implementer", "m2", "opus", t2, 1, 0, 2000, 5),
+		callLine("claude:agent-r", "reviewer", "m5", "opus", t1.Add(90*time.Second), 5, 0, 100, 5),
 		callLine("claude:sess-1", "main", "m3", "opus", t3, 10, 0, 5000, 100),
 		callLine("claude:sess-1", "main", "m4", "opus", t4, 1, 50, 6000, 20),
 	}
@@ -457,49 +463,104 @@ func TestPanelRuns(t *testing.T) {
 	runs := metrics.Runs(calls)
 	since := t1
 	v := engine.View{ID: "API-7", Lane: flow.Light, Phase: flow.Implementing, Since: &since, Phases: flow.DefaultLanes()[flow.Light]}
-	st := metrics.TaskStats{ID: "API-7", TokensAvailable: true, Tokens: metrics.Usage{Input: 14, Output: 165, CacheRead: 14000, CacheWrite: 350, Calls: 4, MaxContext: 6051}}
+	// Nuevo: implementer 348, main 181, "" 471 (total 1000). El reviewer solo está en calls.jsonl.
+	agents := map[string]metrics.Usage{
+		"implementer": {Input: 3, CacheWrite: 300, Output: 45, CacheRead: 3000, Calls: 2},
+		"main":        {Input: 11, CacheWrite: 50, Output: 120, CacheRead: 11000, Calls: 2},
+		"":            {Input: 471},
+	}
+	st := metrics.TaskStats{ID: "API-7", TokensAvailable: true, Agents: agents,
+		Tokens: metrics.Usage{Input: 485, Output: 165, CacheRead: 14000, CacheWrite: 350, Calls: 4, MaxContext: 6051}}
 
 	ps := buildPanel("dev", watchData{Repo: "api", Active: &v, Stats: st, Calls: runs, CallsFile: true}, t4.Add(time.Minute))
 	task := ps.Task
-	if task == nil || len(task.Runs) != 2 {
-		t.Fatalf("un bloque por corrida: %+v", task)
+	if task == nil {
+		t.Fatal("sin tarea")
 	}
-	a, b := task.Runs[0], task.Runs[1]
-	if a.Key != "claude:agent-a" || a.Label != "implementer" || b.Key != "claude:sess-1" || b.Label != "sesión principal" {
-		t.Errorf("clave y etiqueta: %+v %+v", a, b)
+	by := map[string]panelAgent{}
+	var order []string
+	for _, a := range task.Agents {
+		by[a.Key] = a
+		order = append(order, a.Key)
 	}
-	if a.Summary != "2 llamadas · contexto final 2,001 · releído 3,000 · nuevo 348" || b.Summary != "2 llamadas · contexto final 6,051 · releído 11,000 · nuevo 181" {
-		t.Errorf("resumen: %q %q", a.Summary, b.Summary)
+	if len(task.Agents) != 4 {
+		t.Fatalf("una fila por agente de st.Agents y una por el que solo está en calls.jsonl: %v", order)
 	}
-	if a.Open || !b.Open {
-		t.Errorf("abierta solo la corrida con la llamada más reciente: %v %v", a.Open, b.Open)
+	if i, j, k := slices.Index(order, ""), slices.Index(order, "implementer"), slices.Index(order, "main"); i >= j || j >= k {
+		t.Errorf("orden por nuevo de mayor a menor: %v", order)
+	}
+	impl, main, none, rev := by["implementer"], by["main"], by[""], by["reviewer"]
+	if impl.Name != "implementer" || main.Name != "sesión principal" || none.Name != "sin desglose" || rev.Name != "reviewer" {
+		t.Errorf("nombres: %q %q %q %q", impl.Name, main.Name, none.Name, rev.Name)
+	}
+	if impl.Share != 34 || main.Share != 18 || none.Share != 47 {
+		t.Errorf("share (0-100 del nuevo total, truncado): %d %d %d", impl.Share, main.Share, none.Share)
+	}
+	if impl.Calls != 2 || main.Calls != 2 || none.Calls != 0 || rev.Calls != 1 {
+		t.Errorf("llamadas (0 = sin dato): %d %d %d %d", impl.Calls, main.Calls, none.Calls, rev.Calls)
+	}
+	if impl.New != "348" || main.New != "181" || none.New != "471" || rev.New != "10" {
+		t.Errorf("nuevo en Human: %q %q %q %q", impl.New, main.New, none.New, rev.New)
+	}
+	if len(none.Runs) != 0 || none.Last != nil || none.Latest {
+		t.Errorf("agente sin corridas: %+v", none)
+	}
+	if !main.Latest || impl.Latest || rev.Latest {
+		t.Errorf("latest solo en el agente de la llamada más reciente: %v %v %v", main.Latest, impl.Latest, rev.Latest)
+	}
+	if impl.Last == nil || !impl.Last.Equal(t2) || main.Last == nil || !main.Last.Equal(t4) || rev.Last == nil || !rev.Last.Equal(t1.Add(90*time.Second)) {
+		t.Errorf("last: %v %v %v", impl.Last, main.Last, rev.Last)
+	}
+	if len(impl.Runs) != 1 || len(main.Runs) != 1 || len(rev.Runs) != 1 {
+		t.Fatalf("corridas anidadas: %d %d %d", len(impl.Runs), len(main.Runs), len(rev.Runs))
+	}
+	a, b := impl.Runs[0], main.Runs[0]
+	if a.Key != "claude:agent-a" || a.Stage != "implementing" || a.Label != "implementer · implementing" ||
+		b.Key != "claude:sess-1" || b.Label != "sesión principal · implementing" {
+		t.Errorf("clave, etapa y etiqueta: %+v %+v", a, b)
+	}
+	if a.Summary != "2 llamadas · contexto final 2,001 · releído 3,000 · nuevo 348" {
+		t.Errorf("resumen: %q", a.Summary)
+	}
+	if a.Calls != 2 || a.Context != "2.0k" || a.Read != "3.0k" || a.New != "348" || b.Context != "6.1k" || b.Read != "11.0k" || b.New != "181" {
+		t.Errorf("cifras cortas de un decimal: %+v %+v", a, b)
 	}
 	hour := t1.Local().Format("15:04:05")
 	if want := []string{"1", hour, "opus", "2", "300", "1,000", "40", "1,302", "1,000", "342"}; len(a.Rows) != 2 || !reflect.DeepEqual(a.Rows[0], want) {
-		t.Errorf("celdas ya formateadas con la misma función que el CLI: %v", a.Rows)
+		t.Errorf("celdas exactas, con la misma función que el CLI: %v", a.Rows)
 	}
 	if len(a.Total) != len(a.Rows[0]) || a.Total[0] != "total" || !subsequence(a.Total, []string{"3", "300", "3,000", "45", "2,001"}) {
 		t.Errorf("fila total: %v", a.Total)
 	}
-	if task.CallsNote != "" {
-		t.Errorf("los números cuadran: sin aviso (%q)", task.CallsNote)
+	if !strings.Contains(task.CallsNote, partialNote) {
+		t.Errorf("calls_note sigue igual: %q", task.CallsNote)
 	}
 
-	// Registrado antes de GH-29: tokens sin archivo de llamadas.
+	// Un agente con dos corridas las trae en orden de primera llamada.
+	more := append(slices.Clone(calls), metrics.ParseCalls(strings.NewReader(
+		callLine("claude:agent-c", "implementer", "m6", "opus", t4.Add(time.Minute), 1, 0, 10, 1)))...)
+	ps = buildPanel("dev", watchData{Repo: "api", Active: &v, Stats: st, Calls: metrics.Runs(more), CallsFile: true}, t4)
+	found := false
+	for _, ag := range ps.Task.Agents {
+		if ag.Key == "implementer" {
+			found = true
+			if len(ag.Runs) != 2 || ag.Runs[0].Key != "claude:agent-a" || ag.Runs[1].Key != "claude:agent-c" || ag.Runs[1].Stage != "implementing #2" || !ag.Latest {
+				t.Errorf("dos corridas en orden de primera llamada: %+v", ag)
+			}
+		}
+	}
+	if !found {
+		t.Error("falta la fila del implementer")
+	}
+
+	// Registrado antes de GH-29: tokens sin archivo de llamadas; las filas salen sin corridas.
 	ps = buildPanel("dev", watchData{Repo: "api", Active: &v, Stats: st}, t4)
-	if len(ps.Task.Runs) != 0 || ps.Task.CallsNote != legacyNote {
+	if ps.Task.CallsNote != legacyNote || len(ps.Task.Agents) != 3 || ps.Task.Agents[0].Name == "" {
 		t.Errorf("sin calls.jsonl: %+v", ps.Task)
 	}
-	// Parte del gasto sin detalle.
-	more := st
-	more.Tokens.Input += 1000
-	ps = buildPanel("dev", watchData{Repo: "api", Active: &v, Stats: more, Calls: runs, CallsFile: true}, t4)
-	if len(ps.Task.Runs) != 2 || !strings.Contains(ps.Task.CallsNote, partialNote) {
-		t.Errorf("gasto parcial: %+v", ps.Task)
-	}
 	// Sin tokens ni llamadas: nada que decir.
-	ps = buildPanel("dev", watchData{Repo: "api", Active: &v}, t4)
-	if len(ps.Task.Runs) != 0 || ps.Task.CallsNote != "" {
-		t.Errorf("sin tokens: %+v", ps.Task)
+	ps = buildPanel("dev", watchData{Repo: "api", Active: &v, Stats: metrics.TaskStats{ID: "API-7"}}, t4)
+	if len(ps.Task.Agents) != 0 || ps.Task.CallsNote != "" {
+		t.Errorf("sin nada: %+v", ps.Task)
 	}
 }

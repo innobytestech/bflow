@@ -53,7 +53,9 @@ type CallRow struct {
 type Run struct {
 	Run          string     `json:"run"`
 	Agent        string     `json:"agent"`
-	Label        string     `json:"label"` // "implementer", "implementer #2", "sesión principal"
+	Name         string     `json:"name"`  // "sesión principal" | agente (R3)
+	Stage        string     `json:"stage"` // "contract", "discovery → spec", "spec #2" (R1, R2)
+	Label        string     `json:"label"` // Name + " · " + Stage (R3)
 	Phase        flow.Phase `json:"phase"` // de la primera fila
 	Rows         []CallRow  `json:"rows"`
 	Total        Usage      `json:"total"` // Calls = len(Rows), MaxContext = máximo
@@ -89,6 +91,18 @@ func ParseCalls(r io.Reader) []Call {
 			return out
 		}
 	}
+}
+
+// stageOf: fase única, "primera → última" o "sin fase" (R1).
+func stageOf(rows []CallRow) string {
+	if len(rows) == 0 || rows[0].Phase == "" {
+		return "sin fase"
+	}
+	first, last := rows[0].Phase, rows[len(rows)-1].Phase
+	if last == "" || first == last {
+		return string(first)
+	}
+	return string(first) + " → " + string(last)
 }
 
 // Runs fusiona (R3), agrupa y acumula (R4); orden por primera llamada.
@@ -131,22 +145,26 @@ func Runs(calls []Call) []Run {
 		runs = append(runs, r)
 	}
 	sort.SliceStable(runs, func(i, j int) bool { return runs[i].Rows[0].TS.Before(runs[j].Rows[0].TS) })
+	for i := range runs {
+		name := runs[i].Agent
+		if name == MainSession {
+			name = "sesión principal"
+		}
+		runs[i].Name = name
+		runs[i].Stage = stageOf(runs[i].Rows)
+	}
 	count := map[string]int{}
 	for _, r := range runs {
-		count[r.Agent]++
+		count[r.Name+"|"+r.Stage]++
 	}
 	seen := map[string]int{}
 	for i := range runs {
-		a := runs[i].Agent
-		name := a
-		if a == MainSession {
-			name = "sesión principal"
+		k := runs[i].Name + "|" + runs[i].Stage
+		seen[k]++
+		if count[k] > 1 {
+			runs[i].Stage = fmt.Sprintf("%s #%d", runs[i].Stage, seen[k])
 		}
-		seen[a]++
-		if count[a] > 1 {
-			name = fmt.Sprintf("%s #%d", name, seen[a])
-		}
-		runs[i].Label = name
+		runs[i].Label = runs[i].Name + " · " + runs[i].Stage
 	}
 	return runs
 }

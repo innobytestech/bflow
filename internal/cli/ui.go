@@ -72,33 +72,100 @@ type panelPhase struct {
 }
 
 type panelTask struct {
-	ID       string              `json:"id"`
-	Title    string              `json:"title,omitempty"`
-	Lane     string              `json:"lane,omitempty"`
-	Round    int                 `json:"round,omitempty"`
-	Phases   []panelPhase        `json:"phases"`
-	Waiting  bool                `json:"waiting"` // la tarea espera a la persona
-	Blocked  bool                `json:"blocked,omitempty"`
-	Now      *panelStep          `json:"now,omitempty"`
-	Next     *panelStep          `json:"next,omitempty"`
-	Time     map[string]string   `json:"time"`
-	Tokens   string              `json:"tokens,omitempty"`
-	Agents   []map[string]string `json:"agents,omitempty"` // name, tokens, share (0-100 del gasto nuevo)
-	Friction string              `json:"friction,omitempty"`
-	Events   []map[string]string `json:"events,omitempty"`
-	// Runs es el detalle por llamada (calls.jsonl), una corrida por bloque.
-	Runs      []panelRun `json:"runs,omitempty"`
-	CallsNote string     `json:"calls_note,omitempty"`
+	ID        string              `json:"id"`
+	Title     string              `json:"title,omitempty"`
+	Lane      string              `json:"lane,omitempty"`
+	Round     int                 `json:"round,omitempty"`
+	Phases    []panelPhase        `json:"phases"`
+	Waiting   bool                `json:"waiting"` // la tarea espera a la persona
+	Blocked   bool                `json:"blocked,omitempty"`
+	Now       *panelStep          `json:"now,omitempty"`
+	Next      *panelStep          `json:"next,omitempty"`
+	Time      map[string]string   `json:"time"`
+	Tokens    string              `json:"tokens,omitempty"`
+	Agents    []panelAgent        `json:"agents,omitempty"` // tabla de Tokens (R5)
+	Friction  string              `json:"friction,omitempty"`
+	Events    []map[string]string `json:"events,omitempty"`
+	CallsNote string              `json:"calls_note,omitempty"`
 }
 
-// panelRun es una corrida (transcript de agente o sesión principal) en el panel web.
+// panelAgent es una fila de agente de la tabla de Tokens (R5, R7).
+type panelAgent struct {
+	Key    string     `json:"key"`   // agente crudo ("main", "implementer", "")
+	Name   string     `json:"name"`  // agentName(Key)
+	Share  int        `json:"share"` // 0-100 del nuevo total
+	Calls  int64      `json:"calls"` // 0 = sin dato (el JS deja la celda vacía)
+	New    string     `json:"new"`   // metrics.Human
+	Latest bool       `json:"latest,omitempty"`
+	Last   *time.Time `json:"last,omitempty"`
+	Runs   []panelRun `json:"runs,omitempty"`
+}
+
+// panelRun es una corrida anidada en su agente (R6).
 type panelRun struct {
-	Key     string     `json:"key"` // Run.Run: el JS recuerda abierto/cerrado con él
+	Key     string     `json:"key"`
+	Stage   string     `json:"stage"`
 	Label   string     `json:"label"`
-	Summary string     `json:"summary"` // "9 llamadas · contexto final 60,079 · releído 344,086 · nuevo 61,204"
-	Open    bool       `json:"open"`    // la corrida con la llamada más reciente
-	Rows    [][]string `json:"rows"`    // celdas ya formateadas, mismo orden de columnas que R7
+	Summary string     `json:"summary"` // runSummary, para el encabezado de la ventana
+	Calls   int64      `json:"calls"`
+	Context string     `json:"context"` // Human(FinalContext)
+	Read    string     `json:"read"`    // Human(Total.CacheRead)
+	New     string     `json:"new"`     // Human(Total.New())
+	Rows    [][]string `json:"rows"`
 	Total   []string   `json:"total"`
+}
+
+// tokenTable arma la tabla de Tokens (R5-R7).
+func tokenTable(st metrics.TaskStats, runs []metrics.Run) []panelAgent {
+	byAgent := map[string][]metrics.Run{}
+	sums := map[string]metrics.Usage{}
+	for _, r := range runs {
+		byAgent[r.Agent] = append(byAgent[r.Agent], r)
+		u := sums[r.Agent]
+		u.Add(r.Total)
+		sums[r.Agent] = u
+	}
+	usage := map[string]metrics.Usage{}
+	for k, u := range st.Agents {
+		usage[k] = u
+	}
+	for k, u := range sums {
+		if _, ok := usage[k]; !ok {
+			usage[k] = u // solo está en calls.jsonl
+		}
+	}
+	var latest string
+	var latestAt time.Time
+	for _, r := range runs {
+		if r.Last.After(latestAt) {
+			latest, latestAt = r.Agent, r.Last
+		}
+	}
+	total := st.Tokens.New()
+	var out []panelAgent
+	for _, k := range byNew(usage) {
+		u := usage[k]
+		a := panelAgent{Key: k, Name: agentName(k), Calls: u.Calls, New: metrics.Human(u.New())}
+		if total > 0 {
+			a.Share = int(u.New() * 100 / total)
+		}
+		for _, r := range byAgent[k] {
+			a.Runs = append(a.Runs, panelRun{Key: r.Run, Stage: r.Stage, Label: r.Label, Summary: runSummary(r),
+				Calls: r.Total.Calls, Context: metrics.Human(r.FinalContext), Read: metrics.Human(r.Total.CacheRead),
+				New: metrics.Human(r.Total.New()), Total: callTotal(r)})
+			pr := &a.Runs[len(a.Runs)-1]
+			for _, row := range r.Rows {
+				pr.Rows = append(pr.Rows, callCells(row))
+			}
+			if a.Last == nil || r.Last.After(*a.Last) {
+				l := r.Last
+				a.Last = &l
+			}
+		}
+		a.Latest = len(a.Runs) > 0 && k == latest
+		out = append(out, a)
+	}
+	return out
 }
 
 // panelRepo es una fila del tablero de la red: un repo y su tarea activa.
@@ -198,15 +265,7 @@ func buildPanel(version string, d watchData, now time.Time) panelState {
 	}
 	if st.TokensAvailable {
 		t.Tokens = metrics.Summary(st.Tokens)
-		total := st.Tokens.New()
-		for _, a := range byNew(st.Agents) {
-			u := st.Agents[a]
-			share := 0
-			if total > 0 {
-				share = int(u.New() * 100 / total)
-			}
-			t.Agents = append(t.Agents, map[string]string{"name": agentName(a), "tokens": metrics.Detail(u), "share": strconv.Itoa(share)})
-		}
+		t.Agents = tokenTable(st, d.Calls)
 	}
 	if n := st.Refused + st.Guarded + st.Nudged; n > 0 {
 		t.Friction = fmt.Sprintf("%d rechazo(s) del flujo · %d bloqueo(s) de guard · %d fin(es) sin reporte", st.Refused, st.Guarded, st.Nudged)
@@ -216,18 +275,6 @@ func buildPanel(version string, d watchData, now time.Time) panelState {
 		t.Events = append(t.Events, map[string]string{"time": eventTime(evs[i].TS, now), "text": describeEvent(evs[i])})
 	}
 	t.CallsNote = callsNote(st, d.Calls)
-	for i, r := range d.Calls {
-		pr := panelRun{Key: r.Run, Label: r.Label, Summary: runSummary(r), Total: callTotal(r), Open: true}
-		for _, row := range r.Rows {
-			pr.Rows = append(pr.Rows, callCells(row))
-		}
-		for j, o := range d.Calls {
-			if j != i && o.Last.After(r.Last) {
-				pr.Open = false
-			}
-		}
-		t.Runs = append(t.Runs, pr)
-	}
 	ps.Task = t
 	return ps
 }
