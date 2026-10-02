@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -307,6 +308,11 @@ func runSessionStart(c *Ctx) output.Envelope {
 	if len(lines) == 0 {
 		lines = append(lines, "bflow: sin tareas en curso")
 	}
+	if next != nil {
+		if c := compactNext(*next); c != "" {
+			lines = append(lines, "next: "+c, "Sigue con /bflow.")
+		}
+	}
 	env := output.OK("session", data, next)
 	env.Text = strings.Join(lines, "\n")
 	return env
@@ -322,5 +328,12 @@ func truncateCmd(s string) string {
 
 // compactNext serializa el next en una línea y sin display, para el hook de inicio.
 func compactNext(n output.Next) string {
-	return "" // stub del contrato (GH-15 T4)
+	n.Display = ""
+	var b bytes.Buffer
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(n); err != nil {
+		return ""
+	}
+	return strings.TrimRight(b.String(), "\n")
 }

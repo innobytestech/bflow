@@ -89,16 +89,16 @@ líneas: `"next: " + compactNext(n)` y `"Sigue con /bflow."`. `data` y `next` de
 
 ## Tasks
 
-- [ ] **T1 Contrato** (R1-R13): `Next.Clear`; stub `flow.SuggestClear`; stub `compactNext`; pruebas que fallan contra los stubs:
+- [x] **T1 Contrato** (R1-R13): `Next.Clear`; stub `flow.SuggestClear`; stub `compactNext`; pruebas que fallan contra los stubs:
   - `internal/flow/next_test.go`: `TestSuggestClear` (cambio de fase → true; sin cambio → false; next done → false).
   - `internal/engine/engine_test.go`: `TestApproveClearSoloAlAvanzar` (spec → contract trae clear; decision y questions no; reject no), `TestApproveNoteEnDecisions` (nota en gate spec escribe la línea; questions no escribe; sin nota no escribe).
   - `internal/output/output_test.go` o donde viva el JSON de Next: `TestNextClearOmitempty`.
   - `internal/cli/hookcmds_test.go` o `cmd/bflow/e2e_hook_test.go`: `TestSessionStartTraeNext` (línea `next:` sin `display`, línea `Sigue con /bflow.`, ≤10 líneas, exit 0; sin tarea activa no hay `next:`).
   - `internal/adapters/agent/opencode/plugin_test.go`: `TestPluginSessionStart` (el plugin trae `session-start`, `noReply`, filtra por `parentID`, ≤100 líneas).
   - `adapters/leader/leader_test.go`: `TestSkillReglaClear` (la skill menciona `clear`, /clear, sesión nueva y `--note` al aprobar).
-- [ ] **T2** `SuggestClear` y su uso en `engine.Approve` (R1-R4).
-- [ ] **T3** Nota de approve en `decisions.md` (R10, R11).
-- [ ] **T4** `compactNext` y líneas nuevas de `runSessionStart` (R5-R7).
-- [ ] **T5** Plugin de OpenCode con inyección en `session.created` y `bflow render` para regenerar (R8, R9).
-- [ ] **T6** Skill bflow y README (R12).
+- [x] **T2** `SuggestClear` y su uso en `engine.Approve` (R1-R4).
+- [x] **T3** Nota de approve en `decisions.md` (R10, R11).
+- [x] **T4** `compactNext` y líneas nuevas de `runSessionStart` (R5-R7).
+- [x] **T5** Plugin de OpenCode con inyección en `session.created` y `bflow render` para regenerar (R8, R9).
+- [x] **T6** Skill bflow y README (R12).
 - [ ] **T7** Prueba de traspaso por dogfooding: tarea con /clear en cada gate, tokens de la sesión principal contra GH-15, anotada para el walkthrough (R13).

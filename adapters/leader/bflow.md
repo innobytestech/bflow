@@ -15,6 +15,8 @@ Todo comando `bflow … --json` responde con `next`. Haz lo que diga y luego sig
 - `wait`: dile al humano qué se espera (`reason`).
 - `done`: no hay nada pendiente.
 
+Si el `next` trae `clear: true`, la gate acaba de avanzar la fase: el estado ya está en disco. Tras escribir `display`, avisa al humano que puede correr /clear (o abrir una sesión nueva) y que el hook de inicio le devuelve el estado; no sigas hasta que decida. Al aprobar un gate de spec, pasa lo que el humano dijo con `--note "<motivo>"` para que quede en decisions.md.
+
 Si un comando sale con código 2, muestra `data.reason` y pregunta cómo seguir; repetirlo igual dará el mismo rechazo.
 
 ## discovery

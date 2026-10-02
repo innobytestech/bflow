@@ -35,12 +35,24 @@ export const BflowPlugin = async ({ client, directory }) => {
     return proc
   }
 
+  // Sesion raiz nueva: el estado de bflow entra al contexto sin pedirle respuesta al modelo.
+  const inject = async (id) => {
+    if (!Bun.which("bflow") || !existsSync(join(directory, ".bflow"))) return
+    const proc = Bun.spawn(["bflow", "hook", "session-start"], { cwd: directory, stdin: "pipe", stdout: "pipe", stderr: "ignore" })
+    proc.stdin.write("{}")
+    proc.stdin.end()
+    const text = (await new Response(proc.stdout).text()).trim()
+    if (!text) return
+    await client.session.prompt({ path: { id }, body: { noReply: true, parts: [{ type: "text", text }] } })
+  }
+
   return {
     event: async ({ event }) => {
       const p = event.properties ?? {}
       try {
         if (event.type === "session.created" || event.type === "session.updated") {
           note(p.info.id, { parentID: p.info.parentID ?? "", known: true })
+          if (event.type === "session.created" && !p.info.parentID) await inject(p.info.id)
         } else if (event.type === "message.updated" && p.info?.role === "assistant") {
           const i = p.info
           note(i.sessionID, { agent: i.agent ?? i.mode })

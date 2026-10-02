@@ -102,7 +102,7 @@ func TestSkill(t *testing.T) {
 
 // skillBefore es el sha256 de la skill de Claude tal como salía antes de que
 // compartiera cuerpo con el comando de OpenCode (git show <antes>:adapters/claude/skills/bflow/SKILL.md).
-const skillBefore = "5afa8fb7149903a84456783cd7df3398a650fea5cbbaf88b8f31e7c1664dfb98"
+const skillBefore = "6c4a65e196b7238e67aceb2bf82c9028d15f1d149af80f3522b813c64fbe2c73"
 
 func TestSkillFromCommonBody(t *testing.T) {
 	head, err := os.ReadFile("skill_head.md")
