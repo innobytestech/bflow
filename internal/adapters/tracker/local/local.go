@@ -109,7 +109,7 @@ func (t *Tracker) modify(id string, fn func(f *file)) error {
 
 func (f file) task() tracker.Task {
 	return tracker.Task{ID: f.ID, Title: f.Title, Description: f.Description, Phase: f.Phase, State: string(f.Phase),
-		Start: f.Start, Due: f.Due, Updated: f.Updated, Closed: f.Phase == flow.Done}
+		Start: f.Start, Due: f.Due, Updated: f.Updated, Closed: f.Phase == flow.Done || f.Phase == flow.Dropped}
 }
 
 func (t *Tracker) Get(_ context.Context, id string) (tracker.Task, error) {
@@ -138,7 +138,7 @@ func (t *Tracker) List(_ context.Context, flt tracker.Filter) ([]tracker.Task, e
 		if err != nil {
 			return nil, err
 		}
-		if flt.OpenOnly && f.Phase == flow.Done {
+		if flt.OpenOnly && (f.Phase == flow.Done || f.Phase == flow.Dropped) {
 			continue
 		}
 		out = append(out, f.task())

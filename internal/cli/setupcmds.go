@@ -19,7 +19,6 @@ import (
 	"innobytes.tech/bflow/internal/agents"
 	"innobytes.tech/bflow/internal/config"
 	"innobytes.tech/bflow/internal/envcheck"
-	"innobytes.tech/bflow/internal/flow"
 	"innobytes.tech/bflow/internal/metrics"
 	"innobytes.tech/bflow/internal/output"
 	"innobytes.tech/bflow/internal/setup"
@@ -728,7 +727,7 @@ func doctorTracker(ctx context.Context, t tracker.Tracker, cfg *config.Config, a
 			}
 		}
 		var lack []string
-		for _, p := range append(append([]flow.Phase{flow.Backlog}, flow.Order...), flow.Blocked) {
+		for _, p := range tracker.PhaseOrder {
 			if !written[string(p)] {
 				lack = append(lack, string(p))
 			}

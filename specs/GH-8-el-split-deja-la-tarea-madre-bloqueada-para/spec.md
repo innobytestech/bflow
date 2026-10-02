@@ -120,15 +120,15 @@ Hoy, al aprobar el split la madre pasa a `blocked` y no hay forma de retirarla (
 
 ## Tasks
 
-- [ ] **T1 · Contrato.** Tipos y firmas de Design con stubs que compilan, y las pruebas que deben fallar contra ellos:
+- [x] **T1 · Contrato.** Tipos y firmas de Design con stubs que compilan, y las pruebas que deben fallar contra ellos:
   - flow: `Dropped`, `EvDrop`, `Event.Children`. Pruebas: `TestDropFromAnyStartedPhase`, `TestDropFromBlocked`, `TestDropNeedsNote`, `TestDroppedRejectsEvents`, `TestNextForDropped`, `TestApproveSplitDropsWithChildren`, `TestApproveSplitNeedsChildren`, `TestSplitGateShowsBrief`.
   - tracker: `DefaultStates[Dropped]` y `PhaseOrder`. Pruebas: `TestStatesDropped` y la subprueba de conformidad `"dropped closes"`. GitHub: `TestTransitionDroppedClosesNotPlanned`.
   - store: `SplitChild` y `Record.Split`.
   - engine: `SplitPart`, `ParseSplit`, `(*Engine).Drop`. Pruebas: `TestParseSplit` (tabla de R15), `TestReportSplitNeedsDivision`, `TestApproveSplitCreatesChildren`, `TestApproveSplitWithoutCreator`, `TestApproveSplitResumesAfterFailure`, `TestDropWarnsBranchAndPR`, `TestViewsHideDropped`.
   - cli, guard, metrics: `TestDropRequiresID`, `TestHumanOnlyDrop`, `TestDroppedStopsClock`.
   - `Memory.FailCreateAfter`.
-- [ ] **T2 · Fase `dropped` en flow** (R1, R2, R3, R21 en la parte de flow, R22). `machine.go` y `next.go`, incluido el gate `split` (R16).
-- [ ] **T3 · `dropped` en tracker y adaptadores** (R5, R6, R7, R8). `states.go`, GitHub `issues.go`/`setup.go`, local, `Memory` y la conformidad.
-- [ ] **T4 · `bflow drop` y tareas retiradas fuera de la vista** (R4, R9, R10, R11, R12, R13). `Engine.Drop`, `Views`, `Panel`, `metrics.add`, statusline, doctor, comando `drop` y guard.
-- [ ] **T5 · Crear las hijas al aprobar el split** (R14, R15, R17, R18, R19, R20, R21, R23). `store.SplitChild`, `engine/split.go`, la validación en `apply`, `Approve` y `entry`.
-- [ ] **T6 · Oficio del spec-author** (R24). En `internal/agents/craft/spec-author.md`, la viñeta de SPLIT pasa a decir: "Si la feature no cabe en esos límites sin comprimir, no la comprimas. Escribe en el Brief una `### División` con una viñeta `- **<título>**: <alcance>` por hija (de 2 a 6, títulos de 120 caracteres como máximo) y reporta SPLIT con el motivo en `--note`. Al aprobarlo, bflow crea esas tareas." Correr `bflow render` para regenerar `.claude/agents/bflow-spec-author.md`. Si hay una prueba de contenido del oficio, se ajusta. README, guía y CHANGELOG quedan para el documenter.
+- [x] **T2 · Fase `dropped` en flow** (R1, R2, R3, R21 en la parte de flow, R22). `machine.go` y `next.go`, incluido el gate `split` (R16).
+- [x] **T3 · `dropped` en tracker y adaptadores** (R5, R6, R7, R8). `states.go`, GitHub `issues.go`/`setup.go`, local, `Memory` y la conformidad.
+- [x] **T4 · `bflow drop` y tareas retiradas fuera de la vista** (R4, R9, R10, R11, R12, R13). `Engine.Drop`, `Views`, `Panel`, `metrics.add`, statusline, doctor, comando `drop` y guard.
+- [x] **T5 · Crear las hijas al aprobar el split** (R14, R15, R17, R18, R19, R20, R21, R23). `store.SplitChild`, `engine/split.go`, la validación en `apply`, `Approve` y `entry`.
+- [x] **T6 · Oficio del spec-author** (R24). En `internal/agents/craft/spec-author.md`, la viñeta de SPLIT pasa a decir: "Si la feature no cabe en esos límites sin comprimir, no la comprimas. Escribe en el Brief una `### División` con una viñeta `- **<título>**: <alcance>` por hija (de 2 a 6, títulos de 120 caracteres como máximo) y reporta SPLIT con el motivo en `--note`. Al aprobarlo, bflow crea esas tareas." Correr `bflow render` para regenerar `.claude/agents/bflow-spec-author.md`. Si hay una prueba de contenido del oficio, se ajusta. README, guía y CHANGELOG quedan para el documenter.

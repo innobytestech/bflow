@@ -77,7 +77,15 @@ func (e *Engine) Approve(ctx context.Context, id string, o ApproveOpts) (Outcome
 	if rec, err := e.Store.Load(id); err == nil {
 		pending = rec.Flow.Gate
 	}
-	out, err := e.apply(ctx, id, flow.Event{Kind: flow.EvApprove, Gate: flow.Gate(o.Gate), Choice: o.Choice, Note: o.Note, Attachment: o.Attachment}, "")
+	ev := flow.Event{Kind: flow.EvApprove, Gate: flow.Gate(o.Gate), Choice: o.Choice, Note: o.Note, Attachment: o.Attachment}
+	if pending != nil && pending.Name == flow.GateSplit && (o.Gate == "" || o.Gate == string(flow.GateSplit)) {
+		children, err := e.createChildren(ctx, id)
+		if err != nil {
+			return Outcome{ID: id}, err
+		}
+		ev.Children = children
+	}
+	out, err := e.apply(ctx, id, ev, "")
 	if err != nil {
 		return out, err
 	}
@@ -147,7 +155,17 @@ func (e *Engine) Unblock(ctx context.Context, id string) (Outcome, error) {
 // Drop retira la tarea sin terminarla: la cierra en el tracker y la saca de
 // status. No toca la rama ni el PR; avisa si existen.
 func (e *Engine) Drop(ctx context.Context, id, note string) (Outcome, error) {
-	return Outcome{ID: id}, errors.New("no implementado")
+	out, err := e.apply(ctx, id, flow.Event{Kind: flow.EvDrop, Note: note}, "")
+	if err != nil || out.Record == nil {
+		return out, err
+	}
+	if b := out.Record.Branch; b != "" {
+		out.Warnings = append(out.Warnings, "la rama "+b+" sigue existiendo; bórrala a mano si ya no sirve")
+	}
+	if pr := out.Record.PR; pr != nil && !pr.Merged {
+		out.Warnings = append(out.Warnings, "el PR "+pr.URL+" sigue abierto; ciérralo a mano si ya no sirve")
+	}
+	return out, nil
 }
 
 // Merged cierra una tarea en in_review cuyo PR se mergeó.
@@ -238,7 +256,7 @@ func (e *Engine) Views(ctx context.Context) ([]View, error) {
 	}
 	var out []View
 	for _, r := range recs {
-		if r.Flow.Phase != flow.Done {
+		if r.Flow.Phase != flow.Done && r.Flow.Phase != flow.Dropped {
 			out = append(out, e.view(r))
 		}
 	}

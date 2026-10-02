@@ -15,7 +15,7 @@ import (
 var optionColors = map[flow.Phase]string{
 	flow.Backlog: "GRAY", flow.Discovery: "BLUE", flow.Spec: "BLUE", flow.Contract: "PURPLE", flow.Implementing: "BLUE",
 	flow.Paused: "PURPLE", flow.Quality: "PINK", flow.Documenting: "GREEN", flow.Walkthrough: "ORANGE",
-	flow.InReview: "ORANGE", flow.Done: "GREEN", flow.Blocked: "RED",
+	flow.InReview: "ORANGE", flow.Done: "GREEN", flow.Blocked: "RED", flow.Dropped: "GRAY",
 }
 
 type ghLabel struct {

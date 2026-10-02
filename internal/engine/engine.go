@@ -98,6 +98,15 @@ func (e *Engine) apply(ctx context.Context, id string, ev flow.Event, slug strin
 					strings.Join(hollow, "\n") + "\nEscribe su cuerpo real (preparar, actuar, verificar contra las firmas) para que fallen contra los stubs, y reporta otra vez."}
 			}
 		}
+		if ev.Kind == flow.EvReport && ev.Verdict == flow.Split && rec.Flow.Phase == flow.Spec {
+			brief, err := e.specSection(*rec, "brief")
+			if err != nil {
+				return splitInvalid("no se pudo leer el Brief (%v)", err)
+			}
+			if _, err := ParseSplit(brief); err != nil {
+				return err
+			}
+		}
 		if ev.Kind == flow.EvReport && ev.Verdict == flow.DoneV && rec.Flow.Phase == flow.Documenting {
 			if files := e.uncommitted(ctx, rec.Flow); len(files) > 0 {
 				return uncommittedRejection(files, "reporta DONE otra vez")
@@ -208,6 +217,13 @@ func (e *Engine) entry(id string, ev flow.Event, before, after flow.State) store
 		if before.Gate != nil {
 			en.Gate = string(before.Gate.Name)
 		}
+	}
+	if len(ev.Children) > 0 {
+		ids := make([]string, 0, len(ev.Children))
+		for _, c := range ev.Children {
+			ids = append(ids, strings.TrimSpace(strings.SplitN(c, " · ", 2)[0]))
+		}
+		en.Data = map[string]any{"children": ids}
 	}
 	if ev.Kind == flow.EvStart {
 		en.Data = map[string]any{"lane": string(ev.Lane)}

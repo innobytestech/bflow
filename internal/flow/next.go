@@ -24,6 +24,8 @@ func NextFor(cfg Config, s State) output.Next {
 	switch s.Phase {
 	case Done:
 		return output.Next{Action: output.ActionDone, Reason: "tarea cerrada"}
+	case Dropped:
+		return output.Next{Action: output.ActionDone, Reason: "tarea retirada"}
 	case InReview:
 		return output.Next{Action: output.ActionWait,
 			Reason: "se espera el merge del PR; `bflow panel` cierra la tarea al detectarlo"}
@@ -131,8 +133,9 @@ func gateNext(cfg Config, s State) output.Next {
 		}
 	case GateSplit:
 		n.Question = "El spec-author propone dividir la feature: " + g.Note
+		n.Show = []string{cmd("show", id, "brief")}
 		n.Options = []output.Option{
-			approveOpt(id, g.Name, "Dividir (la tarea queda bloqueada hasta crear las nuevas)"),
+			approveOpt(id, g.Name, "Dividir: crear las hijas y retirar "+id),
 			rejectOpt(id, g.Name, "keep", "Seguir como una sola feature", ""),
 		}
 	case GateContract:

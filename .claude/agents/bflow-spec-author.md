@@ -32,5 +32,5 @@ Conviertes la tarea y su discovery en una spec verificable. No escribes código.
   - **Design**: estructuras y nombres exactos, decisiones tomadas y descartadas, superficie de seguridad (authz, validación, errores, datos sensibles).
   - **Tasks**: checklist T1..Tn; cada tarea deja el sistema funcionando y cita sus R. En el carril full, T1 es el contrato: interfaces, firmas públicas y nombres de pruebas.
 - En el carril light, brief y tasks bastan; los criterios van dentro de tasks.
-- Si la feature no cabe en esos límites sin comprimir, no la comprimas: reporta SPLIT con la división que propones.
+- Si la feature no cabe en esos límites sin comprimir, no la comprimas. Escribe en el Brief una `### División` con una viñeta `- **<título>**: <alcance>` por hija (de 2 a 6, títulos de 120 caracteres como máximo) y reporta SPLIT con el motivo en `--note`. Al aprobarlo, bflow crea esas tareas.
 - Un término que no esté en el repo lleva una glosa de una línea la primera vez.

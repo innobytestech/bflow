@@ -178,7 +178,7 @@ func Compute(id string, entries []store.Entry, now time.Time) TaskStats {
 		started   bool
 	)
 	add := func(to time.Time) {
-		if !started || cur == flow.Done || cur == flow.Backlog || !to.After(last) {
+		if !started || cur == flow.Done || cur == flow.Dropped || cur == flow.Backlog || !to.After(last) {
 			return
 		}
 		d := to.Sub(last)

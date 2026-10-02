@@ -246,6 +246,23 @@ func init() {
 			return e.Block(ctx, id, str(c.Flags, "reason"))
 		})})
 
+	Register(&Command{Name: "drop", Summary: "retira una tarea sin terminarla: drop <ID> --note \"motivo\"",
+		Setup: func(fs *flag.FlagSet) { fs.String("note", "", "motivo") },
+		Run: func(c *Ctx) output.Envelope {
+			if len(c.Args) == 0 {
+				return output.Fail("usage", errors.New("drop necesita el ID de la tarea: bflow drop <ID> --note \"motivo\""))
+			}
+			e, err := engineFor(c)
+			if err != nil {
+				return output.Fail("config", err)
+			}
+			o, err := e.Drop(context.Background(), c.Args[0], str(c.Flags, "note"))
+			if err != nil {
+				return fail(err)
+			}
+			return outcomeEnvelope(o)
+		}})
+
 	Register(&Command{Name: "unblock", Summary: "desbloquea la tarea y vuelve a su fase",
 		Run: flowCommand(func(ctx context.Context, e *engine.Engine, id string, _ *Ctx, _ []string) (engine.Outcome, error) {
 			return e.Unblock(ctx, id)

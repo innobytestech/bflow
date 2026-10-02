@@ -30,10 +30,11 @@ var DefaultStates = map[flow.Phase]StateDef{
 	flow.InReview:     {[]string{"PR abierto", "Por PR", "documented"}, "started", "#FB923C"},
 	flow.Done:         {[]string{"Done", "Hecho"}, "completed", "#22C55E"},
 	flow.Blocked:      {[]string{"Bloqueado", "blocked"}, "started", "#EF4444"},
+	flow.Dropped:      {[]string{"Cancelled", "Cancelado", "Descartado", "Canceled"}, "cancelled", "#6B7280"},
 }
 
 // PhaseOrder son todas las fases que un tracker debe poder escribir.
-var PhaseOrder = append(append([]flow.Phase{flow.Backlog}, flow.Order...), flow.Blocked)
+var PhaseOrder = append(append([]flow.Phase{flow.Backlog}, flow.Order...), flow.Blocked, flow.Dropped)
 
 // StateTable es la tabla fase → estado, con los ajustes de tracker.states.
 type StateTable map[flow.Phase]StateDef

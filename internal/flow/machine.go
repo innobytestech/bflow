@@ -64,6 +64,15 @@ func (t *tx) apply(ev Event) error {
 	if s.Phase == Done {
 		return reject("task_done", "la tarea %s ya está cerrada", s.ID)
 	}
+	if s.Phase == Dropped {
+		return reject("task_dropped", "la tarea %s ya se retiró", s.ID)
+	}
+	if ev.Kind == EvDrop {
+		if s.Phase == Backlog {
+			return reject("not_started", "la tarea %s no ha empezado", s.ID)
+		}
+		return t.drop(ev.Note)
+	}
 	if ev.Kind == EvClosedOutside {
 		if s.Phase == Backlog {
 			return reject("not_started", "la tarea %s no ha empezado", s.ID)
@@ -182,8 +191,12 @@ func (t *tx) approve(ev Event) error {
 	case GateSpec:
 		t.enter(t.cfg.after(s.Lane, Spec))
 	case GateSplit:
-		s.Gate = nil
-		return t.block("El spec-author propone dividir la feature. " + g.Note)
+		if len(ev.Children) == 0 {
+			return reject("split_children", "aprobar el split necesita las hijas creadas")
+		}
+		t.comments = append(t.comments, "**Dividida en:**\n- "+strings.Join(ev.Children, "\n- "))
+		s.Block = nil
+		t.enter(Dropped)
 	case GateContract:
 		t.enter(t.cfg.after(s.Lane, Contract))
 		s.Resume = true
@@ -415,6 +428,17 @@ func (t *tx) block(reason string) error {
 	s.Phase = Blocked
 	t.moved = true
 	t.comments = append(t.comments, "**Bloqueada:** "+reason)
+	return nil
+}
+
+func (t *tx) drop(note string) error {
+	note = strings.TrimSpace(note)
+	if note == "" {
+		return reject("note_required", "retirar necesita --note con el motivo")
+	}
+	t.s.Block = nil
+	t.enter(Dropped)
+	t.comments = append(t.comments, "**Retirada:** "+note)
 	return nil
 }
 
