@@ -101,6 +101,9 @@ func reviewIncomplete(cov review.Coverage, m review.Map, hasMap bool) *flow.Reje
 	if len(m.RedNoPath) > 0 {
 		blocks = append(blocks, "Estas viñetas 🔴 no empiezan con la ruta del archivo en backticks (`ruta`: razón):\n- "+strings.Join(m.RedNoPath, "\n- "))
 	}
+	if len(m.QuestionTells) > 0 {
+		blocks = append(blocks, "Estas opciones de `## Preguntas de producto` delatan cuál hace el código; reescríbelas neutras, sin marcas ni menciones al código:\n- "+strings.Join(m.QuestionTells, "\n- "))
+	}
 	if !m.HasDocs {
 		blocks = append(blocks, "El review-map no tiene la sección `## Docs`: lista ahí, una por viñeta con la ruta en backticks, la documentación que este cambio debe tocar.")
 	}

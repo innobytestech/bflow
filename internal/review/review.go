@@ -239,18 +239,62 @@ type Map struct {
 	RedNoPath []string // viñetas 🔴 sin ruta inicial, recortadas a 80 runas
 	Docs      []string // rutas de ## Docs
 	HasDocs   bool
+	// QuestionTells son las opciones de ## Preguntas de producto que delatan
+	// cuál hace el código, recortadas a 80 runas.
+	QuestionTells []string
 }
 
 var (
-	headingRe = regexp.MustCompile(`^(#+)\s+(.*)$`)
-	bulletRe  = regexp.MustCompile(`^(?:[-*]|\d+\.)\s+(.*)$`)
-	lineSufRe = regexp.MustCompile(`:\d+(-\d+)?$`)
+	headingRe  = regexp.MustCompile(`^(#+)\s+(.*)$`)
+	bulletRe   = regexp.MustCompile(`^(?:[-*]|\d+\.)\s+(.*)$`)
+	lineSufRe  = regexp.MustCompile(`:\d+(-\d+)?$`)
+	optionRe   = regexp.MustCompile(`^(\s*)[-*]\s+(.*)$`)
+	numberedRe = regexp.MustCompile(`^\d+\.\s`)
+
+	// tellRe encuentra las marcas que delatan la opción que hace el código.
+	tellRe        = regexp.MustCompile(`(?i)(?:(?:^|[^\pL\pN_])(?:el código|lo que hace|implementad[oa]s?|implementación|actual(?:mente)?|hoy|correct[oa]s?|recomendad[oa]s?|esperad[oa]s?)(?:$|[^\pL\pN_])|[✓✔✅←])`)
+	codeAnswersRe = regexp.MustCompile(`(?i)^el código responde\s*:`)
 )
+
+// OptionScanner reconoce, línea a línea, las opciones de respuesta de las
+// preguntas de producto. Una opción es una viñeta -/* con sangría, o sin ella si
+// sigue a una pregunta escrita como línea suelta o numerada. Una viñeta sin
+// sangría que abre la pregunta ("- ¿…?") es la pregunta, no una opción.
+type OptionScanner struct {
+	plain    bool // la última línea con contenido es una pregunta suelta o sus opciones
+	numbered bool // hubo un ítem numerado de pregunta
+}
+
+// Next lee la línea y, si es una opción, devuelve su texto.
+func (o *OptionScanner) Next(line string) (string, bool) {
+	line = strings.TrimRight(line, " 	")
+	if strings.TrimSpace(line) == "" {
+		return "", false
+	}
+	if numberedRe.MatchString(line) {
+		o.numbered, o.plain = true, false
+		return "", false
+	}
+	m := optionRe.FindStringSubmatch(line)
+	if m == nil {
+		o.plain = !codeAnswersRe.MatchString(strings.TrimSpace(line))
+		return "", false
+	}
+	if codeAnswersRe.MatchString(strings.TrimSpace(m[2])) {
+		o.plain = false
+		return "", false
+	}
+	if m[1] == "" && !o.numbered && !o.plain {
+		return "", false // viñeta que abre una pregunta
+	}
+	return m[2], true
+}
 
 // ParseMap lee las secciones 🔴 y Docs del review-map.
 func ParseMap(md string) Map {
 	var m Map
-	redLvl, docsLvl := 0, 0
+	redLvl, docsLvl, qLvl := 0, 0, 0
+	var scan OptionScanner
 	for _, line := range strings.Split(strings.ReplaceAll(md, "\r\n", "\n"), "\n") {
 		line = strings.TrimRight(line, " \t\r")
 		if h := headingRe.FindStringSubmatch(line); h != nil {
@@ -261,6 +305,12 @@ func ParseMap(md string) Map {
 			if docsLvl > 0 && lvl <= docsLvl {
 				docsLvl = 0
 			}
+			if qLvl > 0 && lvl <= qLvl {
+				qLvl = 0
+			}
+			if strings.Contains(strings.ToLower(h[2]), "preguntas") {
+				qLvl, scan = lvl, OptionScanner{}
+			}
 			if strings.Contains(h[2], "🔴") {
 				redLvl = lvl
 			}
@@ -268,6 +318,15 @@ func ParseMap(md string) Map {
 				docsLvl, m.HasDocs = lvl, true
 			}
 			continue
+		}
+		if qLvl > 0 {
+			if t, ok := scan.Next(line); ok && tellRe.MatchString(t) {
+				r := []rune(strings.TrimSpace(t))
+				if len(r) > 80 {
+					r = r[:80]
+				}
+				m.QuestionTells = append(m.QuestionTells, string(r))
+			}
 		}
 		b := bulletRe.FindStringSubmatch(line)
 		if b == nil || (redLvl == 0 && docsLvl == 0) {

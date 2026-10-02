@@ -3,11 +3,15 @@ package engine
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
+	"math/rand/v2"
 	"os"
+	"slices"
 	"strings"
 
 	"innobytes.tech/bflow/internal/flow"
 	"innobytes.tech/bflow/internal/output"
+	"innobytes.tech/bflow/internal/review"
 	"innobytes.tech/bflow/internal/store"
 )
 
@@ -69,26 +73,61 @@ func (e *Engine) productQuestions(id string) (string, error) {
 		}
 		return "", err
 	}
-	var out []string
-	in, level := false, 0
+	var out, block []string
+	var scan review.OptionScanner
+	in, level, question := false, 0, ""
+	// flush mezcla el bloque de opciones pendiente con la semilla de su pregunta.
+	flush := func() {
+		if len(block) == 0 {
+			return
+		}
+		h := fnv.New64a()
+		h.Write([]byte(id + "\n" + question))
+		out = append(out, shuffleOptions(h.Sum64(), block)...)
+		block = nil
+	}
 	for _, l := range strings.Split(strings.ReplaceAll(string(b), "\r\n", "\n"), "\n") {
 		t := strings.TrimSpace(l)
 		if h := strings.IndexFunc(t, func(r rune) bool { return r != '#' }); strings.HasPrefix(t, "#") && h > 0 {
 			switch {
 			case strings.Contains(strings.ToLower(t), "preguntas"):
-				in, level = true, h
+				flush()
+				in, level, scan = true, h, review.OptionScanner{}
 				continue
 			case in && h <= level:
+				flush()
 				in = false
 			}
 		}
-		if in && !strings.Contains(strings.ToLower(t), "el código responde") {
-			out = append(out, l)
+		if !in {
+			continue
+		}
+		if strings.Contains(strings.ToLower(t), "el código responde") {
+			scan.Next(l)
+			continue
+		}
+		if _, ok := scan.Next(l); ok {
+			block = append(block, l)
+			continue
+		}
+		flush()
+		out = append(out, l)
+		if t != "" {
+			question = t
 		}
 	}
+	flush()
 	q := strings.TrimSpace(strings.Join(out, "\n"))
 	if q == "" {
 		return "(el review-map no trae preguntas de producto)", nil
 	}
 	return q, nil
+}
+
+// shuffleOptions devuelve opts en un orden mezclado que solo depende de seed.
+func shuffleOptions(seed uint64, opts []string) []string {
+	out := slices.Clone(opts)
+	r := rand.New(rand.NewPCG(seed, seed))
+	r.Shuffle(len(out), func(i, j int) { out[i], out[j] = out[j], out[i] })
+	return out
 }

@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -27,9 +28,13 @@ func TestProductQuestionsHideAnswers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "1. ¿Qué pasa si el RFC es genérico?\n   - Lo acepta como cualquier otro\n   - Lo rechaza con 422\n2. ¿Y si viene vacío?"
-	if q != want {
-		t.Errorf("preguntas:\n%s\nwant:\n%s", q, want)
+	if strings.Contains(strings.ToLower(q), "código responde") {
+		t.Errorf("muestra la respuesta: %s", q)
+	}
+	for _, w := range []string{"1. ¿Qué pasa si el RFC es genérico?", "   - Lo acepta como cualquier otro", "   - Lo rechaza con 422", "2. ¿Y si viene vacío?"} {
+		if !strings.Contains(q, w) {
+			t.Errorf("falta %q en: %s", w, q)
+		}
 	}
 	v.e.Store.WriteFile("T-2", "reports/review-map.md", []byte("## 🔴 Decisión\n- algo\n"))
 	if q, _ := v.e.productQuestions("T-2"); !strings.Contains(q, "no trae preguntas") {
@@ -45,5 +50,112 @@ func TestClipDisplay(t *testing.T) {
 	}
 	if clip("corto", "x") != "corto" {
 		t.Error("lo corto no se toca")
+	}
+}
+
+const shuffleMap = `## Preguntas de producto
+1. ¿Pregunta uno?
+   - uno A
+   - uno B
+   - uno C
+2. ¿Pregunta dos?
+   - dos A
+   - dos B
+   - dos C
+3. ¿Pregunta tres?
+   - tres A
+   - tres B
+   - tres C
+4. ¿Pregunta cuatro?
+   - cuatro A
+   - cuatro B
+   - cuatro C
+   el código responde: A (x.go:1)
+`
+
+func TestProductQuestionsShuffleStable(t *testing.T) {
+	v := newEnv(t, "")
+	if err := v.e.Store.WriteFile("T-1", "reports/review-map.md", []byte(shuffleMap)); err != nil {
+		t.Fatal(err)
+	}
+	q1, _ := v.e.productQuestions("T-1")
+	q2, _ := v.e.productQuestions("T-1")
+	if q1 != q2 {
+		t.Fatalf("el orden cambia entre llamadas:\n%s\n---\n%s", q1, q2)
+	}
+	if strings.Contains(q1, "código responde") {
+		t.Error("muestra la respuesta")
+	}
+	changed := false
+	lines := strings.Split(q1, "\n")
+	for _, name := range []string{"uno", "dos", "tres", "cuatro"} {
+		var got []string
+		for _, l := range lines {
+			if strings.HasPrefix(strings.TrimSpace(l), "- "+name+" ") {
+				got = append(got, strings.TrimSpace(l))
+			}
+		}
+		want := []string{"- " + name + " A", "- " + name + " B", "- " + name + " C"}
+		if len(got) != 3 {
+			t.Fatalf("%s: %q", name, got)
+		}
+		if !slices.Equal(got, want) {
+			changed = true
+		}
+		s := slices.Clone(got)
+		slices.Sort(s)
+		if !slices.Equal(s, want) {
+			t.Errorf("%s no es permutación: %q", name, got)
+		}
+	}
+	if !changed {
+		t.Error("ninguna pregunta quedó en orden distinto")
+	}
+	for _, h := range []string{"1. ¿Pregunta uno?", "4. ¿Pregunta cuatro?"} {
+		if !strings.Contains(q1, h) {
+			t.Errorf("falta %q", h)
+		}
+	}
+}
+
+func TestShuffleOptionsPermutation(t *testing.T) {
+	in := []string{"a", "b", "c", "d"}
+	a := shuffleOptions(7, in)
+	if !slices.Equal(a, shuffleOptions(7, in)) {
+		t.Error("misma semilla, distinto orden")
+	}
+	s := slices.Clone(a)
+	slices.Sort(s)
+	if !slices.Equal(s, in) || !slices.Equal(in, []string{"a", "b", "c", "d"}) {
+		t.Errorf("no es permutación o muta la entrada: %v", a)
+	}
+}
+
+func TestProductQuestionsShuffleFlatFormat(t *testing.T) {
+	v := newEnv(t, "")
+	md := "## Preguntas de producto\n"
+	for _, q := range []string{"uno", "dos", "tres", "cuatro"} {
+		md += "¿Pregunta " + q + "?\n- " + q + " A\n- " + q + " B\n- " + q + " C\nel código responde: A (x.go:1)\n\n"
+	}
+	if err := v.e.Store.WriteFile("T-1", "reports/review-map.md", []byte(md)); err != nil {
+		t.Fatal(err)
+	}
+	q1, _ := v.e.productQuestions("T-1")
+	q2, _ := v.e.productQuestions("T-1")
+	if q1 != q2 || strings.Contains(q1, "código responde") {
+		t.Fatalf("inestable o con respuesta:\n%s", q1)
+	}
+	ordered := "- uno A\n- uno B\n- uno C\n"
+	changed := !strings.Contains(q1, ordered)
+	for _, q := range []string{"dos", "tres", "cuatro"} {
+		changed = changed || !strings.Contains(q1, "- "+q+" A\n- "+q+" B\n- "+q+" C\n")
+	}
+	if !changed {
+		t.Errorf("ningún orden cambió:\n%s", q1)
+	}
+	for _, q := range []string{"uno", "dos", "tres", "cuatro"} {
+		if strings.Count(q1, "- "+q+" ") != 3 || !strings.Contains(q1, "¿Pregunta "+q+"?") {
+			t.Errorf("pregunta %s mal: %s", q, q1)
+		}
 	}
 }
