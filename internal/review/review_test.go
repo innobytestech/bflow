@@ -294,6 +294,27 @@ func TestMeasureWholeDiffLimit(t *testing.T) {
 	}
 }
 
+func TestMeasureDirsRespectLimit(t *testing.T) {
+	diff := []string{"internal/a.go", "b.go"}
+	rd := func(p string) []Read {
+		return []Read{{TS: now, Tool: guard.Bash, Paths: []string{p}, ReadHook: true}}
+	}
+	for _, p := range []string{".", "internal"} {
+		c := Measure(diff, WholeDiffMax-1, rd(p), []string{"internal/a.go"}, isTest)
+		if c.Read == 0 || len(c.RedMissing) != 0 {
+			t.Errorf("ruta %q bajo el tope cubre: %+v", p, c)
+		}
+		c = Measure(diff, WholeDiffMax, rd(p), []string{"internal/a.go"}, isTest)
+		if c.Read != 0 || !slices.Equal(c.RedMissing, []string{"internal/a.go"}) {
+			t.Errorf("ruta %q en el tope no cubre: %+v", p, c)
+		}
+	}
+	c := Measure(diff, 5000, rd("internal/a.go"), nil, isTest)
+	if c.Read != 1 {
+		t.Errorf("ruta exacta cubre sobre el tope: %+v", c)
+	}
+}
+
 func TestMeasureUnmeasured(t *testing.T) {
 	diff := []string{"a.go", "b.go"}
 	for name, reads := range map[string][]Read{
