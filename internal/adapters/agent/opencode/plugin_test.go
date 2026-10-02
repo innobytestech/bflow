@@ -68,3 +68,28 @@ func TestPluginSinDependencias(t *testing.T) {
 		t.Errorf("el plugin tiene %d líneas, máximo 100", n)
 	}
 }
+
+// R17: read solo se manda al guard desde la subsesión del reviewer, y con --reads.
+func TestPluginReadsOnlyReviewer(t *testing.T) {
+	src := string(files.Plugin)
+	guarded := regexp.MustCompile(`GUARDED\s*=\s*new Set\(\[([^\]]*)\]`).FindStringSubmatch(src)
+	if guarded == nil || !strings.Contains(guarded[1], `"read"`) {
+		t.Fatalf("GUARDED debe incluir \"read\": %v", guarded)
+	}
+	if !strings.Contains(src, `"--reads"`) {
+		t.Error(`el comando del guard lleva "--reads"`)
+	}
+	// Antes de lanzar el proceso, un read de otra sesión sale sin hacer nada.
+	iRead := strings.Index(src, `input.tool === "read"`)
+	iRun := strings.Index(src, `run(["guard"`)
+	if iRead < 0 || iRun < 0 || iRead > iRun {
+		t.Fatalf("falta el filtro de read antes de run(guard): read=%d run=%d", iRead, iRun)
+	}
+	between := src[iRead:iRun]
+	if !strings.Contains(between, "bflow-reviewer") || !strings.Contains(between, "return") {
+		t.Errorf("el filtro compara con bflow-reviewer y sale con return:\n%s", between)
+	}
+	if n := strings.Count(strings.TrimRight(src, "\n"), "\n") + 1; n > 100 {
+		t.Errorf("el plugin tiene %d líneas, máximo 100", n)
+	}
+}

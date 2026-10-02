@@ -50,7 +50,7 @@ func TestSettings(t *testing.T) {
 	if err := json.Unmarshal(b, &s); err != nil {
 		t.Fatalf("settings.json no es JSON válido: %v", err)
 	}
-	want := map[string]string{"SessionStart": "bflow hook session-start", "PreToolUse": "bflow guard",
+	want := map[string]string{"SessionStart": "bflow hook session-start", "PreToolUse": "bflow guard --reads",
 		"Stop": "bflow hook tokens", "SubagentStop": "bflow hook tokens"}
 	for event, cmd := range want {
 		hs := s.Hooks[event]
@@ -123,5 +123,31 @@ func TestSkillFromCommonBody(t *testing.T) {
 	s := string(files.Skill)
 	if strings.Contains(s, "{{") || strings.Contains(s, "herramienta `question`") {
 		t.Error("sin marcadores ni el nombre de la herramienta de preguntas de OpenCode")
+	}
+}
+
+// R17: el guard ve Read para medir las lecturas del reviewer.
+func TestSettingsGuardSeesRead(t *testing.T) {
+	b, err := os.ReadFile("settings.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var s struct {
+		Hooks map[string][]struct {
+			Matcher string `json:"matcher"`
+			Hooks   []struct {
+				Command string `json:"command"`
+			} `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(b, &s); err != nil {
+		t.Fatal(err)
+	}
+	pre := s.Hooks["PreToolUse"]
+	if len(pre) != 1 || pre[0].Matcher != "Bash|Edit|Write|MultiEdit|NotebookEdit|Read" {
+		t.Fatalf("matcher de PreToolUse: %+v", pre)
+	}
+	if len(pre[0].Hooks) != 1 || pre[0].Hooks[0].Command != "bflow guard --reads" {
+		t.Errorf("PreToolUse llama bflow guard --reads: %+v", pre[0].Hooks)
 	}
 }

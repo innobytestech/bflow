@@ -102,6 +102,9 @@ func (e *Engine) apply(ctx context.Context, id string, ev flow.Event, slug strin
 			if files := e.uncommitted(ctx, rec.Flow); len(files) > 0 {
 				return uncommittedRejection(files, "reporta DONE otra vez")
 			}
+			if rej := e.docsPending(ctx, id); rej != nil {
+				return rej
+			}
 		}
 		if ev.Kind == flow.EvReport && ev.Verdict == flow.DoneV && rec.Flow.Phase == flow.Implementing {
 			ok, detail, err := e.verify(ctx, id)
@@ -125,6 +128,17 @@ func (e *Engine) apply(ctx context.Context, id string, ev flow.Event, slug strin
 			ev.CheckOK = true
 		}
 
+		var coverage *store.Entry
+		if ev.Kind == flow.EvReport && rec.Flow.Phase == flow.Quality && isReviewer(ev.Agent) {
+			cov, m, hasMap := e.reviewCoverage(ctx, id)
+			if ev.Verdict == flow.Approved {
+				if rej := reviewIncomplete(cov, m, hasMap); rej != nil {
+					return rej
+				}
+			}
+			en := e.coverageEntry(id, cov, ev.Agent, rec.Flow.Round)
+			coverage = &en
+		}
 		fc := e.flowCfg()
 		before := rec.Flow
 		res, err := flow.Apply(fc, rec.Flow, ev)
@@ -152,6 +166,9 @@ func (e *Engine) apply(ctx context.Context, id string, ev flow.Event, slug strin
 			out.To = rec.Flow.Phase
 		}
 		entries = append(entries, e.entry(id, ev, before, rec.Flow))
+		if coverage != nil {
+			entries = append(entries, *coverage)
+		}
 		return nil
 	})
 	if err != nil {

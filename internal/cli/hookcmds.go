@@ -19,6 +19,7 @@ import (
 	"innobytes.tech/bflow/internal/flow"
 	"innobytes.tech/bflow/internal/guard"
 	"innobytes.tech/bflow/internal/output"
+	"innobytes.tech/bflow/internal/review"
 	"innobytes.tech/bflow/internal/store"
 )
 
@@ -26,6 +27,7 @@ func init() {
 	Register(&Command{Name: "guard", Summary: "hook PreToolUse: lee la acción por stdin y la bloquea (exit 2) si rompe una regla",
 		Setup: func(fs *flag.FlagSet) {
 			fs.String("tool", "", "herramienta cuya entrada se lee (opencode); vacío: Claude Code")
+			fs.Bool("reads", false, "el hook también ve Read: registra las lecturas del reviewer en quality")
 		},
 		Run: runGuard})
 	Register(&Command{Name: "hook session-start", Summary: "hook de inicio de sesión: entorno, compromisos y tarea activa en pocas líneas",
@@ -92,6 +94,9 @@ func runGuard(c *Ctx) output.Envelope {
 		}
 		acts = []guard.Action{a}
 	}
+	if onlyForeignReads(acts) {
+		return allowed // el Read de otro agente no se mide ni se evalúa: sin leer config
+	}
 	dir := c.Dir
 	if cwd != "" {
 		dir = cwd
@@ -124,7 +129,66 @@ func runGuard(c *Ctx) output.Envelope {
 		env.Quiet = !c.JSON
 		return env
 	}
+	recordReads(c, cfg, acts, cwd, str(c.Flags, "reads") == "true")
 	return allowed
+}
+
+// isReviewer dice si la acción es del subagente reviewer de bflow.
+func isReviewer(a guard.Action) bool {
+	name, ok := strings.CutPrefix(a.Agent, flow.SubagentPrefix)
+	return ok && name == "reviewer"
+}
+
+// onlyForeignReads dice si todas las acciones son Read y ninguna es del reviewer.
+func onlyForeignReads(acts []guard.Action) bool {
+	for _, a := range acts {
+		if a.Tool != guard.Read || isReviewer(a) {
+			return false
+		}
+	}
+	return len(acts) > 0
+}
+
+// recordReads anota en reads.jsonl lo que hizo el reviewer en quality (R1). Nunca
+// bloquea ni falla: cualquier error se ignora (R5).
+func recordReads(c *Ctx, cfg *config.Config, acts []guard.Action, cwd string, readHook bool) {
+	if c.Build == nil {
+		return
+	}
+	var mine []guard.Action
+	for _, a := range acts {
+		if isReviewer(a) {
+			mine = append(mine, a)
+		}
+	}
+	if len(mine) == 0 {
+		return
+	}
+	e, err := c.Build(cfg.Root)
+	if err != nil {
+		return
+	}
+	ctx := context.Background()
+	id, err := e.Active(ctx)
+	if err != nil {
+		return
+	}
+	if v, err := e.Status(ctx, id); err != nil || v.Phase != flow.Quality {
+		return
+	}
+	if cwd == "" {
+		cwd = c.Dir
+	}
+	var lines [][]byte
+	now := time.Now()
+	for _, a := range mine {
+		b, err := json.Marshal(review.FromAction(a, cfg.Root, cwd, readHook, now))
+		if err != nil {
+			return
+		}
+		lines = append(lines, b)
+	}
+	_ = e.Store.AppendFile(id, review.ReadsFile, lines)
 }
 
 // guardContext arma lo que el guard sabe del repo, sin la fase de la tarea.

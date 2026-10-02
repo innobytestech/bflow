@@ -24,7 +24,7 @@ Un valor con `/` se usa tal cual. Un alias sin equivalente deja al agente sin `m
 
 `bflow render` también escribe `<repo>/.opencode/plugins/bflow.js` (de [`plugin.js`](plugin.js); se commitea y no se edita). Solo le pasa datos a bflow por stdin, sin dependencias de npm:
 
-- `tool.execute.before` de bash, edit, write, multiedit y patch/apply_patch corre `bflow guard --tool opencode`; con exit 2 bloquea con el motivo. Si `bflow` no está en el PATH, tarda más de 10 s o falla, la herramienta pasa y el plugin avisa una vez por sesión.
+- `tool.execute.before` de bash, edit, write, multiedit y patch/apply_patch corre `bflow guard --tool opencode --reads`; el de `read` solo corre si la sesión es una subsesión `bflow-reviewer` (así bflow mide cuánto del diff abrió el reviewer); con exit 2 bloquea con el motivo. Si `bflow` no está en el PATH, tarda más de 10 s o falla, la herramienta pasa y el plugin avisa una vez por sesión.
 - `message.updated` agrega cada mensaje de asistente terminado (solo metadatos) a `.bflow/cache/opencode/<sesión>.jsonl`; `session.idle` corre `bflow hook tokens --tool opencode`, que atribuye los tokens por fase, agente y modelo.
 - No hay evento de fin de subagente ni de inicio de sesión: el nudge y el resumen de inicio no existen en OpenCode; lo cubren `bflow report`, `bflow check --verify` y el bloque de AGENTS.md.
 

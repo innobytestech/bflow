@@ -90,7 +90,7 @@ func TestParseActionsRutaRelativa(t *testing.T) {
 }
 
 func TestParseActionsHerramientaIgnorada(t *testing.T) {
-	for _, tool := range []string{"read", "grep", "glob", "task", "webfetch", "inventada"} {
+	for _, tool := range []string{"grep", "glob", "task", "webfetch", "inventada"} {
 		acts, _, ok := Agent{}.ParseActions(input(t, tool, map[string]any{"filePath": "a.go", "command": "git reset --hard"}, nil))
 		if !ok || len(acts) != 0 {
 			t.Errorf("%s no le importa al guard: ok=%v acts=%+v", tool, ok, acts)
@@ -155,5 +155,21 @@ func TestParseActionsCaptura(t *testing.T) {
 	want := []guard.Action{{Tool: guard.Write, Path: filepath.Join(cwd, "b.txt")}, {Tool: guard.Edit, Path: filepath.Join(cwd, "a.txt")}}
 	if p := got["apply_patch"]; !reflect.DeepEqual(p, want) {
 		t.Errorf("apply_patch: %+v, want %+v", p, want)
+	}
+}
+
+// R1: read llega al guard como acción propia, con el agente de la subsesión.
+func TestParseActionsRead(t *testing.T) {
+	cwd := t.TempDir()
+	acts, _, ok := Agent{}.ParseActions(input(t, "read", map[string]any{"filePath": "internal/a.go"},
+		map[string]any{"cwd": cwd, "subagent": true, "agent": "bflow-reviewer"}))
+	want := []guard.Action{{Tool: guard.Read, Path: filepath.Join(cwd, "internal/a.go"), Subagent: true, Agent: "bflow-reviewer"}}
+	if !ok || !reflect.DeepEqual(acts, want) {
+		t.Errorf("read: ok=%v acts=%+v, quiero %+v", ok, acts, want)
+	}
+	f := filepath.Join(cwd, "b.go")
+	acts, _, _ = Agent{}.ParseActions(input(t, "read", map[string]any{"filePath": f}, map[string]any{"cwd": cwd}))
+	if !reflect.DeepEqual(acts, []guard.Action{{Tool: guard.Read, Path: f}}) {
+		t.Errorf("ruta absoluta de la sesión principal: %+v", acts)
 	}
 }

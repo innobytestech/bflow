@@ -19,7 +19,7 @@ func TestParsePreToolUse(t *testing.T) {
 		{`{"tool_name":"MultiEdit","tool_input":{"file_path":"x.go","edits":[]}}`, guard.Action{Tool: guard.Edit, Path: "x.go"}, true},
 		{`{"tool_name":"Write","tool_input":{"file_path":".env","content":"S=1"}}`, guard.Action{Tool: guard.Write, Path: ".env"}, true},
 		{`{"tool_name":"NotebookEdit","tool_input":{"notebook_path":"n.ipynb"}}`, guard.Action{Tool: guard.Edit, Path: "n.ipynb"}, true},
-		{`{"tool_name":"Read","tool_input":{"file_path":".env"}}`, guard.Action{}, true},
+		{`{"tool_name":"Grep","tool_input":{"pattern":"x"}}`, guard.Action{}, true},
 		{`{"tool":"bash","command":"ls"}`, guard.Action{}, false},
 	}
 	for _, c := range cases {
@@ -41,5 +41,21 @@ func TestParsePreToolUseAgent(t *testing.T) {
 	a, _, _ = ParsePreToolUse([]byte(`{"tool_name":"Bash","tool_input":{"command":"bflow approve X"}}`))
 	if a.Agent != "" || a.Subagent {
 		t.Errorf("sin agent_type: %+v", a)
+	}
+}
+
+// R1: Read llega al guard como acción propia, con el agente que la hizo.
+func TestParsePreToolUseRead(t *testing.T) {
+	a, cwd, ok := ParsePreToolUse([]byte(`{"hook_event_name":"PreToolUse","cwd":"C:\\repo","tool_name":"Read","tool_input":{"file_path":"C:\\repo\\internal\\a.go","offset":10,"limit":50},"agent_type":"bflow-reviewer","agent_id":"abc"}`))
+	want := guard.Action{Tool: guard.Read, Path: `C:\repo\internal\a.go`, Subagent: true, Agent: "bflow-reviewer"}
+	if !ok || a != want || cwd != `C:\repo` {
+		t.Errorf("reviewer: %+v cwd=%q ok=%v, quiero %+v", a, cwd, ok, want)
+	}
+	a, _, ok = ParsePreToolUse([]byte(`{"tool_name":"Read","tool_input":{"file_path":"x.go"}}`))
+	if !ok || a != (guard.Action{Tool: guard.Read, Path: "x.go"}) {
+		t.Errorf("sesión principal: %+v ok=%v", a, ok)
+	}
+	if d := guard.Evaluate(a, guard.Context{}); !d.Allow {
+		t.Errorf("el guard permite Read: %+v", d)
 	}
 }

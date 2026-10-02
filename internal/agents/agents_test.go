@@ -171,3 +171,16 @@ func TestResolveModels(t *testing.T) {
 		t.Errorf("sin tabla, cada alias con sus agentes ordenados: %+v", un)
 	}
 }
+
+// R16: el documenter escribe reports/docs.md además del walkthrough.
+func TestDocumenterWritesDocsReport(t *testing.T) {
+	specs, err := Build(flow.DefaultConfig(), nil, testutil.TempDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := byName(t, specs)["documenter"].Body
+	want := "- Escribes `.bflow/tasks/<id>/walkthrough.md` y `.bflow/tasks/<id>/reports/docs.md`. En `.bflow/` no tocas nada más."
+	if !strings.Contains(doc, want) {
+		t.Errorf("el contrato del documenter no lista reports/docs.md:\n%s", doc)
+	}
+}

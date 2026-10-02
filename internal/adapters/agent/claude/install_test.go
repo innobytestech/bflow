@@ -83,7 +83,7 @@ func TestMergeSettingsKeepsUserHooksAndOrder(t *testing.T) {
 }`
 	m, out, _, _ := merge(t, cur)
 	pre := commands(t, m, "PreToolUse")
-	if len(pre) != 2 || pre[0][0] != "echo mio" || pre[1][0] != "bflow guard" {
+	if len(pre) != 2 || pre[0][0] != "echo mio" || pre[1][0] != "bflow guard --reads" {
 		t.Errorf("PreToolUse: la del usuario primero y la de bflow al final: %v", pre)
 	}
 	if n := commands(t, m, "Notification"); len(n) != 1 || n[0][0] != "notify" {

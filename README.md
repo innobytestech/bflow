@@ -46,6 +46,7 @@ Lo que vive en el CLI se cumple con cualquier herramienta. Lo que depende de hoo
 | `git reset --hard`, push forzado o a ramas protegidas, `.env`, `.bflow/` | ✅ se bloquea antes de que ocurra | ✅ se bloquea antes de que ocurra (si `bflow` no está en el PATH el guard no actúa y el plugin avisa) | ❌ |
 | Ramas y PR solo los crea bflow mientras hay una tarea en curso | ✅ | ✅ | ❌ |
 | Un agente que termina sin reportar sigue trabajando (2 avisos, luego decide una persona) | ✅ | ❌ OpenCode no tiene evento de fin de subagente; lo cubren `bflow report`, `bflow check --verify` y el bloque de AGENTS.md | ❌ |
+| El reviewer abrió las 🔴 del diff antes de aprobar (si no, `review_incomplete`) | ✅ mide `Read` y Bash del reviewer en quality | ✅ el plugin manda `read` solo de la subsesión `bflow-reviewer` | ❌ no se mide y no se exige |
 | Tokens por fase, agente y modelo | ✅ | ✅ | ❌ (solo tiempos) |
 
 **Lo que bflow no garantiza:**
@@ -265,7 +266,7 @@ tracker:
 
 Corre `bflow install claude` dentro del repo. Instala la skill en `~/.claude/skills/bflow/SKILL.md` (una vez por máquina), fusiona los hooks, el permiso y la barra de estado en `<repo>/.claude/settings.json` sin tocar lo tuyo, y corre `bflow render` si el repo tiene `agent: claude`. Es idempotente: córrelo otra vez cuando quieras. `bflow install claude --skill-only` instala solo la skill; `bflow update` la refresca sola si ya estaba instalada. Los archivos fuente están en [`adapters/claude/`](adapters/claude/).
 
-La skill tiene unas 30 líneas: no contiene reglas del flujo, solo cómo interpretar `next`. Los hooks corren `bflow hook session-start` al abrir la sesión, `bflow guard` antes de cada edición o comando, `bflow hook tokens` al terminar cada turno y cada subagente (cada uno cuenta solo su transcript), `bflow hook subagent-stop` cuando termina un agente de bflow (si no reportó, lo hace seguir hasta 2 veces con lo que le falta y después bloquea la tarea para que decida una persona) y la barra de estado con `bflow statusline`:
+La skill tiene unas 30 líneas: no contiene reglas del flujo, solo cómo interpretar `next`. Los hooks corren `bflow hook session-start` al abrir la sesión, `bflow guard --reads` antes de cada edición, comando o `Read` (de los `Read` solo registra los del reviewer en quality, para medir cuánto del diff abrió), `bflow hook tokens` al terminar cada turno y cada subagente (cada uno cuenta solo su transcript), `bflow hook subagent-stop` cuando termina un agente de bflow (si no reportó, lo hace seguir hasta 2 veces con lo que le falta y después bloquea la tarea para que decida una persona) y la barra de estado con `bflow statusline`:
 
 ```
 API-12 · implementing · 1h42m · ronda 1 · 145k nuevos · 2.9M caché

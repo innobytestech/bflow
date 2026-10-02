@@ -23,11 +23,11 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit",
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|Read",
         "hooks": [
           {
             "type": "command",
-            "command": "bflow guard",
+            "command": "bflow guard --reads",
             "timeout": 10
           }
         ]

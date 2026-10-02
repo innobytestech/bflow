@@ -139,6 +139,11 @@ func renderStats(st metrics.TaskStats) string {
 	if st.Refused+st.Guarded+st.Nudged > 0 {
 		fmt.Fprintf(&b, "  fricción: %d pedido(s) rechazado(s) por el flujo · %d bloqueo(s) de guard · %d fin(es) sin reporte\n", st.Refused, st.Guarded, st.Nudged)
 	}
+	if st.Review != nil {
+		if l := st.Review.Lines(); len(l) > 0 {
+			b.WriteString("  revisión: " + l[0] + "\n")
+		}
+	}
 	usageTable(&b, "por agente", st.Agents, map[string]string{metrics.MainSession: "sesión principal", "": "sin desglose"})
 	usageTable(&b, "por modelo", st.Models, map[string]string{"": "sin modelo"})
 	if st.TokensAvailable {

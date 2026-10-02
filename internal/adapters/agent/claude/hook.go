@@ -22,7 +22,7 @@ type hookInput struct {
 
 // ParsePreToolUse traduce el JSON de un hook PreToolUse. ok es false si la
 // entrada no tiene la forma de Claude Code. Una herramienta que al guard no le
-// importa (Read, Grep…) devuelve una acción vacía, que se permite.
+// importa (Grep…) devuelve una acción vacía, que se permite.
 func ParsePreToolUse(raw []byte) (a guard.Action, cwd string, ok bool) {
 	var in hookInput
 	if json.Unmarshal(raw, &in) != nil || in.ToolName == "" {
@@ -34,6 +34,8 @@ func ParsePreToolUse(raw []byte) (a guard.Action, cwd string, ok bool) {
 		a = guard.Action{Tool: guard.Bash, Command: in.ToolInput.Command, Subagent: sub, Agent: in.AgentType}
 	case "Edit", "MultiEdit":
 		a = guard.Action{Tool: guard.Edit, Path: in.ToolInput.FilePath, Subagent: sub, Agent: in.AgentType}
+	case "Read":
+		a = guard.Action{Tool: guard.Read, Path: in.ToolInput.FilePath, Subagent: sub, Agent: in.AgentType}
 	case "Write":
 		a = guard.Action{Tool: guard.Write, Path: in.ToolInput.FilePath, Subagent: sub, Agent: in.AgentType}
 	case "NotebookEdit":

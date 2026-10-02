@@ -219,3 +219,29 @@ func TestCommitOnlyPaths(t *testing.T) {
 		t.Errorf("sin cambios no hay commit: %v %v", done, err)
 	}
 }
+
+// R6: DiffLines suma agregadas y borradas de base...HEAD; un binario cuenta 0.
+func TestDiffLines(t *testing.T) {
+	work, _ := fixture(t)
+	g := New(work)
+	ctx := context.Background()
+	if _, err := g.EnsureBranch(ctx, "feature/X-2", "dev"); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := g.DiffLines(ctx, "origin/dev"); err != nil || n != 0 {
+		t.Fatalf("sin cambios: %d %v", n, err)
+	}
+	write(t, work, "internal/b.go", "package a\nvar B = 1\n") // +2
+	write(t, work, "README.md", "hola\nmás\n")                // +1
+	sh(t, work, "rm", "internal/a.go")                        // -1
+	write(t, work, "img.bin", "\x00\x01\x02\x00")             // binario: 0
+	sh(t, work, "add", ".")
+	sh(t, work, "commit", "-m", "cambios")
+	n, err := g.DiffLines(ctx, "origin/dev")
+	if err != nil || n != 4 {
+		t.Errorf("DiffLines = %d, %v; quiero 4 (2 + 1 + 1, binario 0)", n, err)
+	}
+	if _, err := g.DiffLines(ctx, "origin/no-existe"); err == nil {
+		t.Error("una base que no existe es un error")
+	}
+}
