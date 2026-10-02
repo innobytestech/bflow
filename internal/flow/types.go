@@ -25,6 +25,9 @@ const (
 	InReview     Phase = "in_review"
 	Done         Phase = "done"
 	Blocked      Phase = "blocked"
+	// Dropped es una tarea retirada sin terminar. No entra en Order: ningún
+	// carril la recorre.
+	Dropped Phase = "dropped"
 )
 
 // Order es el orden canónico de las fases de trabajo. Un carril recorre un
@@ -130,6 +133,7 @@ const (
 	EvBlock   EventKind = "block"
 	EvUnblock EventKind = "unblock"
 	EvMerged  EventKind = "merged"
+	EvDrop    EventKind = "drop" // retira la tarea sin terminarla (Note = motivo)
 	// EvClosedOutside cierra una tarea que se terminó fuera de esta copia
 	// (el tracker la da por hecha o su PR se mergeó), en cualquier fase empezada.
 	EvClosedOutside EventKind = "closed_outside"
@@ -155,6 +159,9 @@ type Event struct {
 	CheckOK bool     `json:"check_ok,omitempty"` // report DONE en implementing: check verificado en HEAD
 
 	Reason string `json:"reason,omitempty"` // closed_outside: "tracker" o "pr"
+
+	// Children: en el approve del split, una línea "<ID> · <título>" por hija creada.
+	Children []string `json:"children,omitempty"`
 }
 
 // AgentArtifacts son los archivos de .bflow/tasks/<ID>/ que escriben los

@@ -22,10 +22,14 @@ type Memory struct {
 	tasks    map[string]*tracker.Task
 	comments map[string][]tracker.Comment
 	seq      int
+	created  []string // lo creado con Create, para FailCreateAfter
 
 	// FailTransitions y FailComments hacen fallar esas operaciones mientras sean true.
 	FailTransitions bool
 	FailComments    bool
+	// FailCreateAfter, si es mayor que 0, hace que Create devuelva ErrInjected
+	// después de haber creado esa cantidad de tareas.
+	FailCreateAfter int
 	// Calls registra las operaciones de escritura en orden ("transition LOCAL-1 spec", "comment LOCAL-1").
 	Calls []string
 }
@@ -45,10 +49,14 @@ func (m *Memory) Name() string { return "memory" }
 func (m *Memory) Create(_ context.Context, title, desc string) (tracker.Task, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.FailCreateAfter > 0 && len(m.created) >= m.FailCreateAfter {
+		return tracker.Task{}, ErrInjected
+	}
 	m.seq++
 	t := &tracker.Task{ID: "MEM-" + strconv.Itoa(m.seq), Title: title, Description: desc, Phase: flow.Backlog,
 		URL: fmt.Sprintf("https://tracker.test/MEM-%d", m.seq), Updated: time.Now()}
 	m.tasks[t.ID] = t
+	m.created = append(m.created, t.ID)
 	return *t, nil
 }
 
@@ -67,7 +75,7 @@ func (m *Memory) List(_ context.Context, f tracker.Filter) ([]tracker.Task, erro
 	defer m.mu.Unlock()
 	var out []tracker.Task
 	for _, t := range m.tasks {
-		if f.OpenOnly && t.Phase == flow.Done {
+		if f.OpenOnly && (t.Phase == flow.Done || t.Phase == flow.Dropped) {
 			continue
 		}
 		out = append(out, *t)
@@ -87,7 +95,7 @@ func (m *Memory) Transition(_ context.Context, id string, to flow.Phase, p track
 		return tracker.ErrNotFound
 	}
 	t.Phase = to
-	t.Closed = to == flow.Done
+	t.Closed = to == flow.Done || to == flow.Dropped
 	if !p.StampStart.IsZero() && t.Start == nil {
 		d := p.StampStart
 		t.Start = &d

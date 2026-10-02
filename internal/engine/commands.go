@@ -144,6 +144,12 @@ func (e *Engine) Unblock(ctx context.Context, id string) (Outcome, error) {
 	return e.apply(ctx, id, flow.Event{Kind: flow.EvUnblock}, "")
 }
 
+// Drop retira la tarea sin terminarla: la cierra en el tracker y la saca de
+// status. No toca la rama ni el PR; avisa si existen.
+func (e *Engine) Drop(ctx context.Context, id, note string) (Outcome, error) {
+	return Outcome{ID: id}, errors.New("no implementado")
+}
+
 // Merged cierra una tarea en in_review cuyo PR se mergeó.
 func (e *Engine) Merged(ctx context.Context, id string) (Outcome, error) {
 	out, err := e.apply(ctx, id, flow.Event{Kind: flow.EvMerged}, "")

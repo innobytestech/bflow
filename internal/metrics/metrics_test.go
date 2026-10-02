@@ -322,3 +322,26 @@ func TestComputeReviewCoverage(t *testing.T) {
 		t.Errorf("sin evento Review es nil: %+v", base.Review)
 	}
 }
+
+// R9: desde el evento drop no corre el reloj; la fase queda en dropped.
+func TestDroppedStopsClock(t *testing.T) {
+	st := Compute("T-1", []store.Entry{
+		e(0, "start", flow.Backlog, flow.Implementing),
+		e(60, "drop", flow.Implementing, flow.Dropped),
+	}, at(6000))
+	if st.Phase != flow.Dropped {
+		t.Errorf("fase %q, want dropped", st.Phase)
+	}
+	if st.Agent != 60*time.Minute || st.Human != 0 || st.Blocked != 0 {
+		t.Errorf("solo cuenta hasta el drop: agent=%v human=%v blocked=%v", st.Agent, st.Human, st.Blocked)
+	}
+	// retirada estando bloqueada: el bloqueo se cierra en el drop
+	st = Compute("T-1", []store.Entry{
+		e(0, "start", flow.Backlog, flow.Implementing),
+		e(30, "block", flow.Implementing, flow.Blocked),
+		e(50, "drop", flow.Blocked, flow.Dropped),
+	}, at(6000))
+	if st.Blocked != 20*time.Minute || st.Agent != 30*time.Minute {
+		t.Errorf("bloqueada: agent=%v blocked=%v", st.Agent, st.Blocked)
+	}
+}

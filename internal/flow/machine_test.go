@@ -85,7 +85,8 @@ func commonRows(l Lane) []row {
 		{lane: l, from: Spec, ev: rep(sa, Split), want: Spec, wantGate: GateSplit},
 		{lane: l, from: Spec, ev: rep(sa, NeedsDecision), want: Spec, wantGate: GateDecision},
 		{lane: l, from: Spec, gate: GateDecision, ev: approveChoice(1), want: Spec},
-		{lane: l, from: Spec, gate: GateSplit, ev: approve(), want: Blocked, fx: []EffectKind{ts, cm}},
+		{lane: l, from: Spec, gate: GateSplit, ev: approve(), err: "split_children"},
+		{lane: l, from: Spec, gate: GateSplit, ev: Event{Kind: EvApprove, Children: []string{"T-2 · a", "T-3 · b"}}, want: Dropped, fx: []EffectKind{ts, cm}},
 		{lane: l, from: Spec, gate: GateSplit, ev: rej("hazla completa"), want: Spec, fx: []EffectKind{cm}},
 		{lane: l, from: Spec, gate: GateSpec, ev: rej("falta X"), want: Spec, fx: []EffectKind{cm}},
 		// implementing
@@ -306,7 +307,7 @@ func candidates(cfg Config, s State) []Event {
 		}
 		return evs
 	}
-	evs = append(evs, approve(), approveChoice(1), approveWith("adjunto"), rej("nota"), merged())
+	evs = append(evs, approve(), Event{Kind: EvApprove, Children: []string{"T-2 · a"}}, approveChoice(1), approveWith("adjunto"), rej("nota"), merged())
 	for _, p := range Order {
 		evs = append(evs, rejTo(p))
 	}
@@ -429,7 +430,7 @@ func TestPhaseAlwaysInLane(t *testing.T) {
 			continue
 		}
 		p := res.State.Phase
-		if p != Blocked && !cfg.has(res.State.Lane, p) {
+		if p != Blocked && p != Dropped && !cfg.has(res.State.Lane, p) {
 			t.Errorf("%s: terminó en %s, que no está en el carril %s", r.name(), p, res.State.Lane)
 		}
 	}

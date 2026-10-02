@@ -274,13 +274,13 @@ func TestPhaseMappingWithExistingBEStates(t *testing.T) {
 	if task, _ := c.Get(ctx, "API-171"); task.Phase != flow.Implementing {
 		t.Errorf("In Progress se lee como implementing (su nombre preferido), got %s", task.Phase)
 	}
-	// Lectura: "Spec por aprobar" también es spec; "Cancelled" no es ninguna fase.
+	// Lectura: "Spec por aprobar" también es spec; "Cancelled" es dropped.
 	f.items[0]["state"] = "st-speca"
 	if task, _ := c.Get(ctx, "API-171"); task.Phase != flow.Spec || task.State != "Spec por aprobar" {
 		t.Errorf("lectura: %+v", task)
 	}
 	f.items[0]["state"] = "st-cancel"
-	if task, _ := c.Get(ctx, "API-171"); task.Phase != "" || !task.Closed {
+	if task, _ := c.Get(ctx, "API-171"); task.Phase != flow.Dropped || !task.Closed {
 		t.Errorf("cancelada: %+v", task)
 	}
 }
@@ -405,7 +405,7 @@ func TestEnsureStatesOnEmptyProject(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(plan) != 12 || len(f.states) != 0 {
+	if len(plan) != 13 || len(f.states) != 0 {
 		t.Fatalf("dry-run: %v (creados %d)", plan, len(f.states))
 	}
 	if _, err := c.EnsureStates(context.Background(), false); err != nil {
@@ -472,7 +472,7 @@ func TestPhaseMappingWithRealHarnessNames(t *testing.T) {
 		}
 	}
 	read := map[string]flow.Phase{"r-pending": flow.Backlog, "r-sr": flow.Spec, "r-ip": flow.Implementing,
-		"r-rev": flow.Quality, "r-doc": flow.Walkthrough, "r-cancel": ""}
+		"r-rev": flow.Quality, "r-doc": flow.Walkthrough, "r-cancel": flow.Dropped}
 	for st, want := range read {
 		f.items[0]["state"] = st
 		if task, _ := c.Get(ctx, "API-171"); task.Phase != want {
