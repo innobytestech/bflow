@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -182,5 +183,62 @@ func TestDocumenterWritesDocsReport(t *testing.T) {
 	want := "- Escribes `.bflow/tasks/<id>/walkthrough.md` y `.bflow/tasks/<id>/reports/docs.md`. En `.bflow/` no tocas nada más."
 	if !strings.Contains(doc, want) {
 		t.Errorf("el contrato del documenter no lista reports/docs.md:\n%s", doc)
+	}
+}
+
+// variableInPrefix: lo que cambia entre tareas o entre máquinas y rompería el
+// prefijo de caché si entrara en el cuerpo de un agente (GH-19).
+var variableInPrefix = []*regexp.Regexp{
+	regexp.MustCompile(`[A-Z][A-Z0-9]*-[0-9]+`),
+	regexp.MustCompile(`[0-9]{4}-[0-9]{2}-[0-9]{2}`),
+	regexp.MustCompile(`\.bflow/tasks/[^<\s]`),
+}
+
+// allCatalogConfig arma un flujo con todos los agentes del catálogo y el scout.
+func allCatalogConfig() flow.Config {
+	fc := flow.DefaultConfig()
+	fc.Agents = map[flow.Phase][]string{
+		flow.Spec:         {"spec-author", "ui-designer"},
+		flow.Contract:     {"implementer"},
+		flow.Implementing: {"implementer"},
+		flow.Quality:      {"reviewer", "security-auditor", "ux-auditor"},
+		flow.Documenting:  {"documenter"},
+	}
+	fc.Scout = "scout"
+	return fc
+}
+
+func TestAgentBodiesHaveNoTaskData(t *testing.T) {
+	root := testutil.TempDir(t)
+	specs, err := Build(allCatalogConfig(), nil, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(specs) != 8 {
+		t.Fatalf("todos los agentes del catálogo y el scout: %d", len(specs))
+	}
+	for _, s := range specs {
+		pats := append([]*regexp.Regexp{regexp.MustCompile(regexp.QuoteMeta(root)), regexp.MustCompile(regexp.QuoteMeta(filepath.ToSlash(root)))}, variableInPrefix...)
+		for _, re := range pats {
+			if loc := re.FindStringIndex(s.Body); loc != nil {
+				line := s.Body[strings.LastIndex(s.Body[:loc[0]], "\n")+1:]
+				line, _, _ = strings.Cut(line, "\n")
+				t.Errorf("%s: %q aparece en el cuerpo, rompe el prefijo de caché: %s", s.Name, re, line)
+			}
+		}
+	}
+}
+
+func TestAgentSpecsSameAcrossRoots(t *testing.T) {
+	a, err := Build(allCatalogConfig(), nil, testutil.TempDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := Build(allCatalogConfig(), nil, testutil.TempDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(a, b) {
+		t.Errorf("los Spec no dependen de la raíz del repo")
 	}
 }

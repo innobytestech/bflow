@@ -108,6 +108,8 @@ type TaskStats struct {
 	Nudged  int `json:"nudged"`
 	// Tokens por modelo ("" = registrados antes de guardar el modelo).
 	Models map[string]Usage `json:"models,omitempty"`
+	// Prefix es el costo del prefijo por agente, de calls.jsonl (GH-19). Lo llena stats.
+	Prefix map[string]PrefixCost `json:"prefix,omitempty"`
 	// Tokens por agente, como en PhaseStats.
 	Agents map[string]Usage `json:"agents,omitempty"`
 	// Review es la última cobertura del reviewer (evento review_coverage).

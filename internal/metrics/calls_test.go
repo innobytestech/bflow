@@ -217,3 +217,32 @@ func TestPhasesMatchesAllot(t *testing.T) {
 		t.Error("sin muestras no hay fases")
 	}
 }
+
+func TestPrefixByAgent(t *testing.T) {
+	if got := PrefixByAgent(nil); got != nil {
+		t.Errorf("vacío -> nil: %v", got)
+	}
+	calls := []Call{
+		// implementer, corrida a: 1a llamada escribió 8000 (m1 leída en dos pasadas: 5000 + 3000).
+		call("claude:a", "implementer", "m1", 1, flow.Implementing, 1, 5000, 0, 10),
+		call("claude:a", "implementer", "m1", 1, flow.Implementing, 0, 3000, 0, 10),
+		call("claude:a", "implementer", "m2", 2, flow.Implementing, 1, 400, 8000, 5),
+		// corrida b: 1701.
+		call("claude:b", "implementer", "m1", 5, flow.Implementing, 1, 1701, 6000, 5),
+		call("claude:b", "implementer", "m2", 6, flow.Implementing, 1, 900, 7000, 5),
+		// reviewer: una corrida.
+		call("claude:c", "reviewer", "m1", 7, flow.Quality, 1, 4000, 0, 5),
+		// sesión principal: 1a llamada escribió 0 y cuenta.
+		call("claude:s", MainSession, "m1", 0, flow.Implementing, 1, 0, 9000, 5),
+		call("claude:s", MainSession, "m2", 9, flow.Implementing, 1, 700, 9000, 5),
+	}
+	got := PrefixByAgent(Runs(calls))
+	want := map[string]PrefixCost{
+		"implementer": {Runs: 2, Sum: 9701, Avg: 4851},
+		"reviewer":    {Runs: 1, Sum: 4000, Avg: 4000},
+		MainSession:   {Runs: 1, Sum: 0, Avg: 0},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("prefijo por agente:\n got %+v\nwant %+v", got, want)
+	}
+}
