@@ -71,8 +71,8 @@ func TestRenderMultiTool(t *testing.T) {
 
 	code, out, raw := runJSON(t, env, "render")
 	d := dataOf(out)
-	if code != 0 || out["code"] != "rendered" || d["total"] != float64(9) || len(stringsOf(d["changed"])) != 9 {
-		t.Fatalf("4 agentes del flujo por cada herramienta y el plugin de OpenCode: %d %s", code, raw)
+	if code != 0 || out["code"] != "rendered" || d["total"] != float64(11) || len(stringsOf(d["changed"])) != 11 {
+		t.Fatalf("5 agentes del flujo (con el scout) por cada herramienta y el plugin de OpenCode: %d %s", code, raw)
 	}
 	if un, _ := d["unresolved"].([]any); len(un) != 0 {
 		t.Errorf("con la tabla completa no queda nada sin resolver: %v", un)
@@ -89,6 +89,9 @@ func TestRenderMultiTool(t *testing.T) {
 	}
 	if doc := rendered(t, env, ".opencode/agents/bflow-documenter.md"); !strings.Contains(doc, "model: anthropic/claude-haiku-4") {
 		t.Errorf("el alias haiku se traduce:\n%s", doc)
+	}
+	if sc := rendered(t, env, ".opencode/agents/bflow-scout.md"); !strings.Contains(sc, "bash: allow") || strings.Contains(sc, "edit: allow") {
+		t.Errorf("el scout de OpenCode lee y corre bash, sin edit (R23):%s", sc)
 	}
 	if sa := rendered(t, env, ".opencode/agents/bflow-spec-author.md"); strings.Contains(sa, "model:") {
 		t.Errorf("un agente sin modelo no lleva model:\n%s", sa)
@@ -126,11 +129,11 @@ func TestRenderStaleInactiveTool(t *testing.T) {
 
 	setAgent("agent: claude\n")
 	code, out, raw := runJSON(t, env, "render", "--check")
-	if code == 0 || out["code"] != "render_outdated" || len(stringsOf(dataOf(out)["stale"])) != 5 {
+	if code == 0 || out["code"] != "render_outdated" || len(stringsOf(dataOf(out)["stale"])) != 6 {
 		t.Fatalf("lo generado de una herramienta que ya no está en agent: sale stale: %d %s", code, raw)
 	}
 	code, out, raw = runJSON(t, env, "render")
-	if code != 0 || out["code"] != "rendered" || len(stringsOf(dataOf(out)["stale"])) != 5 {
+	if code != 0 || out["code"] != "rendered" || len(stringsOf(dataOf(out)["stale"])) != 6 {
 		t.Fatalf("render borra lo stale: %d %s", code, raw)
 	}
 	if exists(env, ".opencode/agents/bflow-implementer.md") {
@@ -173,7 +176,7 @@ func TestRenderUnresolved(t *testing.T) {
 	if err := json.Unmarshal(b, &un); err != nil || len(un) != 2 {
 		t.Fatalf("data.unresolved: %s", b)
 	}
-	if un[0].Tool != "opencode" || un[0].Alias != "haiku" || !slices.Equal(un[0].Agents, []string{"bflow-documenter"}) ||
+	if un[0].Tool != "opencode" || un[0].Alias != "haiku" || !slices.Equal(un[0].Agents, []string{"bflow-documenter", "bflow-scout"}) ||
 		un[1].Tool != "opencode" || un[1].Alias != "sonnet" || !slices.Equal(un[1].Agents, []string{"bflow-implementer", "bflow-reviewer"}) {
 		t.Errorf("por herramienta, ordenado por alias, con sus agentes ordenados: %+v", un)
 	}

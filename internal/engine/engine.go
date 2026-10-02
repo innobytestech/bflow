@@ -66,6 +66,12 @@ func (e *Engine) now() time.Time {
 
 // apply es el camino único de todo comando que cambia estado.
 func (e *Engine) apply(ctx context.Context, id string, ev flow.Event, slug string) (Outcome, error) {
+	return e.applyWith(ctx, id, ev, slug, nil)
+}
+
+// applyWith es apply con un hook que corre dentro de la transacción, tras un
+// flow.Apply sin error; si falla, el estado no se guarda.
+func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug string, after func() error) (Outcome, error) {
 	out := Outcome{ID: id}
 	if w, err := e.syncFirst(ctx, id); err != nil {
 		return out, err
@@ -107,7 +113,7 @@ func (e *Engine) apply(ctx context.Context, id string, ev flow.Event, slug strin
 				return err
 			}
 		}
-		if ev.Kind == flow.EvReport && ev.Verdict == flow.DoneV && rec.Flow.Phase == flow.Documenting {
+		if ev.Kind == flow.EvReport && ev.Agent != flow.ScoutAgent && ev.Verdict == flow.DoneV && rec.Flow.Phase == flow.Documenting {
 			if files := e.uncommitted(ctx, rec.Flow); len(files) > 0 {
 				return uncommittedRejection(files, "reporta DONE otra vez")
 			}
@@ -115,7 +121,7 @@ func (e *Engine) apply(ctx context.Context, id string, ev flow.Event, slug strin
 				return rej
 			}
 		}
-		if ev.Kind == flow.EvReport && ev.Verdict == flow.DoneV && rec.Flow.Phase == flow.Implementing {
+		if ev.Kind == flow.EvReport && ev.Agent != flow.ScoutAgent && ev.Verdict == flow.DoneV && rec.Flow.Phase == flow.Implementing {
 			ok, detail, err := e.verify(ctx, id)
 			if err != nil {
 				return err
@@ -153,6 +159,11 @@ func (e *Engine) apply(ctx context.Context, id string, ev flow.Event, slug strin
 		res, err := flow.Apply(fc, rec.Flow, ev)
 		if err != nil {
 			return err
+		}
+		if after != nil {
+			if err := after(); err != nil {
+				return err
+			}
 		}
 		rec.Flow = res.State
 		rec.Nudges = nil // cualquier evento cuenta como avance: el agente vuelve a tener sus intentos

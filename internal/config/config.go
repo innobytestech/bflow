@@ -125,6 +125,7 @@ type Flow struct {
 	SLAHours         int                 `yaml:"sla_hours,omitempty"`
 	SecurityAudit    *bool               `yaml:"security_audit,omitempty"` // true: security-auditor aparte, además del reviewer
 	UI               *bool               `yaml:"ui,omitempty"`             // por defecto lo decide el stack
+	Scout            *bool               `yaml:"scout,omitempty"`          // false apaga el scout
 	// ConsumerChangelog: dónde va el único changelog para consumidores, con
 	// {id} y {slug}. Por defecto, junto a la spec.
 	ConsumerChangelog string `yaml:"consumer_changelog,omitempty"`
@@ -590,6 +591,12 @@ func (c *Config) Validate() error {
 	unknownPhase := slices.ContainsFunc(p, func(s string) bool { return strings.Contains(s, "fase desconocida") })
 	if !unknownPhase {
 		core := c.Flow.Core()
+		for _, ags := range c.Flow.Agents {
+			if slices.Contains(ags, flow.ScoutAgent) {
+				add("flow.agents: scout es un agente reservado; se apaga con flow.scout: false")
+				break
+			}
+		}
 		if err := core.Validate(); err != nil {
 			add("flow: %v", err)
 		}
@@ -597,6 +604,7 @@ func (c *Config) Validate() error {
 			a := c.Agents[name]
 			switch {
 			case len(core.PhasesOf(name)) > 0:
+			case name == flow.ScoutAgent && core.Scout != "":
 			case name == "security-auditor": // desde que el reviewer revisa la seguridad
 				add("agents.security-auditor: ya no trabaja por defecto, el reviewer revisa también la seguridad. Pasa su read y extra a agents.reviewer, o pon flow.security_audit: true para conservarlo aparte")
 			default:
@@ -632,6 +640,9 @@ func (f Flow) Core() flow.Config {
 		core.MaxQualityRounds = f.MaxQualityRounds
 	}
 	core.Changelog = f.ConsumerChangelog
+	if f.Scout == nil || *f.Scout {
+		core.Scout = flow.ScoutAgent
+	}
 	if f.UI != nil && *f.UI {
 		core.UI = true
 		core.Agents[flow.Spec] = []string{"ui-designer", "spec-author"}

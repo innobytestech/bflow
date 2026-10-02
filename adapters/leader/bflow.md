@@ -18,7 +18,7 @@ Todo comando `bflow … --json` responde con `next`. Haz lo que diga y luego sig
 Si un comando sale con código 2, muestra `data.reason` y pregunta cómo seguir; repetirlo igual dará el mismo rechazo.
 
 ## discovery
-Pregunta hasta 3 cosas por tanda (alcance, datos clave, errores, restricciones), cada una con tu recomendación. Lo que se contesta leyendo el repo, léelo. Al cerrar, guarda el discovery completo en un archivo y corre el comando de la opción con esa ruta.
+Pregunta hasta 3 cosas por tanda (alcance, datos clave, errores, restricciones), cada una con tu recomendación. Lee primero `bflow show <id> scout`; pregunta solo lo que el reporte y el repo no contestan. Al cerrar, guarda el discovery completo en un archivo y corre el comando de la opción con esa ruta.
 
 ## approve
 Si el brief lista decisiones `[N]`, ratifica cada una (A = lo decidido, B = la alternativa descartada) antes de preguntar si se aprueba.

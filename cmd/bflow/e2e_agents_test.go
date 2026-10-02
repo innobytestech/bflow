@@ -28,6 +28,7 @@ func subagentStop(r *repo, subagent string) (map[string]any, string) {
 
 func TestSubagentStopKeepsAgentWorking(t *testing.T) {
 	r := newRepo(t)
+	r.writeConfig("")
 	id := r.ok("task", "add", "Alta de clientes").Data["id"].(string)
 	r.ok("start", id, "--lane", "light")
 	r.ok("report", id, "--agent", "spec-author", "--verdict", "READY")

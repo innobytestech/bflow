@@ -73,6 +73,19 @@ const (
 	RejectedV     Verdict = "REJECTED"
 )
 
+// ScoutStatus dice si el scout de la tarea falta por correr o ya corrió. Vacío:
+// la tarea no lleva scout (apagado o empezada antes de esta versión).
+type ScoutStatus string
+
+const (
+	ScoutPending ScoutStatus = "pending"
+	ScoutDone    ScoutStatus = "done"
+)
+
+// ScoutAgent es el nombre del agente scout. No trabaja en ninguna fase: corre
+// una vez al entrar a la primera fase del carril y no cuenta para allReported.
+const ScoutAgent = "scout"
+
 // Rejection es un error de reglas del flujo (exit 2): la petición se entiende
 // pero el estado actual no la permite.
 type Rejection struct {
@@ -111,6 +124,7 @@ type State struct {
 	Reports map[string]Verdict `json:"reports,omitempty"` // veredictos de la fase actual
 	Round   int                `json:"round"`             // rechazos de la compuerta de calidad
 	Block   *BlockInfo         `json:"block,omitempty"`
+	Scout   ScoutStatus        `json:"scout,omitempty"`
 
 	BranchCreated bool   `json:"branch_created,omitempty"`
 	Started       bool   `json:"started,omitempty"` // start_date sellada

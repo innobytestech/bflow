@@ -13,13 +13,18 @@ func TestRenderAgents(t *testing.T) {
 	os.WriteFile(cfg, []byte("stack: go\nflow: { security_audit: true }\nagents:\n  implementer:\n    read: [docs/architecture/]\n"), 0o644)
 	agentsDir := filepath.Join(r.dir, ".claude", "agents")
 
-	if n := len(r.ok("render").Data["changed"].([]any)); n != 5 {
-		t.Fatalf("render debe escribir los 5 agentes del flujo go: %d", n)
+	if n := len(r.ok("render").Data["changed"].([]any)); n != 6 {
+		t.Fatalf("render debe escribir los 6 agentes del flujo go (con el scout): %d", n)
 	}
 	imp, _ := os.ReadFile(filepath.Join(agentsDir, "bflow-implementer.md"))
 	if !strings.Contains(string(imp), "name: bflow-implementer") || !strings.Contains(string(imp), "omitClaudeMd: true") ||
 		!strings.Contains(string(imp), "--agent implementer --verdict DONE|NEEDS_DECISION|BLOCKED") {
 		t.Errorf("bflow-implementer.md:\n%s", imp)
+	}
+
+	sc, _ := os.ReadFile(filepath.Join(agentsDir, "bflow-scout.md"))
+	if !strings.Contains(string(sc), "name: bflow-scout") || !strings.Contains(string(sc), "tools: Read, Grep, Glob, Bash") {
+		t.Errorf("bflow-scout.md solo lee (R23):%s", sc)
 	}
 
 	// Un agente del usuario con el mismo prefijo no es de bflow: no se toca.

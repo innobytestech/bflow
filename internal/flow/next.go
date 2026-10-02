@@ -45,6 +45,9 @@ func NextFor(cfg Config, s State) output.Next {
 			Question: fmt.Sprintf("¿En qué carril va %s?", s.ID),
 			Options:  laneOptions(cfg, s.ID)}
 	}
+	if s.Scout == ScoutPending {
+		return scoutNext(s)
+	}
 	if s.Gate != nil {
 		return gateNext(cfg, s)
 	}
@@ -201,6 +204,13 @@ func gateNext(cfg Config, s State) output.Next {
 	return n
 }
 
+func scoutNext(s State) output.Next {
+	args := map[string]string{"id": s.ID, "lane": string(s.Lane), "phase": string(s.Phase)}
+	return output.Next{Action: output.ActionSpawn, Agents: []output.AgentCall{{
+		Agent: ScoutAgent, Subagent: SubagentPrefix + ScoutAgent, Args: args,
+		Report: cmd("report", s.ID, "--agent", ScoutAgent, "--verdict", joinVerdicts(ScoutVerdicts), "--stdin")}}}
+}
+
 func spawnNext(cfg Config, s State) output.Next {
 	agents := cfg.Agents[s.Phase]
 	var pending []string
@@ -273,6 +283,9 @@ func Upcoming(cfg Config, s State) Step {
 			return Step{Phase: p}
 		}
 		return Step{Phase: p, Agents: cfg.Agents[p]}
+	}
+	if s.Scout == ScoutPending {
+		return enter(s.Phase)
 	}
 	if g := s.Gate; g != nil {
 		switch g.Name {

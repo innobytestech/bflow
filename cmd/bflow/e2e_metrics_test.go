@@ -22,6 +22,7 @@ func transcriptLineAt(ts time.Time, id string, in, out, cr, cw int) string {
 
 func TestStatsTokensAndStatusline(t *testing.T) {
 	r := newRepo(t)
+	r.writeConfig("")
 	id := r.ok("task", "add", "Borrador pre-folio").Data["id"].(string)
 	r.ok("start", id, "--lane", "full")
 	os.WriteFile(filepath.Join(r.dir, "d.md"), []byte("d"), 0o644)
@@ -115,6 +116,7 @@ func TestStatsTokensAndStatusline(t *testing.T) {
 
 func TestQualityFrictionAndModelMetrics(t *testing.T) {
 	r := newRepo(t)
+	r.writeConfig("")
 	feat := r.ok("task", "add", "Alta de clientes").Data["id"].(string)
 	r.ok("start", feat, "--lane", "light")
 
@@ -177,7 +179,7 @@ func TestQualityFrictionAndModelMetrics(t *testing.T) {
 func TestWatchOpen(t *testing.T) {
 	r := newRepo(t)
 	t.Setenv("CI", "true")
-	os.WriteFile(filepath.Join(r.dir, "bflow.yaml"), []byte("ui: { watch: true }\n"), 0o644)
+	r.writeConfig("ui: { watch: true }\n")
 	id := r.ok("task", "add", "Panel").Data["id"].(string)
 	// En CI start no abre ventanas ni avisa.
 	if env := r.ok("start", id, "--lane", "light"); env.Data["warnings"] != nil {

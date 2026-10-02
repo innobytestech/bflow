@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -226,18 +227,32 @@ func init() {
 			return e.Reject(ctx, id, engine.RejectOpts{Gate: str(c.Flags, "gate"), To: str(c.Flags, "to"), Note: str(c.Flags, "note")})
 		})})
 
-	Register(&Command{Name: "report", Summary: "un agente reporta su veredicto: report [ID] --agent a --verdict V [--note] [--file] [--option o]...",
+	Register(&Command{Name: "report", Summary: "un agente reporta su veredicto: report [ID] --agent a --verdict V [--note] [--file] [--option o]... [--stdin: reporte del scout]",
 		Setup: func(fs *flag.FlagSet) {
 			fs.String("agent", "", "nombre del agente")
 			fs.String("verdict", "", "veredicto")
 			fs.String("note", "", "detalle (problema en NEEDS_DECISION, motivo en BLOCKED)")
 			fs.String("file", "", "archivo del reporte")
+			fs.Bool("stdin", false, "el reporte llega por stdin (solo el scout)")
 			fs.Var(&multi{}, "option", "opción para NEEDS_DECISION (repetible)")
 		},
 		Run: flowCommand(func(ctx context.Context, e *engine.Engine, id string, c *Ctx, _ []string) (engine.Outcome, error) {
 			opts := *(c.Flags.Lookup("option").Value.(*multi))
+			var content *string
+			if c.Flags.Lookup("stdin").Value.String() == "true" {
+				const limit = 64 << 10
+				b, err := io.ReadAll(io.LimitReader(c.Stdin, limit+1))
+				if err != nil {
+					return engine.Outcome{}, err
+				}
+				if len(b) > limit {
+					return engine.Outcome{}, &flow.Rejection{Code: "scout_too_long", Reason: "el reporte pasa de 64 KiB; recórtalo (40 líneas como máximo) y reporta otra vez"}
+				}
+				s := string(b)
+				content = &s
+			}
 			return e.Report(ctx, id, engine.ReportOpts{Agent: str(c.Flags, "agent"), Verdict: flow.Verdict(str(c.Flags, "verdict")),
-				Note: str(c.Flags, "note"), File: str(c.Flags, "file"), Options: opts})
+				Note: str(c.Flags, "note"), File: str(c.Flags, "file"), Options: opts, Content: content})
 		})})
 
 	Register(&Command{Name: "block", Summary: "bloquea la tarea: block [ID] --reason \"motivo\"",
@@ -303,7 +318,7 @@ func init() {
 		Setup: func(fs *flag.FlagSet) { fs.Bool("brief", false, "resumen de pocas líneas (hooks)") },
 		Run:   runStatus})
 
-	Register(&Command{Name: "show", Summary: "muestra un artefacto: show [ID] task|brief|spec|contract|review-map|questions|decisions|discovery|check [--section s]",
+	Register(&Command{Name: "show", Summary: "muestra un artefacto: show [ID] task|brief|spec|contract|review-map|questions|decisions|discovery|check|scout [--section s]",
 		Setup: func(fs *flag.FlagSet) { fs.String("section", "", "sección del spec") },
 		Run: func(c *Ctx) output.Envelope {
 			ctx := context.Background()
@@ -316,14 +331,14 @@ func init() {
 				return fail(err)
 			}
 			if len(rest) == 0 {
-				return output.Fail("usage", errors.New("uso: bflow show [ID] task|brief|spec|contract|review-map|questions|decisions|discovery|check"))
+				return output.Fail("usage", errors.New("uso: bflow show [ID] task|brief|spec|contract|review-map|questions|decisions|discovery|check|scout"))
 			}
 			text, err := e.Show(ctx, id, rest[0], str(c.Flags, "section"))
 			if err != nil {
 				return output.Fail("not_found", err)
 			}
 			env := output.OK("shown", map[string]any{"id": id, "what": rest[0], "content": text}, nil)
-			env.Text = text
+			env.Text = strings.TrimRight(text, "\n")
 			if strings.TrimSpace(text) == "" {
 				env.Text = fmt.Sprintf("(%s de %s está vacío todavía)", rest[0], id)
 			}

@@ -71,6 +71,23 @@ func newRepo(t *testing.T) *repo {
 	return &repo{t: t, dir: dir}
 }
 
+// noScout apaga el scout en un bflow.yaml: estas pruebas recorren el flujo sin
+// él (lo cubren las pruebas del scout).
+func noScout(yaml string) string {
+	if strings.Contains(yaml, "flow: { ") {
+		return strings.Replace(yaml, "flow: { ", "flow: { scout: false, ", 1)
+	}
+	return yaml + "flow: { scout: false }\n"
+}
+
+// writeConfig escribe bflow.yaml con el scout apagado.
+func (r *repo) writeConfig(yaml string) {
+	r.t.Helper()
+	if err := os.WriteFile(filepath.Join(r.dir, "bflow.yaml"), []byte(noScout(yaml)), 0o644); err != nil {
+		r.t.Fatal(err)
+	}
+}
+
 // run ejecuta bflow con --json y decodifica el envelope.
 func (r *repo) run(args ...string) envelope {
 	r.t.Helper()
@@ -164,7 +181,7 @@ func spawned(t *testing.T, env envelope, agents ...string) {
 func TestFullFeatureWithLocalTracker(t *testing.T) {
 	r := newRepo(t)
 	// Con el auditor de seguridad aparte: quality con dos revisores en paralelo.
-	os.WriteFile(filepath.Join(r.dir, "bflow.yaml"), []byte("flow: { security_audit: true }\n"), 0o644)
+	r.writeConfig("flow: { security_audit: true }\n")
 	env := r.ok("task", "add", "Borrador pre-folio de cotización")
 	id := env.Data["id"].(string)
 	if id != "LOCAL-1" {
@@ -286,6 +303,7 @@ func TestFullFeatureWithLocalTracker(t *testing.T) {
 
 func TestHotfixWithLocalTracker(t *testing.T) {
 	r := newRepo(t)
+	r.writeConfig("")
 	id := r.ok("task", "add", "Servidor no arranca: migración 124 mal numerada").Data["id"].(string)
 	env := r.ok("start", id, "--lane", "hotfix")
 	spawned(t, env, "implementer")
@@ -315,6 +333,7 @@ func TestHotfixWithLocalTracker(t *testing.T) {
 
 func TestRejectionsExitTwo(t *testing.T) {
 	r := newRepo(t)
+	r.writeConfig("")
 	id := r.ok("task", "add", "Demo").Data["id"].(string)
 	env := r.run("approve", id)
 	if env.exit != 2 || env.Code != "not_started" {

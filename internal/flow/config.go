@@ -23,6 +23,8 @@ type Config struct {
 	// Changelog: plantilla de la ruta del changelog para consumidores, con
 	// {id} y {slug}; vacía, va junto a la spec.
 	Changelog string
+	// Scout: nombre del agente scout; vacío = apagado.
+	Scout string
 }
 
 // ChangelogPath es la ruta, versionada, del único changelog para consumidores
