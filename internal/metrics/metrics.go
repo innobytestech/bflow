@@ -27,6 +27,9 @@ type Usage struct {
 	Calls int64 `json:"calls,omitempty"`
 	// MaxContext es el contexto más grande de una sola llamada (entrada y caché).
 	MaxContext int64 `json:"max_context,omitempty"`
+	// LastContext es el contexto final: la última llamada (entrada, caché y
+	// salida). Es la cifra que el agent map de Claude Code llama "tokens".
+	LastContext int64 `json:"last_context,omitempty"`
 }
 
 // Total suma todo lo que se procesó.
@@ -59,6 +62,9 @@ func (u *Usage) Add(o Usage) {
 	u.CacheWrite += o.CacheWrite
 	u.Calls += o.Calls
 	u.MaxContext = max(u.MaxContext, o.MaxContext)
+	if o.LastContext > 0 {
+		u.LastContext = o.LastContext // el último gana
+	}
 }
 
 // PhaseStats son los tiempos de una fase.
@@ -309,10 +315,15 @@ func Allot(entries []store.Entry, id, agent string, samples []Sample) []Share {
 		m string
 	}
 	sum := map[key]Usage{}
+	last := len(samples) - 1
 	for i, s := range samples {
 		k := key{phases[i], s.Model}
 		u := sum[k]
-		u.Add(s.Usage)
+		su := s.Usage
+		if i != last {
+			su.LastContext = 0 // solo la parte con la última muestra conserva el contexto final
+		}
+		u.Add(su)
 		sum[k] = u
 	}
 	out := make([]Share, 0, len(sum))
@@ -330,7 +341,7 @@ func Allot(entries []store.Entry, id, agent string, samples []Sample) []Share {
 
 func usageOf(d map[string]any) Usage {
 	return Usage{Input: num(d["input"]), Output: num(d["output"]), CacheRead: num(d["cache_read"]), CacheWrite: num(d["cache_write"]),
-		Calls: num(d["calls"]), MaxContext: num(d["max_context"])}
+		Calls: num(d["calls"]), MaxContext: num(d["max_context"]), LastContext: num(d["last_context"])}
 }
 
 func num(v any) int64 {
@@ -365,7 +376,11 @@ func Detail(u Usage) string {
 	if u.Calls == 0 {
 		return Tokens(u.New(), u.CacheRead)
 	}
-	return fmt.Sprintf("%s nuevos · %d llamadas de hasta %s", Human(u.New()), u.Calls, Human(u.MaxContext))
+	s := fmt.Sprintf("%s nuevos · %d llamadas de hasta %s", Human(u.New()), u.Calls, Human(u.MaxContext))
+	if u.LastContext > 0 {
+		s += " · final " + Human(u.LastContext)
+	}
+	return s
 }
 
 // Tokens separa lo nuevo de lo leído de caché: "145k nuevos · 2.9M caché".
@@ -378,13 +393,13 @@ func Tokens(fresh, cached int64) string {
 	return s
 }
 
-// Human formatea tokens: 900, 184k, 1.2M.
+// Human formatea tokens: 900, 15.9k, 1.2M.
 func Human(n int64) string {
 	switch {
-	case n >= 1_000_000:
+	case n >= 999_950: // 999.95k ya redondea a 1000.0k
 		return fmt.Sprintf("%.1fM", float64(n)/1e6)
 	case n >= 1000:
-		return fmt.Sprintf("%dk", n/1000)
+		return fmt.Sprintf("%.1fk", float64(n)/1e3)
 	}
 	return fmt.Sprint(n)
 }

@@ -45,9 +45,9 @@ func TestRenderWatch(t *testing.T) {
 		"DESPUÉS  AGENTE  documenter documenta el cambio y escribe el walkthrough",
 		"10m · agentes 8m · tú 2m",
 		"spec 2m · implementing 6m",
-		"100k nuevos · 1.5M caché",
-		"implementer        90k nuevos",
-		"sesión principal   10k nuevos · 900k caché",
+		"100.0k nuevos · 1.5M caché",
+		"implementer        90.0k nuevos",
+		"sesión principal   10.0k nuevos · 900.0k caché",
 		"0 rechazo(s) del flujo · 1 bloqueo(s) de guard",
 		"17:41 reviewer APPROVED\n  17:40 implementer DONE → quality\n  17:35 guard bloqueó: frozen_test\n  17:32 inicio en carril light → spec",
 		"otras     API-9 · spec · decidir spec",
@@ -56,7 +56,7 @@ func TestRenderWatch(t *testing.T) {
 			t.Errorf("falta %q en:\n%s", want, out)
 		}
 	}
-	if strings.Index(out, "implementer        90k") > strings.Index(out, "sesión principal") {
+	if strings.Index(out, "implementer        90.0k") > strings.Index(out, "sesión principal") {
 		t.Error("los agentes van de mayor a menor gasto nuevo")
 	}
 	if strings.Contains(out, "\x1b[") {
@@ -142,15 +142,15 @@ func TestRenderWatchFitsRows(t *testing.T) {
 
 func TestStartupCheck(t *testing.T) {
 	st, d := startupCheck([]agents.ContextSource{{Label: "CLAUDE.md", Bytes: 1500}, {Label: "MEMORY.md", Bytes: 3000}})
-	if st != "ok" || !strings.Contains(d, "≈2k tokens") || !strings.Contains(d, "MEMORY.md ≈1k, CLAUDE.md ≈682") {
+	if st != "ok" || !strings.Contains(d, "≈2.0k tokens") || !strings.Contains(d, "MEMORY.md ≈1.4k, CLAUDE.md ≈682") {
 		t.Errorf("chico: %s %s", st, d)
 	}
 	st, d = startupCheck([]agents.ContextSource{{Label: "CLAUDE.md", Bytes: 1500}, {Label: "MEMORY.md", Bytes: 19048}})
-	if st != "warn" || !strings.Contains(d, "MEMORY.md ≈8k tokens, más de 4k en un solo archivo") {
+	if st != "warn" || !strings.Contains(d, "MEMORY.md ≈8.7k tokens, más de 4.0k en un solo archivo") {
 		t.Errorf("MEMORY.md de ms-sys: %s %s", st, d)
 	}
 	st, d = startupCheck([]agents.ContextSource{{Label: "a", Bytes: 11000}, {Label: "b", Bytes: 11000}, {Label: "c", Bytes: 11000}})
-	if st != "warn" || !strings.Contains(d, "el total pasa de 10k") {
+	if st != "warn" || !strings.Contains(d, "el total pasa de 10.0k") {
 		t.Errorf("total: %s %s", st, d)
 	}
 	if st, d := startupCheck([]agents.ContextSource{{Label: "MEMORY.md", Bytes: 900, Note: "se corta"}}); st != "warn" || !strings.Contains(d, "MEMORY.md se corta") {

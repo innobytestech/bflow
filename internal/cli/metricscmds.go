@@ -176,14 +176,14 @@ func usageTable(b *strings.Builder, title string, m map[string]metrics.Usage, na
 	if _, legacy := m[""]; len(m) == 0 || (len(m) == 1 && legacy) {
 		return
 	}
-	row := "  %-22s %8s %8s %8s %8s\n"
-	fmt.Fprintf(b, row, title, "nuevos", "caché", "llamadas", "ctx máx")
+	row := "  %-22s %8s %8s %8s %8s %9s\n"
+	fmt.Fprintf(b, row, title, "nuevos", "caché", "llamadas", "ctx máx", "ctx final")
 	for _, k := range byNew(m) {
 		name := k
 		if n, ok := names[k]; ok {
 			name = n
 		}
-		fmt.Fprintf(b, row, name, tok(m[k].New()), tok(m[k].CacheRead), calls(m[k].Calls), tok(m[k].MaxContext))
+		fmt.Fprintf(b, row, name, tok(m[k].New()), tok(m[k].CacheRead), calls(m[k].Calls), tok(m[k].MaxContext), tok(m[k].LastContext))
 	}
 }
 
@@ -373,6 +373,9 @@ func addTokens(e *engine.Engine, id, tool, run string, samples []metrics.Sample,
 			"input": s.Input, "output": s.Output, "cache_read": s.CacheRead, "cache_write": s.CacheWrite}
 		if s.Calls > 0 {
 			d["calls"], d["max_context"] = s.Calls, s.MaxContext
+			if s.LastContext > 0 {
+				d["last_context"] = s.LastContext
+			}
 		}
 		if s.Model != "" {
 			d["model"] = s.Model

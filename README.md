@@ -269,7 +269,7 @@ Corre `bflow install claude` dentro del repo. Instala la skill en `~/.claude/ski
 La skill tiene unas 30 líneas: no contiene reglas del flujo, solo cómo interpretar `next`. Los hooks corren `bflow hook session-start` al abrir la sesión, `bflow guard --reads` antes de cada edición, comando o `Read` (de los `Read` solo registra los del reviewer en quality, para medir cuánto del diff abrió), `bflow hook tokens` al terminar cada turno y cada subagente (cada uno cuenta solo su transcript), `bflow hook subagent-stop` cuando termina un agente de bflow (si no reportó, lo hace seguir hasta 2 veces con lo que le falta y después bloquea la tarea para que decida una persona) y la barra de estado con `bflow statusline`:
 
 ```
-API-12 · implementing · 1h42m · ronda 1 · 145k nuevos · 2.9M caché
+API-12 · implementing · 1h42m · ronda 1 · 145.1k nuevos · 2.9M caché
 ```
 
 #### OpenCode
