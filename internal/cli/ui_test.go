@@ -69,6 +69,21 @@ func TestUIPageBanner(t *testing.T) {
 	}
 }
 
+// R9, R12, R16, R20: la página cabe en una pantalla, con ventana de detalle y chips de repos.
+func TestUIPageOneScreen(t *testing.T) {
+	page := string(uiPage)
+	for _, want := range []string{"100dvh", `<dialog id="calls"`, `id="repos"`} {
+		if !strings.Contains(page, want) {
+			t.Errorf("la página debe tener %q", want)
+		}
+	}
+	for _, bad := range []string{"<details", `id="foot"`, `id="net"`} {
+		if strings.Contains(page, bad) {
+			t.Errorf("la página no debe tener %q", bad)
+		}
+	}
+}
+
 func TestBrowserCmd(t *testing.T) {
 	if c, err := browserCmd("windows", env(), "http://127.0.0.1:7719/"); err != nil || c[0] != "rundll32" {
 		t.Errorf("windows: %v %v", c, err)

@@ -53,7 +53,9 @@ type CallRow struct {
 type Run struct {
 	Run          string     `json:"run"`
 	Agent        string     `json:"agent"`
-	Label        string     `json:"label"` // "implementer", "implementer #2", "sesión principal"
+	Name         string     `json:"name"`  // "sesión principal" | agente (R3)
+	Stage        string     `json:"stage"` // "contract", "discovery → spec", "spec #2" (R1, R2)
+	Label        string     `json:"label"` // Name + " · " + Stage (R3)
 	Phase        flow.Phase `json:"phase"` // de la primera fila
 	Rows         []CallRow  `json:"rows"`
 	Total        Usage      `json:"total"` // Calls = len(Rows), MaxContext = máximo
@@ -90,6 +92,10 @@ func ParseCalls(r io.Reader) []Call {
 		}
 	}
 }
+
+// stageOf: fase única, "primera → última" o "sin fase" (R1).
+// TODO(T2): sin lógica todavía.
+func stageOf(rows []CallRow) string { return "" }
 
 // Runs fusiona (R3), agrupa y acumula (R4); orden por primera llamada.
 func Runs(calls []Call) []Run {

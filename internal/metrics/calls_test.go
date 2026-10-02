@@ -130,31 +130,54 @@ func TestRunsAccumulatesPerRun(t *testing.T) {
 }
 
 func TestRunsLabels(t *testing.T) {
-	one := Runs([]Call{call("claude:a", "implementer", "m", 1, flow.Implementing, 1, 0, 0, 1),
-		call("claude:b", "main", "m", 2, flow.Spec, 1, 0, 0, 1),
-		call("claude:c", "?", "m", 3, flow.Spec, 1, 0, 0, 1)})
-	var got []string
-	for _, r := range one {
-		got = append(got, r.Label)
+	type got struct{ name, stage, label string }
+	read := func(calls ...Call) map[string]got {
+		out := map[string]got{}
+		for _, r := range Runs(calls) {
+			out[r.Run] = got{r.Name, r.Stage, r.Label}
+		}
+		return out
 	}
-	if want := []string{"implementer", "sesión principal", "?"}; !reflect.DeepEqual(got, want) {
-		t.Errorf("una corrida por agente: sin #n: %v, want %v", got, want)
+	// R1, R3: fase única; varias fases "primera → última"; primera = última; sin fase.
+	g := read(
+		call("claude:i", "implementer", "a", 1, flow.Implementing, 1, 0, 0, 1),
+		call("claude:i", "implementer", "b", 2, flow.Implementing, 1, 0, 0, 1),
+		call("claude:m", "main", "a", 3, flow.Discovery, 1, 0, 0, 1),
+		call("claude:m", "main", "b", 4, flow.Spec, 1, 0, 0, 1),
+		call("claude:m", "main", "c", 5, flow.Contract, 1, 0, 0, 1),
+		call("claude:s", "spec-author", "a", 6, flow.Spec, 1, 0, 0, 1),
+		call("claude:s", "spec-author", "b", 7, flow.Contract, 1, 0, 0, 1),
+		call("claude:s", "spec-author", "c", 8, flow.Spec, 1, 0, 0, 1),
+		call("claude:x", "?", "a", 9, "", 1, 0, 0, 1),
+	)
+	for run, want := range map[string]got{
+		"claude:i": {"implementer", "implementing", "implementer · implementing"},
+		"claude:m": {"sesión principal", "discovery → contract", "sesión principal · discovery → contract"},
+		"claude:s": {"spec-author", "spec", "spec-author · spec"},
+		"claude:x": {"?", "sin fase", "? · sin fase"},
+	} {
+		if g[run] != want {
+			t.Errorf("%s: %+v, want %+v", run, g[run], want)
+		}
 	}
-	many := Runs([]Call{
-		call("claude:i2", "implementer", "m", 5, flow.Implementing, 1, 0, 0, 1),
-		call("claude:i1", "implementer", "m", 1, flow.Implementing, 1, 0, 0, 1),
-		call("claude:r", "reviewer", "m", 2, flow.Quality, 1, 0, 0, 1),
-		call("claude:s2", "main", "m", 4, flow.Quality, 1, 0, 0, 1),
-		call("claude:s1", "main", "m", 0, flow.Spec, 1, 0, 0, 1),
-	})
-	got = nil
-	for _, r := range many {
-		got = append(got, r.Run+"="+r.Label)
+	// R2: "#N" solo si se repiten Name y Stage, numerado por la primera llamada.
+	g = read(
+		call("claude:s2", "main", "a", 4, flow.Spec, 1, 0, 0, 1),
+		call("claude:s1", "main", "a", 1, flow.Spec, 1, 0, 0, 1),
+		call("claude:c", "main", "a", 2, flow.Contract, 1, 0, 0, 1),
+		call("claude:q", "implementer", "a", 3, flow.Spec, 1, 0, 0, 1),
+		call("claude:s3", "main", "a", 6, flow.Spec, 1, 0, 0, 1),
+	)
+	for run, want := range map[string]string{
+		"claude:s1": "sesión principal · spec #1", "claude:s2": "sesión principal · spec #2", "claude:s3": "sesión principal · spec #3",
+		"claude:c": "sesión principal · contract", "claude:q": "implementer · spec",
+	} {
+		if g[run].label != want {
+			t.Errorf("%s: label %q, want %q", run, g[run].label, want)
+		}
 	}
-	want := []string{"claude:s1=sesión principal #1", "claude:i1=implementer #1", "claude:r=reviewer",
-		"claude:s2=sesión principal #2", "claude:i2=implementer #2"}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("con dos o más del mismo agente se numeran por su primera llamada: %v, want %v", got, want)
+	if g["claude:s2"].stage != "spec #2" {
+		t.Errorf("el número va en Stage: %+v", g["claude:s2"])
 	}
 }
 
