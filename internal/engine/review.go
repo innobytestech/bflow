@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -109,7 +110,14 @@ func reviewIncomplete(cov review.Coverage, m review.Map, hasMap bool, base strin
 		if base == "" {
 			base = "<base>"
 		}
-		b := "Archivos del diff (código y pruebas) que no abriste:\n- " + strings.ReplaceAll(review.ListCapped(cov.Pending), ", ", "\n- ")
+		shown, more := cov.Pending, 0
+		if len(shown) > 20 {
+			shown, more = shown[:20], len(shown)-20
+		}
+		b := "Archivos del diff (código y pruebas) que no abriste:\n- " + strings.Join(shown, "\n- ")
+		if more > 0 {
+			b += fmt.Sprintf("\n- y %d más", more)
+		}
 		b += "\nÁbrelos con Read o `git diff " + base + "...HEAD -- <ruta>`"
 		if cov.DiffLines < review.WholeDiffMax {
 			b += "; con menos de 1,500 líneas basta un `git diff " + base + "...HEAD` completo"
