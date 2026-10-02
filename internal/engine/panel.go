@@ -96,7 +96,7 @@ func (e *Engine) Panel(ctx context.Context, sla bool) (PanelReport, error) {
 	now := e.now()
 	slaHours := e.Cfg.Flow.SLAHours
 	for _, rec := range recs {
-		if rec.Flow.Phase == flow.Done {
+		if rec.Flow.Phase == flow.Done || rec.Flow.Phase == flow.Dropped {
 			continue
 		}
 		id := rec.Flow.ID

@@ -63,6 +63,24 @@ func Run(t *testing.T, h Harness) {
 		}
 	})
 
+	t.Run("dropped closes", func(t *testing.T) {
+		tr := h.New(t)
+		id, _ := h.Seed(t, tr)
+		if err := tr.Transition(ctx, id, flow.Dropped, tracker.Patch{}); err != nil {
+			t.Fatalf("Transition(dropped): %v", err)
+		}
+		task, err := tr.Get(ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !task.Closed {
+			t.Errorf("tras Transition(dropped) la tarea sigue abierta: %+v", task)
+		}
+		if contains(t, tr, id) {
+			t.Errorf("%s retirada sigue en List(OpenOnly)", id)
+		}
+	})
+
 	t.Run("stamp start once", func(t *testing.T) {
 		tr := h.New(t)
 		id, _ := h.Seed(t, tr)

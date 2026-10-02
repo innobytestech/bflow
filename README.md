@@ -118,7 +118,7 @@ stateDiagram-v2
   in_review --> done: PR mergeado
 ```
 
-`⏸` marca un gate humano. Cualquier fase puede pasar a `blocked` y volver a donde estaba. Si la revisión de calidad rechaza dos rondas seguidas, `bflow` pregunta si dividir la feature, volver a spec o hacer otra ronda. Nadie marca `done` a mano: se cierra al detectar el merge.
+`⏸` marca un gate humano. Cualquier fase puede pasar a `blocked` y volver a donde estaba. Si la revisión de calidad rechaza dos rondas seguidas, `bflow` pregunta si dividir la feature, volver a spec o hacer otra ronda. Nadie marca `done` a mano: se cierra al detectar el merge. Una tarea también puede pasar a `dropped` (retirada sin terminar) desde cualquier fase de trabajo con `bflow drop`, o automáticamente cuando se aprueba un split que crea tareas hijas.
 
 | Carril | Fases |
 |---|---|
@@ -359,7 +359,7 @@ La validación junta todos los problemas en un solo mensaje, indica la línea de
 
 | Grupo | Comandos |
 |---|---|
-| Flujo | `status [ID] [--brief]` · `start <ID> --lane [--fixes ID]` · `approve` · `reject --note` · `report --agent --verdict` · `block` / `unblock` · `freeze` · `show` · `new --lane --title [--file]` · `task add` · `task list` · `sync` · `import --from harness` |
+| Flujo | `status [ID] [--brief]` · `start <ID> --lane [--fixes ID]` · `approve` · `reject --note` · `report --agent --verdict` · `block` / `unblock` · `drop --note` · `freeze` · `show` · `new --lane --title [--file]` · `task add` · `task list` · `sync` · `import --from harness` |
 | Agentes | `render [--check]` |
 | Git y PR | `pr` · `panel [--sla]` (cierra lo mergeado o lo que el tracker ya dio por hecho, aunque esté en otra fase; recuerda gates vencidos) |
 | Calidad | `check [--quick pkg] [--verify]` · `env check` · `guard` |

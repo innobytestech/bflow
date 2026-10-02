@@ -111,6 +111,9 @@ func TestNextOptionsAreExecutable(t *testing.T) {
 			if !ok {
 				continue
 			}
+			if ev.Kind == EvApprove && ev.Gate == GateSplit {
+				ev.Children = []string{"T-2 · hija"} // las crea engine antes de aplicar el evento
+			}
 			if _, err := Apply(cfg, s, ev); err != nil {
 				t.Errorf("%s[%s] opción %q (%s): %v", s.Phase, gateName(s), o.ID, o.Command, err)
 			}

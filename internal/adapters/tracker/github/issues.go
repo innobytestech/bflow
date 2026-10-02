@@ -147,6 +147,11 @@ func (c *Client) Transition(ctx context.Context, id string, to flow.Phase, p tra
 	if err != nil {
 		return err
 	}
+	if to == flow.Dropped && is.State != "closed" {
+		if err = c.do(ctx, "PATCH", c.issuePath(is.Number), map[string]any{"state": "closed", "state_reason": "not_planned"}, nil); err != nil {
+			return err
+		}
+	}
 	if c.Project != "" {
 		err = c.withProject(ctx, func(pr *projInfo) error { return c.setProjectStatus(ctx, pr, is, to, p) })
 	} else {

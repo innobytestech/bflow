@@ -225,7 +225,7 @@ func StatuslineText(sc engine.StatusCache, now time.Time) string {
 	if sc.Gate != "" {
 		parts[1] += " (" + sc.Gate + ")"
 	}
-	if !sc.Since.IsZero() && sc.Phase != flow.Done {
+	if !sc.Since.IsZero() && sc.Phase != flow.Done && sc.Phase != flow.Dropped {
 		parts = append(parts, metrics.Duration(now.Sub(sc.Since)))
 	}
 	if sc.Round > 0 {

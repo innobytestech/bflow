@@ -263,6 +263,42 @@ func TestDoneClosesIssueOnce(t *testing.T) {
 	}
 }
 
+// R5: dropped cierra el issue como no planeado, antes de escribir la etiqueta,
+// y no vuelve a cerrar uno ya cerrado.
+func TestTransitionDroppedClosesNotPlanned(t *testing.T) {
+	f := newFake(t)
+	is := f.issue(1, "x", "bflow:spec")
+	c := f.client(Options{})
+	if err := c.Transition(ctx, "GH-1", flow.Dropped, tracker.Patch{}); err != nil {
+		t.Fatal(err)
+	}
+	if is.State != "closed" || is.Reason != "not_planned" || !slices.Equal(is.Labels, []string{"bflow:dropped"}) || f.patches != 1 {
+		t.Errorf("dropped cierra como no planeado: %s/%s %v patches=%d", is.State, is.Reason, is.Labels, f.patches)
+	}
+	patch, label := -1, -1
+	for i, call := range f.calls {
+		if strings.HasPrefix(call, "PATCH ") && patch < 0 {
+			patch = i
+		}
+		if strings.Contains(call, "/labels") && strings.HasPrefix(call, "POST ") && label < 0 {
+			label = i
+		}
+	}
+	if patch < 0 || label < 0 || patch > label {
+		t.Errorf("primero se cierra y después se escribe la etiqueta: %v", f.calls)
+	}
+	if err := c.Transition(ctx, "GH-1", flow.Dropped, tracker.Patch{}); err != nil {
+		t.Fatal(err)
+	}
+	if f.patches != 1 {
+		t.Errorf("ya cerrado no vuelve a hacer PATCH: %d", f.patches)
+	}
+	done := f.issue(2, "y", "bflow:quality")
+	if err := c.Transition(ctx, "GH-2", flow.Done, tracker.Patch{}); err != nil || done.Reason != "completed" {
+		t.Errorf("done sigue cerrando como completado: %v %q", err, done.Reason)
+	}
+}
+
 func TestStartAddsIssueToProject(t *testing.T) {
 	f := newFake(t)
 	p := f.project("acme", false, 7)
@@ -405,8 +441,8 @@ func TestStateMap(t *testing.T) {
 		!slices.Contains(ip.Writes, "contract") || !slices.Contains(ip.Writes, "implementing") {
 		t.Errorf("Status: %+v", got)
 	}
-	if by["Cancelled"].Phase != "" || len(by["Cancelled"].Writes) != 0 {
-		t.Errorf("una opción sin fase: %+v", by["Cancelled"])
+	if by["Cancelled"].Phase != flow.Dropped || !slices.Equal(by["Cancelled"].Writes, []string{"dropped"}) {
+		t.Errorf("Cancelled es el estado de dropped: %+v", by["Cancelled"])
 	}
 }
 
@@ -437,7 +473,7 @@ func TestSetupLabelsDryRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(sorted(got), sorted(want)) || len(f.labels) != 12 {
+	if !slices.Equal(sorted(got), sorted(want)) || len(f.labels) != 13 {
 		t.Errorf("crea las que faltan: %v (%d etiquetas)", got, len(f.labels))
 	}
 	for _, p := range tracker.PhaseOrder {
@@ -468,7 +504,7 @@ func TestSetupOptionsKeepIDs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantNew := []string{"Spec pendiente", "Contrato", "In Progress", "En pausa", "En revisión", "Documentando", "Walkthrough", "PR abierto", "Bloqueado"}
+	wantNew := []string{"Spec pendiente", "Contrato", "In Progress", "En pausa", "En revisión", "Documentando", "Walkthrough", "PR abierto", "Bloqueado", "Cancelled"}
 	if !slices.Equal(sorted(got), sorted(wantNew)) || f.count("setField") != 0 {
 		t.Errorf("dry-run lista las faltantes sin escribir: %v", got)
 	}
@@ -480,8 +516,8 @@ func TestSetupOptionsKeepIDs(t *testing.T) {
 	if !slices.Equal(sorted(got), sorted(wantNew)) || f.count("setField") != 1 {
 		t.Fatalf("una sola mutación: %v setField=%d", got, f.count("setField"))
 	}
-	if len(p.Options) != 12 {
-		t.Fatalf("12 opciones: %v", p.names())
+	if len(p.Options) != 13 {
+		t.Fatalf("13 opciones: %v", p.names())
 	}
 	for i, o := range before {
 		if p.Options[i] != o {
@@ -528,10 +564,10 @@ func TestSetupManualWhenIDUnsupported(t *testing.T) {
 			t.Errorf("falta %q (%s) en %v", name, color, me.Missing)
 		}
 	}
-	if len(me.Missing) != 9 || f.count("setField") != 0 || f.destroyed || !slices.Equal(p.Options, before) {
+	if len(me.Missing) != 10 || f.count("setField") != 0 || f.destroyed || !slices.Equal(p.Options, before) {
 		t.Errorf("no modifica nada: %d faltantes, setField=%d", len(me.Missing), f.count("setField"))
 	}
-	if got, err := c.EnsureStates(ctx, true); err != nil || len(got) != 9 {
+	if got, err := c.EnsureStates(ctx, true); err != nil || len(got) != 10 {
 		t.Errorf("dry-run solo lista: %v %v", got, err)
 	}
 }

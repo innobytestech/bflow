@@ -38,6 +38,13 @@ type PR struct {
 	Merged bool   `json:"merged,omitempty"`
 }
 
+// SplitChild es una hija creada al aprobar un split: su título (para no
+// repetirla al reintentar) y su ID en el tracker.
+type SplitChild struct {
+	Title string `json:"title"`
+	ID    string `json:"id"`
+}
+
 // Record es lo que se guarda por tarea: el estado de flujo del núcleo más
 // datos operativos que el núcleo no necesita.
 type Record struct {
@@ -48,6 +55,7 @@ type Record struct {
 	Branch    string            `json:"branch,omitempty"`
 	PR        *PR               `json:"pr,omitempty"`
 	Adapter   map[string]string `json:"adapter,omitempty"`    // datos propios del adaptador del tracker
+	Split     []SplitChild      `json:"split,omitempty"`      // hijas ya creadas al aprobar el split
 	Pending   []flow.Effect     `json:"pending,omitempty"`    // efectos del tracker que fallaron y se reintentan
 	Since     time.Time         `json:"since"`                // entrada a la fase actual
 	GateSince time.Time         `json:"gate_since,omitempty"` // apertura del gate pendiente (SLA)

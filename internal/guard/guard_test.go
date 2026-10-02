@@ -1,6 +1,7 @@
 package guard
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -312,5 +313,22 @@ func TestSegmentsUnwrap(t *testing.T) {
 func TestShellEmptyTokens(t *testing.T) {
 	for _, cmd := range []string{`bash "" -c x`, `bash '' -c "bflow approve X"`, `sh ""`, `bash -c`} {
 		_ = segments(cmd, 0) // no debe entrar en pánico
+	}
+}
+
+// R12: retirar una tarea es decisión de una persona.
+func TestHumanOnlyDrop(t *testing.T) {
+	active := ctx()
+	active.Phase = flow.Implementing
+	cmd := `bflow drop GH-1 --note "ya no aplica"`
+	d := Evaluate(Action{Tool: Bash, Command: cmd, Subagent: true, Agent: "implementer"}, active)
+	if d.Allow || d.Rule != "human_only" {
+		t.Errorf("subagente %q → allow=%v rule=%q", cmd, d.Allow, d.Rule)
+	}
+	if d := Evaluate(Action{Tool: Bash, Command: cmd}, active); !d.Allow {
+		t.Errorf("la sesión principal corre %q: %+v", cmd, d)
+	}
+	if !slices.Contains(HumanOnly, "drop") {
+		t.Errorf("HumanOnly: %v", HumanOnly)
 	}
 }

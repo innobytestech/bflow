@@ -17,7 +17,7 @@ func TestStateTablePhaseOf(t *testing.T) {
 		"discovery":        flow.Discovery,
 		"Bloqueado":        flow.Blocked,
 		"Spec por aprobar": flow.Spec,
-		"Cancelled":        "",
+		"Cancelled":        flow.Dropped,
 	}
 	for name, want := range cases {
 		if got := tab.PhaseOf(name); got != want {
@@ -45,5 +45,37 @@ func TestStateTableOverrides(t *testing.T) {
 	}
 	if got := NewStateTable(nil)[flow.Quality].Names[0]; got != "En revisión" {
 		t.Errorf("los overrides no tocan DefaultStates: %q", got)
+	}
+}
+
+// R6, R8: dropped tiene estado propio (grupo cancelled) y entra en PhaseOrder.
+func TestStatesDropped(t *testing.T) {
+	d, ok := DefaultStates[flow.Dropped]
+	if !ok {
+		t.Fatal("DefaultStates no tiene dropped")
+	}
+	if d.Group != "cancelled" || len(d.Names) != 4 || d.Names[0] != "Cancelled" || d.Names[1] != "Cancelado" || d.Names[2] != "Descartado" || d.Names[3] != "Canceled" {
+		t.Errorf("dropped: %+v", d)
+	}
+	var in []flow.Phase
+	for _, p := range PhaseOrder {
+		if p == flow.Dropped {
+			in = append(in, p)
+		}
+	}
+	if len(in) != 1 || PhaseOrder[len(PhaseOrder)-1] != flow.Dropped {
+		t.Errorf("PhaseOrder debe terminar en dropped, una vez: %v", PhaseOrder)
+	}
+	for _, p := range flow.Order {
+		if p == flow.Dropped {
+			t.Error("dropped no entra en flow.Order")
+		}
+	}
+	tab := NewStateTable(nil)
+	if got := tab.PhaseOf("Cancelado"); got != flow.Dropped {
+		t.Errorf("PhaseOf(Cancelado) = %q", got)
+	}
+	if n, ok := tab.Write([]string{"Backlog", "Cancelled"}, flow.Dropped); !ok || n != "Cancelled" {
+		t.Errorf("Write(dropped): %q %v", n, ok)
 	}
 }

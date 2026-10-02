@@ -64,8 +64,8 @@ func TestPlaneWiring(t *testing.T) {
 		t.Errorf("start debe mover la tarea a Discovery en Plane: %v", v)
 	}
 	plan := r.ok("tracker", "setup", "--dry-run")
-	if created, _ := plan.Data["created"].([]any); len(created) != 10 {
-		t.Errorf("faltan 10 estados en el fake: %v", plan.Data)
+	if created, _ := plan.Data["created"].([]any); len(created) != 11 {
+		t.Errorf("faltan 11 estados en el fake: %v", plan.Data)
 	}
 	if _, err := os.Stat(filepath.Join(r.dir, ".bflow", "cache", "plane.json")); err != nil {
 		t.Error("la resolución del proyecto debe quedar en caché")
