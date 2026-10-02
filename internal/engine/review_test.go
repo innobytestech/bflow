@@ -434,11 +434,7 @@ func TestReviewerSmallDiffWholeCovers(t *testing.T) {
 		t.Fatalf("diff chico leído entero: %+v %v", o, err)
 	}
 	// Con 1500 líneas el diff entero no cubre; la 🔴 está fuera del diff, así que solo cuentan los pendientes.
-	m = "## 🔴 Primero
-- `gone.go`: ya no está
-## Docs
-- `README.md`
-"
+	m = "## 🔴 Primero\n- `gone.go`: ya no está\n## Docs\n- `README.md`\n"
 	v, id, _ = inQuality(t, m, []string{"internal/a.go", "internal/a_test.go"}, review.WholeDiffMax)
 	withTests(v)
 	addReads(t, v, id, review.Read{Tool: guard.Bash, Whole: true, ReadHook: true})
