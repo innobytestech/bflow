@@ -260,3 +260,57 @@ func TestBflowSubcommand(t *testing.T) {
 		}
 	}
 }
+
+func TestShellWrapped(t *testing.T) {
+	active := ctx()
+	active.Phase = flow.Implementing
+	sub := func(cmd string) Decision {
+		return Evaluate(Action{Tool: Bash, Command: cmd, Subagent: true, Agent: "implementer"}, active)
+	}
+	if d := sub(`bash -c "bflow approve X"`); d.Allow || d.Rule != "human_only" {
+		t.Errorf("subagente bash -c approve → %+v", d)
+	}
+	if d := Evaluate(Action{Tool: Bash, Command: `bash -c "bflow approve X"`}, active); !d.Allow {
+		t.Errorf("sesión principal debe poder: %+v", d)
+	}
+	for cmd, rule := range map[string]string{
+		`sh -c 'git reset --hard'`:                 "git_destructive",
+		`bash -lc "git push -f origin x"`:          "force_push",
+		`/usr/bin/zsh -c "git push origin main"`:   "protected_branch",
+		`bash -c "sh -c 'bflow approve X'"`:        "human_only",
+		`bash -c "sh -c 'zsh -c bflow approve X'"`: "human_only",
+	} {
+		if d := sub(cmd); d.Allow || d.Rule != rule {
+			t.Errorf("%q → allow=%v rule=%q, quería %q", cmd, d.Allow, d.Rule, rule)
+		}
+	}
+	if !TaskScoped(`bash -c "gh pr create"`) {
+		t.Error("TaskScoped debe ver dentro de bash -c")
+	}
+	if d := Evaluate(Action{Tool: Bash, Command: `bash -c "gh pr create"`}, active); d.Rule != "bflow_pr" {
+		t.Errorf("bflow_pr dentro de bash -c → %+v", d)
+	}
+}
+
+func TestSegmentsUnwrap(t *testing.T) {
+	for _, cmd := range []string{
+		`bash -c "x y"`, `/bin/bash -c "x y"`, `C:\Git\bin\bash.exe -c "x y"`, `BASH -c "x y"`,
+		`"bash" -c "x y"`, `FOO=1 bash -c "x y"`, `env -i FOO=1 sh -c "x y"`, `bash -ec "x y"`,
+		`bash -l -c "x y"`, `bash -o pipefail -c "x y"`, `zsh +O extglob -c 'x y'`, `sh -c x y`,
+	} {
+		if got := Segments(cmd); len(got) != 1 || got[0] != "x y" {
+			t.Errorf("%q → %q", cmd, got)
+		}
+	}
+	for _, cmd := range []string{`bash script.sh`, `bashx -c x`, `echo bash -c x`, `bash -x script.sh`, `bash -o pipefail`} {
+		if got := Segments(cmd); len(got) != 1 || got[0] != cmd {
+			t.Errorf("%q debía quedar igual, dio %q", cmd, got)
+		}
+	}
+}
+
+func TestShellEmptyTokens(t *testing.T) {
+	for _, cmd := range []string{`bash "" -c x`, `bash '' -c "bflow approve X"`, `sh ""`, `bash -c`} {
+		_ = segments(cmd, 0) // no debe entrar en pánico
+	}
+}
