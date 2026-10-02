@@ -109,9 +109,9 @@ h2 { font: 30px/1 var(--px); letter-spacing: 3px; text-transform: uppercase; mar
 .by svg { width: 56px; height: 28px; }
 .by b { color: var(--ink); font-weight: 400; }
 .tools { display: flex; align-items: center; gap: 12px 18px; flex-wrap: wrap; }
-.where { color: var(--ink-2); }
+.where { color: var(--ink-2); max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .where b { color: var(--ink); font-weight: 400; }
-.ver { color: var(--ink-2); }
+.ver { color: var(--ink-2); max-width: 20ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .link { color: var(--ink-2); }
 .link.off { color: var(--offline); }
 
@@ -137,27 +137,8 @@ h2 { font: 30px/1 var(--px); letter-spacing: 3px; text-transform: uppercase; mar
 .tokens { grid-area: tok; }
 #tokens[hidden], #repos[hidden], .line[hidden] { display: none; }
 @media (min-width: 1180px) {
-  .layout { grid-template-columns: minmax(0, 1fr) 440px; grid-template-areas: "board tok" "line tok" "gauges tok"; }
+  .layout { grid-template-columns: minmax(0, 1fr) clamp(380px, 30vw, 440px); grid-template-areas: "board tok" "line tok" "gauges tok"; }
   .layout.no-tok { grid-template-columns: minmax(0, 1fr); grid-template-areas: "board" "line" "gauges"; }
-  .gauges { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .gauge.log-g { grid-column: auto; }
-}
-@media (min-width: 1180px) and (min-height: 720px) {
-  html, body { height: 100dvh; }
-  body { display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
-  .strip { margin-bottom: 8px; padding-top: 12px; padding-bottom: 10px; }
-  .layout { min-height: 0; gap: 16px 24px; padding-bottom: 16px; grid-template-rows: auto auto minmax(0, 1fr); }
-  .gauges { min-height: 0; align-items: stretch; }
-  .gauge { min-height: 0; overflow: hidden; }
-  .tokens { min-height: 0; overflow: hidden; }
-  .board { padding: 14px 20px; }
-  .b-head { margin-bottom: 10px; }
-  .b-prog { margin-top: 8px; }
-  .row { padding: 4px 12px; }
-  .line { padding: 14px 16px 14px; }
-  .l-head { margin-bottom: 12px; }
-  .gauge { padding: 14px 16px 14px; }
-  h2 { margin-bottom: 10px; }
 }
 
 /* ---------- Tablero LED ----------
@@ -308,7 +289,7 @@ table.calls tr.sum td { color: var(--ink); border-bottom: 0; }
 .tokens { background: var(--panel); padding: 18px 16px 14px; display: flex; flex-direction: column; }
 .tok-wrap { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 table.tok { border-collapse: collapse; width: 100%; table-layout: fixed; }
-table.tok col.c { width: 62px; } table.tok col.x { width: 72px; }
+table.tok col.c { width: 44px; } table.tok col.x { width: 66px; }
 table.tok th, table.tok td { padding: 3px 4px; text-align: right; white-space: nowrap; font-weight: 400; vertical-align: baseline; }
 table.tok th { color: var(--ink-2); position: sticky; top: 0; background: var(--panel); }
 table.tok th:first-child, table.tok td:first-child { text-align: left; }
@@ -386,6 +367,57 @@ svg.px.arrow { display: inline-block; width: 14px; height: 10px; margin: 0 6px; 
   .lockup .by { padding-left: 0; min-height: 0; box-shadow: none; }
   .st .nm { grid-area: nm; } .st .t { grid-area: t; } .tags { grid-area: tags; align-items: flex-start; flex-direction: row; flex-wrap: wrap; }
 }
+/* Dos columnas: Tiempo y Bitácora lado a lado (después de .gauges, que es la base). */
+@media (min-width: 1180px) {
+  .gauges { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .gauge.log-g { grid-column: auto; }
+}
+/* Una sola pantalla: desde 1180x720, todo compacto y sin scroll de página. */
+@media (min-width: 1180px) and (min-height: 720px) {
+  html, body { height: 100dvh; }
+  body { display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
+  .strip { margin-bottom: 8px; padding-top: 12px; padding-bottom: 10px; }
+  .layout { min-height: 0; gap: 16px 24px; padding-bottom: 16px; grid-template-rows: auto auto minmax(0, 1fr); }
+  .gauges { min-height: 0; align-items: stretch; }
+  .gauge { min-height: 0; overflow: hidden; }
+  .tokens { min-height: 0; overflow: hidden; }
+  .board { padding: 14px 20px; }
+  .b-head { margin-bottom: 10px; }
+  .b-prog { margin-top: 8px; }
+  .row { padding: 4px 12px; }
+  .line { padding: 14px 16px 14px; }
+  .l-head { margin-bottom: 12px; }
+  .gauge { padding: 14px 16px 14px; }
+  h2 { margin-bottom: 10px; font-size: 20px; letter-spacing: 2px; }
+  .tools { flex-wrap: nowrap; }
+  .wordmark { width: 150px; height: 42px; }
+  .lockup .by { min-height: 42px; }
+  .strip { padding-top: 8px; padding-bottom: 8px; margin-bottom: 4px; }
+  .repos { height: 44px; padding-block: 2px; }
+  .b-title { font-size: 30px; -webkit-line-clamp: 1; }
+  .route .badge { width: 34px; height: 34px; font-size: 30px; }
+  .row.now .who, .row.now .what { font-size: 30px; }
+  .b-head { margin-bottom: 4px; }
+  .row { padding: 2px 12px; }
+  .b-prog { margin-top: 4px; }
+  .pict { width: 36px; height: 36px; }
+  .pict svg { width: 22px; height: 22px; }
+  ol.stations { gap: 0; }
+  .st { gap: 4px; }
+  .st .tag.nr { display: none; }
+  .tags { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+  .l-head { margin-bottom: 8px; }
+  .gauge dl { display: flex; flex-wrap: wrap; gap: 0 20px; }
+  .kv { border-bottom: 0; padding: 2px 0; gap: 8px; }
+  .stack { margin: 2px 0 6px; }
+}
+@media (min-width: 1180px) and (min-height: 720px) and (max-height: 799px) {
+  .legend, .b-prog, .st .t { display: none; }
+  .l-head { margin-bottom: 4px; }
+  .line { padding-block: 10px; }
+  .board { padding-block: 10px; }
+}
+
 @media (prefers-reduced-motion: reduce) { .wipe { animation: none; } .train.moving, .btn, .chip { transition: none; } }
 </style>
 </head>
