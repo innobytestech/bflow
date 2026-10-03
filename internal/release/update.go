@@ -3,6 +3,7 @@ package release
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,8 +20,10 @@ const DefaultAPI = "https://api.github.com/repos/innobytestech/bflow"
 
 // Release es una versión publicada.
 type Release struct {
-	Tag    string            // v0.1.0
-	Assets map[string]string // nombre → URL de descarga
+	Tag        string            // v0.1.0
+	Prerelease bool              // marcada como prerelease en GitHub
+	Draft      bool              // borrador (no se ofrece)
+	Assets     map[string]string // nombre → URL de descarga
 }
 
 // Client consulta y descarga publicaciones.
@@ -38,15 +41,59 @@ func NewClient() *Client {
 	return &Client{API: strings.TrimRight(api, "/"), HTTP: &http.Client{Timeout: 2 * time.Minute}}
 }
 
-// Latest es la última versión publicada (sin borradores ni pre-releases).
-func (c *Client) Latest(ctx context.Context) (Release, error) {
-	b, err := c.get(ctx, c.API+"/releases/latest", "application/vnd.github+json")
+// Latest es la última versión publicada. Con pre=false usa /releases/latest
+// (sin borradores ni prereleases) y, si GitHub responde 404 porque solo hay
+// prereleases, la primera no borrador de la lista. Con pre=true elige la mayor
+// según Compare entre las no borrador, prereleases incluidas.
+func (c *Client) Latest(ctx context.Context, pre bool) (Release, error) {
+	const accept = "application/vnd.github+json"
+	if !pre {
+		b, err := c.get(ctx, c.API+"/releases/latest", accept)
+		if err == nil {
+			return decodeRelease(b)
+		}
+		var he *HTTPError
+		if !errors.As(err, &he) || he.Status != http.StatusNotFound {
+			return Release{}, err
+		}
+	}
+	b, err := c.get(ctx, c.API+"/releases?per_page=10", accept)
 	if err != nil {
 		return Release{}, err
 	}
+	var list []json.RawMessage
+	if err := json.Unmarshal(b, &list); err != nil {
+		return Release{}, fmt.Errorf("respuesta de releases: %w", err)
+	}
+	var best Release
+	found := false
+	for _, raw := range list {
+		rel, err := decodeRelease(raw)
+		if err != nil || rel.Draft {
+			continue
+		}
+		if !pre {
+			return rel, nil
+		}
+		if _, err := Compare(rel.Tag, rel.Tag); err != nil {
+			continue
+		}
+		if cmp, _ := Compare(rel.Tag, best.Tag); !found || cmp > 0 {
+			best, found = rel, true
+		}
+	}
+	if !found {
+		return Release{}, errors.New("no hay versiones publicadas")
+	}
+	return best, nil
+}
+
+func decodeRelease(b []byte) (Release, error) {
 	var r struct {
-		Tag    string `json:"tag_name"`
-		Assets []struct {
+		Tag        string `json:"tag_name"`
+		Prerelease bool   `json:"prerelease"`
+		Draft      bool   `json:"draft"`
+		Assets     []struct {
 			Name string `json:"name"`
 			URL  string `json:"browser_download_url"`
 		} `json:"assets"`
@@ -54,11 +101,21 @@ func (c *Client) Latest(ctx context.Context) (Release, error) {
 	if err := json.Unmarshal(b, &r); err != nil {
 		return Release{}, fmt.Errorf("respuesta de releases: %w", err)
 	}
-	rel := Release{Tag: r.Tag, Assets: map[string]string{}}
+	rel := Release{Tag: r.Tag, Prerelease: r.Prerelease, Draft: r.Draft, Assets: map[string]string{}}
 	for _, a := range r.Assets {
 		rel.Assets[a.Name] = a.URL
 	}
 	return rel, nil
+}
+
+// HTTPError es una respuesta que no fue 200.
+type HTTPError struct {
+	URL    string
+	Status int
+}
+
+func (e *HTTPError) Error() string {
+	return fmt.Sprintf("GET %s: %d %s", e.URL, e.Status, http.StatusText(e.Status))
 }
 
 // Binary descarga el binario de rel para esta plataforma y lo verifica contra
@@ -102,7 +159,7 @@ func (c *Client) get(ctx context.Context, url, accept string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GET %s: %s", url, resp.Status)
+		return nil, &HTTPError{URL: url, Status: resp.StatusCode}
 	}
 	return io.ReadAll(io.LimitReader(resp.Body, 200<<20))
 }

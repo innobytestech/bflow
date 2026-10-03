@@ -175,11 +175,25 @@ irm https://raw.githubusercontent.com/innobytestech/bflow/main/install.ps1 | iex
 
 Los dos scripts verifican el SHA-256 del archivo contra `checksums.txt` antes de instalar. También puedes bajar el archivo de tu plataforma de [Releases](https://github.com/innobytestech/bflow/releases). Cada release trae una atestación de procedencia: `gh attestation verify <archivo> --repo innobytestech/bflow` comprueba que lo compiló el workflow del repo.
 
+Los scripts instalan la última versión. Mientras solo haya prereleases publicadas (`v0.1.0-rc.*`), que GitHub no cuenta como "latest", instalan la más reciente. `BFLOW_VERSION` fija una versión, con o sin la `v`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/innobytestech/bflow/main/install.sh | BFLOW_VERSION=v0.1.0-rc.9 sh
+```
+
+```powershell
+$env:BFLOW_VERSION = 'v0.1.0-rc.9'; irm https://raw.githubusercontent.com/innobytestech/bflow/main/install.ps1 | iex
+```
+
+En Windows, `BFLOW_INSTALL_NO_PATH=1` evita que el script toque tu `PATH`.
+
 Para actualizar:
 
 ```bash
 bflow update           # --check solo dice si hay una versión nueva
 ```
+
+`bflow update` elige el canal según lo que tienes instalado: con una prerelease recibes la siguiente (`rc.9` → `rc.10` o `v0.1.0`); con una estable nunca recibes prereleases.
 
 Con Go 1.25 o superior:
 

@@ -28,7 +28,11 @@ var executable = os.Executable
 func runUpdate(c *Ctx) output.Envelope {
 	ctx := context.Background()
 	cl := release.NewClient()
-	rel, err := cl.Latest(ctx)
+	// El canal sale de la versión instalada: con una prerelease se busca entre
+	// todas; con una estable (o sin versión publicada) solo entre las estables.
+	_, suffix, perr := release.Parts(c.Version)
+	pre := perr == nil && release.Published(c.Version) && suffix != ""
+	rel, err := cl.Latest(ctx, pre)
 	if err != nil {
 		return output.Fail("update", fmt.Errorf("no se pudo consultar la última versión: %w", err))
 	}
@@ -41,6 +45,10 @@ func runUpdate(c *Ctx) output.Envelope {
 	cmp, err := release.Compare(c.Version, rel.Tag)
 	published := err == nil && release.Published(c.Version)
 	force := str(c.Flags, "force") == "true"
+	if published && !pre && rel.Prerelease {
+		// Un estable nunca recibe una prerelease (llegó por la lista).
+		return env("up_to_date", "ya tienes la última versión ("+c.Version+")")
+	}
 	switch {
 	case !published && !force:
 		return env("update_unknown", fmt.Sprintf("este bflow (%s) no viene de una versión publicada, así que no se puede comparar con %s. bflow update --force lo reemplaza por %s", c.Version, rel.Tag, rel.Tag))
