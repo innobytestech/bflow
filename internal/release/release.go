@@ -261,10 +261,42 @@ func Compare(a, b string) (int, error) {
 		return 1, nil
 	case sb == "":
 		return -1, nil
-	case sa < sb:
-		return -1, nil
 	}
-	return 1, nil
+	return compareSuffix(sa, sb), nil
+}
+
+// compareSuffix ordena sufijos como semver: identificador por identificador,
+// los numéricos como números y antes que los de texto; el prefijo va antes.
+func compareSuffix(a, b string) int {
+	ia, ib := strings.Split(a, "."), strings.Split(b, ".")
+	for i := 0; i < len(ia) && i < len(ib); i++ {
+		if ia[i] == ib[i] {
+			continue
+		}
+		na, ea := strconv.Atoi(ia[i])
+		nb, eb := strconv.Atoi(ib[i])
+		switch {
+		case ea == nil && eb == nil:
+			if na < nb {
+				return -1
+			}
+			return 1
+		case ea == nil:
+			return -1
+		case eb == nil:
+			return 1
+		case ia[i] < ib[i]:
+			return -1
+		}
+		return 1
+	}
+	switch {
+	case len(ia) < len(ib):
+		return -1
+	case len(ia) > len(ib):
+		return 1
+	}
+	return 0
 }
 
 func parse(v string) ([3]int, string, error) {
@@ -305,3 +337,6 @@ func modTime(p string) time.Time {
 	}
 	return time.Now()
 }
+
+// Parts devuelve el núcleo y el sufijo de una versión publicada.
+func Parts(v string) ([3]int, string, error) { return parse(v) }

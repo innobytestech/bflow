@@ -17,6 +17,7 @@ func TestCompareAndPublished(t *testing.T) {
 	}{
 		{"v0.1.0", "v0.1.0", 0}, {"v0.1.0", "v0.2.0", -1}, {"v0.10.0", "v0.9.3", 1}, {"v1.0.0", "v0.99.99", 1},
 		{"v0.2.0-rc.1", "v0.2.0", -1}, {"v0.1.1-0.20260928221113-0a0c342abcde", "v0.1.1", -1},
+		{"v0.1.0-rc.9", "v0.1.0-rc.10", -1}, {"v0.1.0-rc.10", "v0.1.0-rc.9", 1}, {"v0.1.0-rc.1", "v0.1.0-rc.1.1", -1}, {"v0.1.0-alpha", "v0.1.0-rc.1", -1},
 	} {
 		if got, err := Compare(c.a, c.b); err != nil || got != c.want {
 			t.Errorf("Compare(%s, %s) = %d %v, want %d", c.a, c.b, got, err, c.want)
