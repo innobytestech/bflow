@@ -45,7 +45,7 @@ func runUpdate(c *Ctx) output.Envelope {
 	cmp, err := release.Compare(c.Version, rel.Tag)
 	published := err == nil && release.Published(c.Version)
 	force := str(c.Flags, "force") == "true"
-	if published && !pre && rel.Prerelease && !force {
+	if published && !pre && rel.Prerelease {
 		// Un estable nunca recibe una prerelease (llegó por la lista).
 		return env("up_to_date", "ya tienes la última versión ("+c.Version+")")
 	}
