@@ -19,6 +19,7 @@ import (
 	"innobytes.tech/bflow/internal/envcheck"
 	"innobytes.tech/bflow/internal/flow"
 	"innobytes.tech/bflow/internal/guard"
+	"innobytes.tech/bflow/internal/metrics"
 	"innobytes.tech/bflow/internal/output"
 	"innobytes.tech/bflow/internal/review"
 	"innobytes.tech/bflow/internal/store"
@@ -95,9 +96,6 @@ func runGuard(c *Ctx) output.Envelope {
 		}
 		acts = []guard.Action{a}
 	}
-	if onlyForeignReads(acts) {
-		return allowed // el Read de otro agente no se mide ni se evalúa: sin leer config
-	}
 	dir := c.Dir
 	if cwd != "" {
 		dir = cwd
@@ -105,6 +103,10 @@ func runGuard(c *Ctx) output.Envelope {
 	cfg, err := config.Load(dir)
 	if err != nil {
 		// Con la config rota no se bloquea al agente: lo reporta cualquier otro comando.
+		return allowed
+	}
+	if allReads(acts) {
+		recordReads(c, cfg, acts, cwd, str(c.Flags, "reads") == "true") // un Read no se evalúa (R9)
 		return allowed
 	}
 	// Las acciones se evalúan en orden: la primera rechazada da el registro y el motivo.
@@ -140,65 +142,77 @@ func isReviewer(a guard.Action) bool {
 	return ok && name == "reviewer"
 }
 
-// allReads dice si hay acciones y todas son Read (R9: se registran sin evaluar).
-func allReads(acts []guard.Action) bool { panic("TODO") }
-
-// readAgent es el agente que se anota en reads-all.jsonl (R2, R3).
-func readAgent(a guard.Action) string { panic("TODO") }
-
-// readTool es la herramienta que se anota: "claude" sin --tool (R8).
-func readTool(c *Ctx) string { panic("TODO") }
-
-// onlyForeignReads dice si todas las acciones son Read y ninguna es del reviewer.
-func onlyForeignReads(acts []guard.Action) bool {
+// allReads dice si hay acciones y todas son Read (se registran sin evaluar).
+func allReads(acts []guard.Action) bool {
 	for _, a := range acts {
-		if a.Tool != guard.Read || isReviewer(a) {
+		if a.Tool != guard.Read {
 			return false
 		}
 	}
 	return len(acts) > 0
 }
 
-// recordReads anota en reads.jsonl lo que hizo el reviewer en quality (R1). Nunca
-// bloquea ni falla: cualquier error se ignora (R5).
+// readAgent es el agente que se anota en reads-all.jsonl (R2, R3).
+func readAgent(a guard.Action) string {
+	if a.Agent != "" {
+		return strings.TrimPrefix(a.Agent, flow.SubagentPrefix)
+	}
+	if a.Subagent {
+		return metrics.UnknownAgent
+	}
+	return metrics.MainSession
+}
+
+// readTool es la herramienta que se anota: "claude" sin --tool (R8).
+func readTool(c *Ctx) string {
+	if t := str(c.Flags, "tool"); t != "" {
+		return t
+	}
+	return "claude"
+}
+
+// recordReads anota las lecturas de todos los agentes en reads-all.jsonl y, en
+// quality, las del reviewer en reads.jsonl (cobertura). Nunca bloquea ni falla.
 func recordReads(c *Ctx, cfg *config.Config, acts []guard.Action, cwd string, readHook bool) {
-	if c.Build == nil {
-		return
-	}
-	var mine []guard.Action
-	for _, a := range acts {
-		if isReviewer(a) {
-			mine = append(mine, a)
-		}
-	}
-	if len(mine) == 0 {
+	if c.Build == nil || len(acts) == 0 {
 		return
 	}
 	e, err := c.Build(cfg.Root)
 	if err != nil {
 		return
 	}
-	ctx := context.Background()
-	id, err := e.Active(ctx)
+	id, err := e.Active(context.Background())
 	if err != nil {
 		return
 	}
-	if v, err := e.Status(ctx, id); err != nil || v.Phase != flow.Quality {
+	rec, err := e.Store.Load(id)
+	if err != nil {
 		return
 	}
 	if cwd == "" {
 		cwd = c.Dir
 	}
-	var lines [][]byte
 	now := time.Now()
-	for _, a := range mine {
-		b, err := json.Marshal(review.FromAction(a, cfg.Root, cwd, readHook, now))
-		if err != nil {
-			return
+	var all, mine [][]byte
+	for _, a := range acts {
+		if n, ok := review.Normalize(cfg.Root, cwd, a.Path); ok && a.Tool == guard.Read {
+			ev := metrics.ReadEvent{TS: now, Agent: readAgent(a), Phase: string(rec.Flow.Phase), Path: n, Partial: a.Partial, Tool: readTool(c)}
+			if b, err := json.Marshal(ev); err == nil {
+				all = append(all, b)
+			}
 		}
-		lines = append(lines, b)
+		if rec.Flow.Phase == flow.Quality && isReviewer(a) {
+			if b, err := json.Marshal(review.FromAction(a, cfg.Root, cwd, readHook, now)); err == nil {
+				mine = append(mine, b)
+			}
+		}
 	}
-	_ = e.Store.AppendFile(id, review.ReadsFile, lines)
+	if len(all) > 0 {
+		_ = e.Store.AppendFile(id, metrics.ReadsAllFile, all)
+	}
+	if len(mine) > 0 {
+		_ = e.Store.AppendFile(id, review.ReadsFile, mine)
+	}
 }
 
 // guardContext arma lo que el guard sabe del repo, sin la fase de la tarea.

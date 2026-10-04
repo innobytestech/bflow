@@ -155,7 +155,7 @@ Algoritmo de R14: se hace `sort.SliceStable` por `TS`. Para cada lectura se busc
 
 ## Tasks
 
-- [ ] **T1 Contrato.** Tipos y firmas exactas de Design (`metrics.ReadEvent`, `ReadRow`, `ReadsSummary`, `ReadsAllFile`, `UnknownAgent`, `ParseReadEvents`, `SummarizeReads`, `guard.Action.Partial`, `readAgent`, `readTool`, `allReads`, `renderReads`, `readReadEvents`) con cuerpos vacíos o `panic("TODO")`, que compilan. Las pruebas, por ahora en rojo, son:
+- [x] **T1 Contrato.** Tipos y firmas exactas de Design (`metrics.ReadEvent`, `ReadRow`, `ReadsSummary`, `ReadsAllFile`, `UnknownAgent`, `ParseReadEvents`, `SummarizeReads`, `guard.Action.Partial`, `readAgent`, `readTool`, `allReads`, `renderReads`, `readReadEvents`) con cuerpos vacíos o `panic("TODO")`, que compilan. Las pruebas, por ahora en rojo, son:
   - `internal/metrics/reads_test.go`: `TestParseReadEventsSkipsInvalid` (R20), `TestSummarizeReadsCrossRereads` (R14: A,A,B → 1; A,B,A → 2; empate de ts conserva el orden), `TestSummarizeReadsOrder` (R15), `TestSummarizeReadsEmpty` (R19).
   - `internal/adapters/agent/claude/hook_test.go`: `TestParseReadPartial` (R7: offset, limit, null, ausente).
   - `internal/adapters/agent/opencode/hook_test.go`: `TestParseActionsReadPartial` (R7).
@@ -163,9 +163,9 @@ Algoritmo de R14: se hace `sort.SliceStable` por `TS`. Para cada lectura se busc
   - `internal/cli/opencode_hooks_test.go`: `TestOpenCodeGuardRecordsReads` (R1, R8 con `tool: opencode`).
   - `internal/adapters/agent/opencode/plugin_test.go`: `TestPluginReadsOnlyReviewer` se reescribe como `TestPluginReadsFireAndForget` (R12: el read que no es del reviewer llama a `run` con `false` antes de esperar; el del reviewer espera).
   - `internal/cli/reads_test.go`: `TestStatsReadsText` (R13, R16), `TestStatsReadsJSON` (R17), `TestStatsReadsLegacy` (R19), `TestStatsReadsWithCalls` (R21), `TestStatsReadsNeedsID` (R22). `TestStatsJSONUnchangedWithoutCalls` sigue en verde (R18).
-- [ ] **T2 Agregación.** Implementar `ParseReadEvents` y `SummarizeReads` en `internal/metrics/reads.go`. Las pruebas de metrics pasan a verde. (R14, R15, R19, R20)
-- [ ] **T3 Parsers con `partial`.** Agregar `guard.Action.Partial` y `offset/limit` en los parsers de Claude y OpenCode. (R7)
-- [ ] **T4 Registro en el guard.** Cambiar `onlyForeignReads` por `allReads`, escribir el nuevo `recordReads` con `Store.Load` para la fase, y agregar `readAgent` y `readTool`. `reads.jsonl` no cambia. (R1 a R6, R8 a R11)
-- [ ] **T5 Plugin de OpenCode.** `run(..., wait)` y el read sin esperar para los agentes que no son el reviewer. Reescribir la prueba del plugin. (R12)
-- [ ] **T6 `stats --reads`.** Flag, `readReadEvents`, `renderReads`, `runStats` que arma la salida por bloques y la combinación con `--calls`. (R13, R16 a R19, R21, R22)
-- [ ] **T7 Verificación.** `go test ./...` y `go vet` en verde. Correr `bflow render` en este repo para que `.opencode/plugins/bflow.js` quede al día si existe. Medir a mano la latencia de un Read de la sesión principal con el hook, antes y después del cambio, y anotarla en el PR.
+- [x] **T2 Agregación.** Implementar `ParseReadEvents` y `SummarizeReads` en `internal/metrics/reads.go`. Las pruebas de metrics pasan a verde. (R14, R15, R19, R20)
+- [x] **T3 Parsers con `partial`.** Agregar `guard.Action.Partial` y `offset/limit` en los parsers de Claude y OpenCode. (R7)
+- [x] **T4 Registro en el guard.** Cambiar `onlyForeignReads` por `allReads`, escribir el nuevo `recordReads` con `Store.Load` para la fase, y agregar `readAgent` y `readTool`. `reads.jsonl` no cambia. (R1 a R6, R8 a R11)
+- [x] **T5 Plugin de OpenCode.** `run(..., wait)` y el read sin esperar para los agentes que no son el reviewer. Reescribir la prueba del plugin. (R12)
+- [x] **T6 `stats --reads`.** Flag, `readReadEvents`, `renderReads`, `runStats` que arma la salida por bloques y la combinación con `--calls`. (R13, R16 a R19, R21, R22)
+- [x] **T7 Verificación.** `go test ./...` y `go vet` en verde. Correr `bflow render` en este repo para que `.opencode/plugins/bflow.js` quede al día si existe. Medir a mano la latencia de un Read de la sesión principal con el hook, antes y después del cambio, y anotarla en el PR.

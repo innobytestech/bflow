@@ -26,6 +26,7 @@ func init() {
 	Register(&Command{Name: "stats", Summary: "tiempo por fase (agente, humano, bloqueada), iteraciones y tokens: stats [ID]", Run: runStats,
 		Setup: func(fs *flag.FlagSet) {
 			fs.Bool("calls", false, "una tabla por llamada del modelo, por corrida (requiere ID)")
+			fs.Bool("reads", false, "lecturas por archivo y relectura entre agentes (requiere ID)")
 		}})
 	Register(&Command{Name: "statusline", Summary: "una línea para la barra de estado (lee una caché: milisegundos)", Run: runStatusline})
 	Register(&Command{Name: "hook tokens", Summary: "hook Stop/SubagentStop: suma los tokens nuevos a la fase y, al terminar el turno, avisa si la tarea espera a la persona", Run: runHookTokens,
@@ -48,6 +49,10 @@ func runStats(c *Ctx) output.Envelope {
 	if wantCalls && len(c.Args) == 0 {
 		return output.Fail("usage", fmt.Errorf("--calls requiere un ID: stats ID --calls"))
 	}
+	wantReads := str(c.Flags, "reads") == "true"
+	if wantReads && len(c.Args) == 0 {
+		return output.Fail("usage", fmt.Errorf("--reads requiere un ID: stats ID --reads"))
+	}
 	if len(c.Args) > 0 {
 		id := strings.ToUpper(c.Args[0])
 		st := metrics.Compute(id, log, now)
@@ -56,16 +61,26 @@ func runStats(c *Ctx) output.Envelope {
 		}
 		runs, _ := readCalls(e, id)
 		st.Prefix = metrics.PrefixByAgent(runs)
-		if wantCalls {
-			env := output.OK("stats", map[string]any{"stats": st, "calls": runs}, nil)
-			env.Text = statsLine(st) + "\n" + renderCalls(runs, callsNote(st, runs))
-			if !st.TokensAvailable {
-				env.Text = statsLine(st) + "\n  " + noTokensText
-			}
-			return env
+		data := map[string]any{"stats": st}
+		text := renderStats(st)
+		if wantCalls || wantReads {
+			text = statsLine(st)
 		}
-		env := output.OK("stats", map[string]any{"stats": st}, nil)
-		env.Text = renderStats(st)
+		if wantCalls {
+			data["calls"] = runs
+			if st.TokensAvailable {
+				text += "\n" + renderCalls(runs, callsNote(st, runs))
+			} else {
+				text += "\n  " + noTokensText
+			}
+		}
+		if wantReads {
+			rs := readReadEvents(e, id)
+			data["reads"] = rs
+			text += "\n" + renderReads(rs)
+		}
+		env := output.OK("stats", data, nil)
+		env.Text = text
 		return env
 	}
 	recs, err := e.Store.List()
