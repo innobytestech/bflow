@@ -328,7 +328,7 @@ func TestGuardReadsAllNoActiveTask(t *testing.T) {
 	if code, out, errOut := hookRun(t, env, claudeTool(env, "Read", "", map[string]any{"file_path": f}), "guard", "--reads"); code != 0 || out != "" || errOut != "" {
 		t.Fatalf("se permite en silencio: %d %q %q", code, out, errOut)
 	}
-	filepath.WalkDir(env.Dir, func(p string, d os.DirEntry, _ error) error {
+	_ = filepath.WalkDir(env.Dir, func(p string, d os.DirEntry, _ error) error {
 		if d != nil && d.Name() == metrics.ReadsAllFile {
 			t.Errorf("sin tarea activa no se crea %s", p)
 		}
