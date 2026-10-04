@@ -11,6 +11,7 @@ import (
 	"innobytes.tech/bflow/internal/engine"
 	"innobytes.tech/bflow/internal/flow"
 	"innobytes.tech/bflow/internal/guard"
+	"innobytes.tech/bflow/internal/metrics"
 	"innobytes.tech/bflow/internal/review"
 	"innobytes.tech/bflow/internal/store"
 )
@@ -233,5 +234,157 @@ func TestDoctorWarnsGuardWithoutReads(t *testing.T) {
 	}
 	if has(env) {
 		t.Error("guard con --reads: sin aviso")
+	}
+}
+
+func allReadsOf(t *testing.T, e *engine.Engine, id string) []metrics.ReadEvent {
+	t.Helper()
+	b, err := e.Store.ReadFile(id, metrics.ReadsAllFile)
+	if err != nil {
+		return nil
+	}
+	return metrics.ParseReadEvents(strings.NewReader(string(b)))
+}
+
+func setPhase(t *testing.T, e *engine.Engine, id string, p flow.Phase) {
+	t.Helper()
+	if _, err := e.Store.Update(id, func(r *store.Record, _ bool) error { r.Flow.Phase = p; return nil }); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// R1, R2, R3, R5, R8: todo Read queda en reads-all.jsonl con agente sin prefijo y la fase del store.
+func TestGuardRecordsAllReads(t *testing.T) {
+	env, e, id := qualityTask(t)
+	setPhase(t, e, id, flow.Implementing)
+	a := filepath.Join(env.Dir, "internal", "a.go")
+	read := func(agent string, in map[string]any) {
+		t.Helper()
+		if code, out, errOut := hookRun(t, env, claudeTool(env, "Read", agent, in), "guard", "--reads"); code != 0 || out != "" || errOut != "" {
+			t.Fatalf("%q: %d %q %q", agent, code, out, errOut)
+		}
+	}
+	read("", map[string]any{"file_path": a})
+	read("bflow-implementer", map[string]any{"file_path": a, "offset": 5, "limit": 20})
+	read("reviewer", map[string]any{"file_path": a}) // no es de bflow: conserva el nombre
+	// Subagente sin nombre: solo agent_id.
+	raw, _ := json.Marshal(map[string]any{"hook_event_name": "PreToolUse", "cwd": env.Dir, "tool_name": "Read", "agent_id": "ag9",
+		"tool_input": map[string]any{"file_path": a}})
+	if code, out, errOut := hookRun(t, env, string(raw), "guard", "--reads"); code != 0 || out != "" || errOut != "" {
+		t.Fatalf("sin nombre: %d %q %q", code, out, errOut)
+	}
+	setPhase(t, e, id, flow.Quality)
+	read("bflow-reviewer", map[string]any{"file_path": a})
+
+	got := allReadsOf(t, e, id)
+	type row struct {
+		agent, phase string
+		partial      bool
+	}
+	want := []row{{metrics.MainSession, "implementing", false}, {"implementer", "implementing", true}, {"reviewer", "implementing", false},
+		{metrics.UnknownAgent, "implementing", false}, {"reviewer", "quality", false}}
+	if len(got) != len(want) {
+		t.Fatalf("una línea por Read: %+v", got)
+	}
+	for i, w := range want {
+		g := got[i]
+		if g.Agent != w.agent || g.Phase != w.phase || g.Partial != w.partial || g.Path != "internal/a.go" || g.Tool != "claude" || g.TS.IsZero() {
+			t.Errorf("línea %d: %+v, quiero %+v", i, g, w)
+		}
+	}
+	b, _ := e.Store.ReadFile(id, metrics.ReadsAllFile)
+	if strings.Contains(string(b), env.Dir) || strings.Contains(string(b), `"partial":false`) {
+		t.Errorf("sin rutas absolutas y partial se omite si es false: %s", b)
+	}
+	// Solo el reviewer en quality llega a reads.jsonl.
+	if rs := readsOf(t, e, id); len(rs) != 1 {
+		t.Errorf("reads.jsonl solo trae la del reviewer en quality: %+v", rs)
+	}
+}
+
+// R4: una ruta fuera del repo no se registra.
+func TestGuardReadsAllOutsideRepo(t *testing.T) {
+	env, e, id := qualityTask(t)
+	outside := filepath.Join(filepath.Dir(env.Dir), "otro-repo", "secreto.go")
+	if code, out, errOut := hookRun(t, env, claudeTool(env, "Read", "bflow-implementer", map[string]any{"file_path": outside}), "guard", "--reads"); code != 0 || out != "" || errOut != "" {
+		t.Fatalf("se permite en silencio: %d %q %q", code, out, errOut)
+	}
+	if got := allReadsOf(t, e, id); len(got) != 0 {
+		t.Fatalf("fuera del repo no se registra: %+v", got)
+	}
+	hookRun(t, env, claudeTool(env, "Read", "bflow-implementer", map[string]any{"file_path": filepath.Join(env.Dir, "internal", "a.go")}), "guard", "--reads")
+	if got := allReadsOf(t, e, id); len(got) != 1 || got[0].Path != "internal/a.go" {
+		t.Errorf("control: dentro del repo sí: %+v", got)
+	}
+}
+
+// R6: sin tarea activa no se registra nada.
+func TestGuardReadsAllNoActiveTask(t *testing.T) {
+	env, _, _, _ := tokensEnv(t, false)
+	f := filepath.Join(env.Dir, "a.go")
+	if err := os.WriteFile(f, []byte("package a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code, out, errOut := hookRun(t, env, claudeTool(env, "Read", "", map[string]any{"file_path": f}), "guard", "--reads"); code != 0 || out != "" || errOut != "" {
+		t.Fatalf("se permite en silencio: %d %q %q", code, out, errOut)
+	}
+	filepath.WalkDir(env.Dir, func(p string, d os.DirEntry, _ error) error {
+		if d != nil && d.Name() == metrics.ReadsAllFile {
+			t.Errorf("sin tarea activa no se crea %s", p)
+		}
+		return nil
+	})
+}
+
+// R9: si no se puede escribir, el guard permite sin una palabra.
+func TestGuardReadsAllSilent(t *testing.T) {
+	env, e, id := qualityTask(t)
+	setPhase(t, e, id, flow.Implementing)
+	in := claudeTool(env, "Read", "bflow-implementer", map[string]any{"file_path": filepath.Join(env.Dir, "internal", "a.go")})
+	if hookRun(t, env, in, "guard", "--reads"); len(allReadsOf(t, e, id)) != 1 {
+		t.Fatal("control: el Read se registra")
+	}
+	p, err := e.Store.Path(id, metrics.ReadsAllFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(p); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(p, 0o755); err != nil { // una carpeta: no se puede agregar
+		t.Fatal(err)
+	}
+	code, out, errOut := hookRun(t, env, in, "guard", "--reads")
+	if code != 0 || out != "" || errOut != "" {
+		t.Errorf("exit 0 sin salida: %d %q %q", code, out, errOut)
+	}
+	// Sin --reads, un Read tampoco falla ni dice nada.
+	if code, out, errOut := hookRun(t, env, in, "guard"); code != 0 || out != "" || errOut != "" {
+		t.Errorf("sin --reads: %d %q %q", code, out, errOut)
+	}
+}
+
+// R10: reads.jsonl queda como hoy y el Read del reviewer también va a reads-all.jsonl.
+func TestGuardReviewerReadsUnchanged(t *testing.T) {
+	env, e, id := qualityTask(t)
+	a := filepath.Join(env.Dir, "internal", "a.go")
+	hookRun(t, env, claudeTool(env, "Read", "bflow-reviewer", map[string]any{"file_path": a, "offset": 1}), "guard", "--reads")
+	hookRun(t, env, claudeTool(env, "Bash", "bflow-reviewer", map[string]any{"command": "git diff main...HEAD"}), "guard", "--reads")
+	hookRun(t, env, claudeTool(env, "Read", "bflow-implementer", map[string]any{"file_path": a}), "guard", "--reads")
+
+	rs := readsOf(t, e, id)
+	if len(rs) != 2 || rs[0].Tool != guard.Read || len(rs[0].Paths) != 1 || rs[0].Paths[0] != "internal/a.go" || !rs[0].ReadHook ||
+		rs[1].Tool != guard.Bash || !rs[1].Whole {
+		t.Fatalf("reads.jsonl: Read y Bash del reviewer, sin el del implementer: %+v", rs)
+	}
+	raw, _ := e.Store.ReadFile(id, review.ReadsFile)
+	want := review.FromAction(guard.Action{Tool: guard.Read, Path: a, Subagent: true, Agent: "bflow-reviewer"}, env.Dir, env.Dir, true, rs[0].TS)
+	wb, _ := json.Marshal(want)
+	if first, _, _ := strings.Cut(string(raw), "\n"); first != string(wb) {
+		t.Errorf("la línea de reads.jsonl no cambia (sin campos nuevos):\n got %s\nwant %s", first, wb)
+	}
+	all := allReadsOf(t, e, id)
+	if len(all) != 2 || all[0].Agent != "reviewer" || all[0].Phase != "quality" || !all[0].Partial || all[1].Agent != "implementer" {
+		t.Errorf("reads-all: los dos Read, no el Bash: %+v", all)
 	}
 }

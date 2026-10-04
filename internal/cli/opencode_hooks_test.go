@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"innobytes.tech/bflow/internal/engine"
+	"innobytes.tech/bflow/internal/metrics"
 	"innobytes.tech/bflow/internal/store"
 	"innobytes.tech/bflow/internal/tracker/trackertest"
 )
@@ -445,6 +446,33 @@ func TestDoctorOpenCodePlugin(t *testing.T) {
 	for _, w := range []string{"nudge", "bflow report", "bflow check --verify", "AGENTS.md"} {
 		if !strings.Contains(d, w) {
 			t.Errorf("la nota debe mencionar %q: %s", w, d)
+		}
+	}
+}
+
+// R1, R7, R8: los Read de OpenCode (sesión raíz y subagente) se registran con tool opencode.
+func TestOpenCodeGuardRecordsReads(t *testing.T) {
+	env, e, id, _ := tokensEnv(t, true)
+	if err := os.WriteFile(filepath.Join(env.Dir, "a.go"), []byte("package a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	g := func(args any, sub bool, agent string) {
+		t.Helper()
+		if code, out, errOut := hookRun(t, env, guardIn(env, "read", args, sub, agent), "guard", "--tool", "opencode", "--reads"); code != 0 || out != "" || errOut != "" {
+			t.Fatalf("%d %q %q", code, out, errOut)
+		}
+	}
+	g(map[string]any{"filePath": "a.go"}, false, "")
+	g(map[string]any{"filePath": filepath.Join(env.Dir, "a.go"), "offset": 3, "limit": 10}, true, "bflow-implementer")
+	g(map[string]any{"filePath": "a.go"}, true, "")
+	got := allReadsOf(t, e, id)
+	if len(got) != 3 {
+		t.Fatalf("tres lecturas: %+v", got)
+	}
+	wantAgent := []string{metrics.MainSession, "implementer", metrics.UnknownAgent}
+	for i, g := range got {
+		if g.Tool != "opencode" || g.Path != "a.go" || g.Agent != wantAgent[i] || g.Partial != (i == 1) || g.Phase == "" {
+			t.Errorf("línea %d: %+v", i, g)
 		}
 	}
 }

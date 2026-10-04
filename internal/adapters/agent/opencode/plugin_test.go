@@ -69,31 +69,6 @@ func TestPluginSinDependencias(t *testing.T) {
 	}
 }
 
-// R17: read solo se manda al guard desde la subsesión del reviewer, y con --reads.
-func TestPluginReadsOnlyReviewer(t *testing.T) {
-	src := string(files.Plugin)
-	guarded := regexp.MustCompile(`GUARDED\s*=\s*new Set\(\[([^\]]*)\]`).FindStringSubmatch(src)
-	if guarded == nil || !strings.Contains(guarded[1], `"read"`) {
-		t.Fatalf("GUARDED debe incluir \"read\": %v", guarded)
-	}
-	if !strings.Contains(src, `"--reads"`) {
-		t.Error(`el comando del guard lleva "--reads"`)
-	}
-	// Antes de lanzar el proceso, un read de otra sesión sale sin hacer nada.
-	iRead := strings.Index(src, `input.tool === "read"`)
-	iRun := strings.Index(src, `run(["guard"`)
-	if iRead < 0 || iRun < 0 || iRead > iRun {
-		t.Fatalf("falta el filtro de read antes de run(guard): read=%d run=%d", iRead, iRun)
-	}
-	between := src[iRead:iRun]
-	if !strings.Contains(between, "bflow-reviewer") || !strings.Contains(between, "return") {
-		t.Errorf("el filtro compara con bflow-reviewer y sale con return:\n%s", between)
-	}
-	if n := strings.Count(strings.TrimRight(src, "\n"), "\n") + 1; n > 100 {
-		t.Errorf("el plugin tiene %d líneas, máximo 100", n)
-	}
-}
-
 // GH-15 R8, R9: al crearse una sesión raíz, el plugin inyecta session-start sin pedir respuesta.
 func TestPluginSessionStart(t *testing.T) {
 	src := string(files.Plugin)
@@ -112,6 +87,53 @@ func TestPluginSessionStart(t *testing.T) {
 	}
 	if !regexp.MustCompile(`!\s*p\.info\.parentID`).MatchString(src) {
 		t.Error("solo se inyecta en sesiones sin parentID")
+	}
+	if n := strings.Count(strings.TrimRight(src, "\n"), "\n") + 1; n > 100 {
+		t.Errorf("el plugin tiene %d líneas, máximo 100", n)
+	}
+}
+
+// R12: el read que no es del reviewer se lanza sin esperar (run con wait=false) y sale;
+// el del reviewer y las demás herramientas esperan al guard.
+func TestPluginReadsFireAndForget(t *testing.T) {
+	src := string(files.Plugin)
+	guarded := regexp.MustCompile(`GUARDED\s*=\s*new Set\(\[([^\]]*)\]`).FindStringSubmatch(src)
+	if guarded == nil || !strings.Contains(guarded[1], `"read"`) {
+		t.Fatalf("GUARDED debe incluir \"read\": %v", guarded)
+	}
+	if !regexp.MustCompile(`const run = \(args, input, wait = true\)`).MatchString(src) {
+		t.Fatal("run(args, input, wait = true): con wait en false no se espera al proceso")
+	}
+	idx := func(sub string, from int) int {
+		i := strings.Index(src[from:], sub)
+		if i < 0 {
+			t.Fatalf("falta %q", sub)
+		}
+		return from + i
+	}
+	if n := strings.Count(src, `"--reads"`); n != 2 {
+		t.Fatalf("dos llamadas al guard con --reads (sin esperar y esperando): %d", n)
+	}
+	iRead := idx(`input.tool === "read"`, 0)
+	i1 := idx(`"--reads"`, iRead)
+	i2 := idx(`"--reads"`, i1+1)
+	if !strings.Contains(src[iRead:i1], "bflow-reviewer") {
+		t.Errorf("el filtro compara con bflow-reviewer antes de lanzar sin esperar:\n%s", src[iRead:i1])
+	}
+	fire := src[i1:i2]
+	iFalse, iRet := strings.Index(fire, "false"), strings.Index(fire, "return")
+	if iFalse < 0 || iRet < 0 || iFalse > iRet {
+		t.Errorf("el read ajeno se lanza con false y luego sale con return:\n%s", fire)
+	}
+	if i1 > idx("proc.stderr", 0) {
+		t.Error("el read sin esperar se lanza antes de leer stderr del proceso")
+	}
+	wait := src[i2:idx("proc.exited", i2)]
+	if strings.Contains(wait, "false") {
+		t.Errorf("la llamada que espera no lleva false:\n%s", wait)
+	}
+	if !strings.Contains(src, `stderr: "ignore"`) {
+		t.Error(`sin esperar, el proceso se lanza con stderr: "ignore"`)
 	}
 	if n := strings.Count(strings.TrimRight(src, "\n"), "\n") + 1; n > 100 {
 		t.Errorf("el plugin tiene %d líneas, máximo 100", n)

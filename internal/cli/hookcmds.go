@@ -140,6 +140,15 @@ func isReviewer(a guard.Action) bool {
 	return ok && name == "reviewer"
 }
 
+// allReads dice si hay acciones y todas son Read (R9: se registran sin evaluar).
+func allReads(acts []guard.Action) bool { panic("TODO") }
+
+// readAgent es el agente que se anota en reads-all.jsonl (R2, R3).
+func readAgent(a guard.Action) string { panic("TODO") }
+
+// readTool es la herramienta que se anota: "claude" sin --tool (R8).
+func readTool(c *Ctx) string { panic("TODO") }
+
 // onlyForeignReads dice si todas las acciones son Read y ninguna es del reviewer.
 func onlyForeignReads(acts []guard.Action) bool {
 	for _, a := range acts {
