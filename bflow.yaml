@@ -1,6 +1,6 @@
 # bflow.yaml — generado por bflow init. Solo lo propio de este repo; lo compartido va en el perfil.
 stack: go
-agent: claude
+agent: [claude, opencode]
 vcs:
   host: github
   base_branch: main
