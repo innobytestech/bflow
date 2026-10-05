@@ -85,9 +85,102 @@ func Evaluate(a Action, c Context) Decision {
 // vacíos. Lo usan TaskScoped, bash y review.FromAction.
 func Segments(cmd string) []string { return segments(cmd, 0) }
 
+var heredocRe = regexp.MustCompile(`(?:^|[^<])<<-?\s*(?:'([^']+)'|"([^"]+)"|([A-Za-z_][A-Za-z0-9_]*))`)
+
+var shellNames = map[string]bool{"bash": true, "sh": true, "zsh": true, "dash": true, "ksh": true}
+
+// feedsShell dice si algún segmento de la línea ejecuta un shell (bash <<EOF,
+// cat <<EOF | bash): entonces el cuerpo del heredoc son comandos.
+func feedsShell(line string) bool {
+	for _, seg := range segSplit.Split(line, -1) {
+		for _, f := range strings.Fields(seg) {
+			if strings.Contains(f, "=") && !strings.HasPrefix(f, "-") {
+				continue
+			}
+			f = strings.Trim(f, `"'`)
+			f = strings.ToLower(f[strings.LastIndexAny(f, `/\`)+1:])
+			f = strings.TrimSuffix(f, ".exe")
+			if shellNames[f] {
+				return true
+			}
+			if f != "sudo" && f != "env" && f != "exec" {
+				break
+			}
+		}
+	}
+	return false
+}
+
+// stripHeredocs quita el cuerpo de los heredocs que leen otros programas: es
+// texto. Si el heredoc alimenta a un shell, el cuerpo se conserva (se ejecuta).
+func stripHeredocs(cmd string) string {
+	if !strings.Contains(cmd, "<<") {
+		return cmd
+	}
+	var out []string
+	end, run := "", false
+	for _, line := range strings.Split(cmd, "\n") {
+		if end != "" {
+			if strings.TrimSpace(line) == end {
+				end = ""
+			} else if run {
+				out = append(out, line)
+			}
+			continue
+		}
+		out = append(out, line)
+		if m := heredocRe.FindStringSubmatch(line); m != nil {
+			end = m[1] + m[2] + m[3]
+			run = feedsShell(line)
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
+// splitCommand parte en &&, ||, ;, | y saltos de línea, pero no dentro de
+// comillas ni en el cuerpo de un heredoc. Si las comillas no cierran o hay sustitución ($(...), `) entre comillas dobles, cae al
+// corte simple para no esconder comandos.
+func splitCommand(cmd string) []string {
+	cmd = stripHeredocs(cmd)
+	var out []string
+	var q byte
+	subst := false
+	start := 0
+	for i := 0; i < len(cmd); i++ {
+		c := cmd[i]
+		switch {
+		case q != 0:
+			if c == q {
+				q = 0
+			} else if c == '\\' && q == '"' {
+				i++
+			} else if q == '"' && (c == '`' || c == '$' && i+1 < len(cmd) && cmd[i+1] == '(') {
+				subst = true
+			}
+		case c == '"' || c == '\'':
+			q = c
+		case c == '\\':
+			i++
+		case c == ';' || c == '|' || c == '\n' || c == '&' && i+1 < len(cmd) && cmd[i+1] == '&':
+			out = append(out, cmd[start:i])
+			if (c == '|' || c == '&') && i+1 < len(cmd) && cmd[i+1] == c {
+				i++
+			}
+			start = i + 1
+		}
+	}
+	if subst {
+		cmd = strings.NewReplacer("$(", ";", "`", ";", ")", ";").Replace(cmd)
+	}
+	if q != 0 || subst {
+		return segSplit.Split(cmd, -1)
+	}
+	return append(out, cmd[start:])
+}
+
 func segments(cmd string, depth int) []string {
 	var out []string
-	for _, seg := range segSplit.Split(cmd, -1) {
+	for _, seg := range splitCommand(cmd) {
 		s := strings.TrimSpace(seg)
 		if s == "" {
 			continue

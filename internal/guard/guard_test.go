@@ -49,6 +49,13 @@ func TestBashRules(t *testing.T) {
 		{"git -C . add .bflow/x", false, "bflow_tracked"},
 		{`cd x && git add .bflow\x`, false, "bflow_tracked"},
 		{"git stage .bflow", false, "bflow_tracked"},
+		{`grep -nE "x|git add -f|\.bflow/" CHANGELOG.md`, true, ""},
+		{`echo "no uses git add -f .bflow/x"`, true, ""},
+		{`rg 'git add -f|y' docs`, true, ""},
+		{"cat > n.md <<'EOF'\ngit add -f .bflow/x\nEOF", true, ""},
+		{"gh issue create --body \"$(cat <<EOF\ngit add --force a\nEOF\n)\"", true, ""},
+		{"echo hi\ngit add -f a.go", false, "bflow_tracked"},
+		{`bash -c "ls && git add -f a.go"`, false, "bflow_tracked"},
 		{"git add internal/a.go", true, ""},
 		{"git add -A", true, ""},
 		{"git add -p", true, ""},
@@ -365,6 +372,33 @@ func TestBflowArgs(t *testing.T) {
 				t.Errorf("%q → %v, want %v", c.seg, got, c.want)
 				break
 			}
+		}
+	}
+}
+
+// El cuerpo de un heredoc que ejecuta un shell son comandos; si lo lee otro
+// programa, es texto.
+func TestHeredocExecutedByShell(t *testing.T) {
+	active := ctx()
+	active.Phase = flow.Implementing
+	cases := []struct {
+		cmd, rule string
+	}{
+		{"bash <<EOF\ngit add -f .bflow/x\nEOF", "bflow_tracked"},
+		{"sh <<'EOF'\nbflow approve X\nEOF", "human_only"},
+		{"cat <<EOF | bash\ngit add -f .bflow/x\nEOF", "bflow_tracked"},
+		{"bash -s <<EOF\ngit push --force origin x\nEOF", "force_push"},
+		{"cat <<EOF | tee n.md\ngit add -f .bflow/x\nEOF", ""},
+		{"python - <<EOF\ngit add -f .bflow/x\nEOF", ""},
+		{"cat <<< \"x\"\ngit add -f .bflow/x", "bflow_tracked"},
+		{"echo $((1 << 2))\ngit add -f .bflow/x", "bflow_tracked"},
+		{"echo \"$(git add -f .bflow/x)\"", "bflow_tracked"},
+		{"echo \"`git add -f .bflow/x`\"", "bflow_tracked"},
+	}
+	for _, c := range cases {
+		d := Evaluate(Action{Tool: Bash, Command: c.cmd, Subagent: true, Agent: "implementer"}, active)
+		if c.rule == "" && !d.Allow || c.rule != "" && (d.Allow || d.Rule != c.rule) {
+			t.Errorf("%q → %+v, quería regla %q", c.cmd, d, c.rule)
 		}
 	}
 }
