@@ -6,6 +6,8 @@ Los cambios de bflow que ve quien lo usa. Las versiones siguen [semver](https://
 
 ### Agregado
 
+- **Tokens de la sesión principal repartidos por marcas.** El guard marca la sesión que conduce una tarea (también en subagentes) y `stats` y `watch` reparten los tokens por esas marcas; lo que no cae en ninguna tarea se muestra como «sin tarea». Hace falta correr `bflow install claude` de nuevo para que el matcher de los hooks sea `Task|Agent`.
+- **Lecturas de todos los agentes y relectura por archivo.** Las lecturas de archivos de todos los agentes (Claude Code y OpenCode) se registran, y `stats` muestra cuántas veces se releyó cada archivo.
 - **Tracker de GitHub Issues y Projects.** `tracker: github` lleva el estado de cada tarea con etiquetas `bflow:*` en el issue o, con `project`, en las columnas de un GitHub Project. `init` lo ofrece, `doctor` revisa el acceso y `setup` crea lo que falta; los errores 422 de GitHub ahora dicen qué campo falló.
 - **OpenCode como segundo agente.** `agent:` acepta una lista (`claude`, `opencode`) y una tabla `models` con alias de modelo. `bflow render` escribe los agentes y el comando `/bflow` de OpenCode, `bflow install opencode` los instala y `init`, `doctor` y `update` lo entienden.
 - **Plugin de OpenCode con guard y tokens.** `bflow render` escribe `.opencode/plugins/bflow.js` (se commitea, no se edita): aplica el guard a bash, edit, write, multiedit, patch y apply_patch, y mide los tokens por fase, agente y modelo en `bflow stats`. OpenCode no tiene aviso de subagente sin reporte ni hook de inicio de sesión: cierra con `bflow report` explícito.

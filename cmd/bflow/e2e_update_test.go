@@ -68,7 +68,7 @@ func releaseServerOf(t *testing.T, badSum bool, rels ...rel) *httptest.Server {
 			{"name": release.Checksums, "browser_download_url": srv.URL + "/dl/" + r.Tag + "/" + release.Checksums},
 		}}
 	}
-	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	srv = httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		p := req.URL.Path
 		switch {
 		case p == "/releases/latest":
@@ -108,6 +108,7 @@ func releaseServerOf(t *testing.T, badSum bool, rels ...rel) *httptest.Server {
 			http.NotFound(w, req)
 		}
 	}))
+	srv.Start()
 	t.Cleanup(srv.Close)
 	return srv
 }
