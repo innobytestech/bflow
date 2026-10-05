@@ -14,7 +14,7 @@ import (
 // input arma la entrada que el plugin le pasa a `bflow guard --tool opencode`.
 func input(t *testing.T, tool string, args any, extra map[string]any) []byte {
 	t.Helper()
-	m := map[string]any{"tool": tool, "args": args, "sessionID": "ses_1", "cwd": "", "agent": "", "subagent": false}
+	m := map[string]any{"tool": tool, "args": args, "sessionID": "", "cwd": "", "agent": "", "subagent": false}
 	for k, v := range extra {
 		m[k] = v
 	}
@@ -191,5 +191,19 @@ func TestParseActionsReadPartial(t *testing.T) {
 		if !ok || len(acts) != 1 || acts[0].Tool != guard.Read || acts[0].Path != "x.go" || acts[0].Partial != c.want {
 			t.Errorf("%v: %+v ok=%v, Partial debe ser %v", c.args, acts, ok, c.want)
 		}
+	}
+}
+
+func TestParseActionsSpawn(t *testing.T) {
+	acts, _, ok := Agent{}.ParseActions(input(t, "task",
+		map[string]any{"subagent_type": "bflow-implementer", "prompt": `{"id":"GH-7","lane":"full"}`},
+		map[string]any{"sessionID": "ses_9"}))
+	want := []guard.Action{{Tool: guard.Spawn, Target: "bflow-implementer", Command: `{"id":"GH-7","lane":"full"}`, Session: "ses_9"}}
+	if !ok || !reflect.DeepEqual(acts, want) {
+		t.Fatalf("task: ok=%v acts=%+v, want %+v", ok, acts, want)
+	}
+	acts, _, _ = Agent{}.ParseActions(input(t, "bash", map[string]any{"command": "bflow status GH-7"}, map[string]any{"sessionID": "ses_9"}))
+	if len(acts) != 1 || acts[0].Session != "ses_9" {
+		t.Errorf("toda acción lleva el sessionID: %+v", acts)
 	}
 }

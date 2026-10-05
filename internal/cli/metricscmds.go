@@ -310,18 +310,18 @@ func runHookTokens(c *Ctx) output.Envelope {
 	if c.Agent == nil {
 		return quiet
 	}
-	path, agent := c.Agent.TokenSource(raw)
-	if path == "" {
+	src := c.Agent.TokenSource(raw)
+	if src.Path == "" {
 		return quiet
 	}
 	e, err := engineFor(c)
 	if err != nil {
 		return quiet
 	}
-	if agent == "" {
+	if src.Agent == "" {
 		defer notifyActive(e)
 	}
-	return tokensFrom(e, c.Agent.Name(), []TokenSource{{Path: path, Agent: agent}}, c.Agent.ReadUsage, nil)
+	return tokensFrom(e, c.Agent.Name(), []TokenSource{src}, c.Agent.ReadUsage, nil)
 }
 
 // tokensFrom lee las líneas nuevas de cada fuente bajo el lock del cursor y las

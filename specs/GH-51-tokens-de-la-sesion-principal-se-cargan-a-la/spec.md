@@ -109,7 +109,7 @@ func TaskFor(marks []Mark, src TokenSource, ts time.Time) string
 
 ## Tasks
 
-- [ ] **T1 Contrato** (R1-R15): tipos y firmas del Design (`Mark`, `MarksPath`, `UnassignedPath`, `AppendMark`, `ReadMarks`, `PruneMarks`, `TaskFor`, `UnassignedUsage`, `TokenSource` con `Session`/`Parent`, `guard.Spawn`, `Action.Session`/`Target`, `BflowArgs`, nueva firma de `AgentAdapter.TokenSource`) con cuerpos mínimos que compilan, y las pruebas que fallan:
+- [x] **T1 Contrato** (R1-R15): tipos y firmas del Design (`Mark`, `MarksPath`, `UnassignedPath`, `AppendMark`, `ReadMarks`, `PruneMarks`, `TaskFor`, `UnassignedUsage`, `TokenSource` con `Session`/`Parent`, `guard.Spawn`, `Action.Session`/`Target`, `BflowArgs`, nueva firma de `AgentAdapter.TokenSource`) con cuerpos mínimos que compilan, y las pruebas que fallan:
   - `internal/guard`: `TestBflowArgs`.
   - `internal/adapters/agent/claude`: `TestParsePreToolUseSession`, `TestParsePreToolUseSpawn`, `TestTokenSourceSession`.
   - `internal/adapters/agent/opencode`: `TestParseActionsSpawn`, `TestTokenSourcesSession`.

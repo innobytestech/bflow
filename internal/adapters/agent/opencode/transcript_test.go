@@ -311,3 +311,16 @@ func TestReadUsageSetsMsg(t *testing.T) {
 		t.Errorf("el id lleva el prefijo opencode:, igual que la llave de cur.Seen: %v", ids)
 	}
 }
+
+func TestTokenSourcesSession(t *testing.T) {
+	dir := cache(t)
+	srcs, _ := Agent{}.TokenSources([]byte(`{"sessionID":"ses_main","parentID":""}`), dir)
+	got := map[string][2]string{}
+	for _, s := range srcs {
+		got[filepath.Base(s.Path)] = [2]string{s.Session, s.Parent}
+	}
+	want := map[string][2]string{"ses_main.jsonl": {"ses_main", ""}, "ses_kid.jsonl": {"ses_kid", "ses_main"}, "ses_anon.jsonl": {"ses_anon", "ses_main"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Session y Parent salen de la primera línea de cada archivo: %v, want %v", got, want)
+	}
+}

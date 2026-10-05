@@ -27,7 +27,7 @@ func (Agent) ParsePreToolUse(raw []byte) (guard.Action, string, bool) { return P
 // TokenSource dice qué transcript leer al terminar un turno o un subagente. En
 // Stop es el de la sesión principal (agent vacío); en SubagentStop, solo el
 // del subagente, para no mezclar sus tokens con los de la sesión.
-func (Agent) TokenSource(raw []byte) (path, agent string) {
+func (Agent) TokenSource(raw []byte) metrics.TokenSource {
 	var in struct {
 		TranscriptPath      string `json:"transcript_path"`
 		AgentTranscriptPath string `json:"agent_transcript_path"`
@@ -36,17 +36,17 @@ func (Agent) TokenSource(raw []byte) (path, agent string) {
 	}
 	_ = json.Unmarshal(raw, &in)
 	if in.AgentType == "" && in.AgentID == "" {
-		return in.TranscriptPath, ""
+		return metrics.TokenSource{Path: in.TranscriptPath}
 	}
-	path = in.AgentTranscriptPath
+	path := in.AgentTranscriptPath
 	if path == "" && in.AgentID != "" && in.TranscriptPath != "" { // versiones que no mandan la ruta
 		path = filepath.Join(strings.TrimSuffix(in.TranscriptPath, filepath.Ext(in.TranscriptPath)), "subagents", "agent-"+in.AgentID+".jsonl")
 	}
-	agent = in.AgentType
+	agent := in.AgentType
 	if agent == "" {
 		agent = "?"
 	}
-	return path, agent
+	return metrics.TokenSource{Path: path, Agent: agent} // T4: Session/Parent (R4)
 }
 
 // ReadUsage devuelve las respuestas nuevas del transcript, con su hora y

@@ -19,7 +19,8 @@ const (
 	Bash  = "bash"
 	Edit  = "edit"
 	Write = "write"
-	Read  = "read" // la registran todas las lecturas (guard --reads); Evaluate la permite
+	Read  = "read"  // la registran todas las lecturas (guard --reads); Evaluate la permite
+	Spawn = "spawn" // lanzamiento de un subagente (Command = prompt, Target = tipo); Evaluate la permite
 )
 
 // Action es lo que el agente quiere hacer.
@@ -30,6 +31,8 @@ type Action struct {
 	Subagent bool   `json:"subagent,omitempty"`
 	Agent    string `json:"agent,omitempty"`   // agent_type del hook; "" en la sesión principal
 	Partial  bool   `json:"partial,omitempty"` // Read con offset o limit; solo la llenan los parsers
+	Session  string `json:"session,omitempty"` // llave de sesión (R4); la llenan los parsers
+	Target   string `json:"target,omitempty"`  // Spawn: tipo de subagente lanzado
 }
 
 // Context es lo que el guard sabe del repo y de la tarea activa.
@@ -243,6 +246,10 @@ func BflowSubcommand(seg string) string {
 	}
 	return strings.ToLower(t[0])
 }
+
+// BflowArgs devuelve los argumentos sin guion tras el subcomando de un segmento
+// bflow (misma lógica de BflowSubcommand); nil si el segmento no es bflow.
+func BflowArgs(seg string) []string { return nil } // T3
 
 // TaskScoped dice si el comando toca algo que bflow maneja por tarea (rama,
 // PR): el guard necesita saber si hay una tarea en curso.
