@@ -85,9 +85,68 @@ func Evaluate(a Action, c Context) Decision {
 // vacíos. Lo usan TaskScoped, bash y review.FromAction.
 func Segments(cmd string) []string { return segments(cmd, 0) }
 
+var heredocRe = regexp.MustCompile(`<<-?\s*(?:'([^']+)'|"([^"]+)"|([A-Za-z_][A-Za-z0-9_]*))`)
+
+// stripHeredocs quita el cuerpo de los heredocs: es texto, no comandos.
+func stripHeredocs(cmd string) string {
+	if !strings.Contains(cmd, "<<") {
+		return cmd
+	}
+	var out []string
+	end := ""
+	for _, line := range strings.Split(cmd, "\n") {
+		if end != "" {
+			if strings.TrimSpace(line) == end {
+				end = ""
+			}
+			continue
+		}
+		out = append(out, line)
+		if m := heredocRe.FindStringSubmatch(line); m != nil {
+			end = m[1] + m[2] + m[3]
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
+// splitCommand parte en &&, ||, ;, | y saltos de línea, pero no dentro de
+// comillas ni en el cuerpo de un heredoc. Si las comillas no cierran, cae al
+// corte simple para no esconder comandos.
+func splitCommand(cmd string) []string {
+	cmd = stripHeredocs(cmd)
+	var out []string
+	var q byte
+	start := 0
+	for i := 0; i < len(cmd); i++ {
+		c := cmd[i]
+		switch {
+		case q != 0:
+			if c == q {
+				q = 0
+			} else if c == '\\' && q == '"' {
+				i++
+			}
+		case c == '"' || c == '\'':
+			q = c
+		case c == '\\':
+			i++
+		case c == ';' || c == '|' || c == '\n' || c == '&' && i+1 < len(cmd) && cmd[i+1] == '&':
+			out = append(out, cmd[start:i])
+			if (c == '|' || c == '&') && i+1 < len(cmd) && cmd[i+1] == c {
+				i++
+			}
+			start = i + 1
+		}
+	}
+	if q != 0 {
+		return segSplit.Split(cmd, -1)
+	}
+	return append(out, cmd[start:])
+}
+
 func segments(cmd string, depth int) []string {
 	var out []string
-	for _, seg := range segSplit.Split(cmd, -1) {
+	for _, seg := range splitCommand(cmd) {
 		s := strings.TrimSpace(seg)
 		if s == "" {
 			continue
