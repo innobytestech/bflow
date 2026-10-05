@@ -177,6 +177,16 @@ func recordReads(c *Ctx, cfg *config.Config, acts []guard.Action, cwd string, re
 	if c.Build == nil || len(acts) == 0 {
 		return
 	}
+	relevant := false
+	for _, a := range acts {
+		if a.Tool == guard.Read || isReviewer(a) {
+			relevant = true
+			break
+		}
+	}
+	if !relevant {
+		return
+	}
 	e, err := c.Build(cfg.Root)
 	if err != nil {
 		return
