@@ -278,7 +278,7 @@ func contract(name string, phases []flow.Phase, b base) string {
 		w.WriteString("- No escribes changelogs ni documentación para otros equipos, aunque las reglas del repo lo pidan: los escribe el documenter, en un solo archivo.\n")
 	}
 	if slices.Contains(phases, flow.Contract) {
-		w.WriteString("- Las pruebas del contrato quedan congeladas al aprobarse: después no se cambian. Si una está mal, reporta NEEDS_DECISION con el cambio exacto; si una persona lo aprueba y corre `bflow freeze --allow <archivo>`, puedes cambiarla una vez.\n")
+		w.WriteString("- Las pruebas del contrato quedan congeladas al aprobarse: después no se cambian. Si una está mal, reporta NEEDS_DECISION con el cambio exacto y una opción que incluya el comando literal `bflow freeze --allow <archivo>` (lo corre una persona, tú no); si una persona lo aprueba y corre `bflow freeze --allow <archivo>`, puedes cambiarla una vez.\n")
 	}
 	if slices.Contains(phases, flow.Implementing) {
 		w.WriteString("- DONE exige `bflow check <id>` en verde sobre tu último commit y todas las tareas de la spec marcadas `[x]`. Mientras iteras, `bflow check <id> --quick <paquete>`. Un paso marcado preexistente no lo arreglas por tu cuenta: reporta NEEDS_DECISION.\n")

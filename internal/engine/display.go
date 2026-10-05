@@ -24,6 +24,11 @@ const maxDisplayLines = 150
 // sesión corría `bflow show` pero no copiaba la salida al chat, y el humano
 // aprobaba sin ver nada: con el texto en `next`, solo tiene que repetirlo.
 func (e *Engine) withDisplay(ctx context.Context, rec store.Record, n output.Next) output.Next {
+	if n.Action == output.ActionSpawn {
+		if files := e.pendingAllow(rec); len(files) > 0 {
+			return holdForAllow(rec.Flow.ID, files)
+		}
+	}
 	if n.Action != output.ActionAsk || len(n.Show) == 0 {
 		return n
 	}
@@ -130,4 +135,37 @@ func shuffleOptions(seed uint64, opts []string) []string {
 	r := rand.New(rand.NewPCG(seed, seed))
 	r.Shuffle(len(out), func(i, j int) { out[i], out[j] = out[j], out[i] })
 	return out
+}
+
+// pendingAllow son los archivos congelados que la decisión elegida pidió dejar
+// cambiar con `freeze --allow` y que una persona todavía no liberó.
+func (e *Engine) pendingAllow(rec store.Record) []string {
+	s := rec.Flow
+	if s.Decision == "" || s.Gate != nil || s.Phase != flow.Implementing {
+		return nil
+	}
+	m := e.readFrozen(s.ID)
+	var out []string
+	for _, f := range flow.AllowFiles(s.Decision) {
+		if h, ok := m[f]; ok && h != allowed {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// holdForAllow retiene el spawn: el guard no deja que un agente corra
+// `freeze --allow`, así que lo corre una persona antes de relanzarlo.
+func holdForAllow(id string, files []string) output.Next {
+	list := strings.Join(files, " ")
+	return output.Next{
+		Action: output.ActionAsk,
+		Gate:   "freeze_allow",
+		Question: "La decisión pide cambiar una prueba congelada. El guard no deja que un agente corra `bflow freeze --allow`: " +
+			"corre tú en tu terminal `bflow freeze --allow <archivo>` para: " + list + ". Luego se relanza al implementer.",
+		Options: []output.Option{
+			{ID: "done", Label: "Ya lo corrí", Command: "bflow status " + id},
+			{ID: "block", Label: "Dejarlo para después", Command: "bflow block " + id + ` --reason "falta bflow freeze --allow ` + files[0] + `"`},
+		},
+	}
 }
