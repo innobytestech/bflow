@@ -96,7 +96,7 @@ func TestMarksAppendPrune(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.WriteString("{no es json\n")
+	_, _ = f.WriteString("{no es json\n")
 	f.Close()
 	if err := AppendMark(path, Mark{TS: now, Session: "s3", ID: "GH-3"}); err != nil {
 		t.Fatal(err)
