@@ -83,8 +83,8 @@ func toAllowDecision(t *testing.T, v *env, id, option string) {
 	m := mustT(t)
 	toDecision(t, v, id)
 	root := v.e.Cfg.Root
-	os.MkdirAll(filepath.Join(root, "internal"), 0o755)
-	os.WriteFile(filepath.Join(root, "internal", "a_test.go"), []byte("package a\n"), 0o644)
+	_ = os.MkdirAll(filepath.Join(root, "internal"), 0o755)
+	_ = os.WriteFile(filepath.Join(root, "internal", "a_test.go"), []byte("package a\n"), 0o644)
 	_ = v.e.writeFrozen(id, []string{"internal/a_test.go"})
 	_, err := v.e.Store.Update(id, func(r *store.Record, _ bool) error {
 		r.Flow.Gate.Options = []string{option, "B"}
