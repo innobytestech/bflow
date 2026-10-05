@@ -390,6 +390,10 @@ func TestHeredocExecutedByShell(t *testing.T) {
 		{"bash -s <<EOF\ngit push --force origin x\nEOF", "force_push"},
 		{"cat <<EOF | tee n.md\ngit add -f .bflow/x\nEOF", ""},
 		{"python - <<EOF\ngit add -f .bflow/x\nEOF", ""},
+		{"cat <<< \"x\"\ngit add -f .bflow/x", "bflow_tracked"},
+		{"echo $((1 << 2))\ngit add -f .bflow/x", "bflow_tracked"},
+		{"echo \"$(git add -f .bflow/x)\"", "bflow_tracked"},
+		{"echo \"`git add -f .bflow/x`\"", "bflow_tracked"},
 	}
 	for _, c := range cases {
 		d := Evaluate(Action{Tool: Bash, Command: c.cmd, Subagent: true, Agent: "implementer"}, active)

@@ -85,7 +85,7 @@ func Evaluate(a Action, c Context) Decision {
 // vacíos. Lo usan TaskScoped, bash y review.FromAction.
 func Segments(cmd string) []string { return segments(cmd, 0) }
 
-var heredocRe = regexp.MustCompile(`<<-?\s*(?:'([^']+)'|"([^"]+)"|([A-Za-z_][A-Za-z0-9_]*))`)
+var heredocRe = regexp.MustCompile(`(?:^|[^<])<<-?\s*(?:'([^']+)'|"([^"]+)"|([A-Za-z_][A-Za-z0-9_]*))`)
 
 var shellNames = map[string]bool{"bash": true, "sh": true, "zsh": true, "dash": true, "ksh": true}
 
@@ -138,12 +138,13 @@ func stripHeredocs(cmd string) string {
 }
 
 // splitCommand parte en &&, ||, ;, | y saltos de línea, pero no dentro de
-// comillas ni en el cuerpo de un heredoc. Si las comillas no cierran, cae al
+// comillas ni en el cuerpo de un heredoc. Si las comillas no cierran o hay sustitución ($(...), `) entre comillas dobles, cae al
 // corte simple para no esconder comandos.
 func splitCommand(cmd string) []string {
 	cmd = stripHeredocs(cmd)
 	var out []string
 	var q byte
+	subst := false
 	start := 0
 	for i := 0; i < len(cmd); i++ {
 		c := cmd[i]
@@ -153,6 +154,8 @@ func splitCommand(cmd string) []string {
 				q = 0
 			} else if c == '\\' && q == '"' {
 				i++
+			} else if q == '"' && (c == '`' || c == '$' && i+1 < len(cmd) && cmd[i+1] == '(') {
+				subst = true
 			}
 		case c == '"' || c == '\'':
 			q = c
@@ -166,7 +169,10 @@ func splitCommand(cmd string) []string {
 			start = i + 1
 		}
 	}
-	if q != 0 {
+	if subst {
+		cmd = strings.NewReplacer("$(", ";", "`", ";", ")", ";").Replace(cmd)
+	}
+	if q != 0 || subst {
 		return segSplit.Split(cmd, -1)
 	}
 	return append(out, cmd[start:])
