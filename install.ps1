@@ -53,7 +53,9 @@ try {
     $sums = (Invoke-WebRequest $sumsUrl -UseBasicParsing).Content
     if ($sums -is [byte[]]) { $sums = [Text.Encoding]::UTF8.GetString($sums) }
     $want = ($sums -split "`n" | Where-Object { $_ -match "\s$([regex]::Escape($asset))\s*$" } | ForEach-Object { ($_ -split '\s+')[0] }) | Select-Object -First 1
-    $got = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    $fs = [System.IO.File]::OpenRead($zip)
+    try { $got = ([BitConverter]::ToString($sha.ComputeHash($fs)) -replace '-', '').ToLower() } finally { $fs.Dispose(); $sha.Dispose() }
     if (-not $want -or $got -ne $want.ToLower()) { throw "bflow: $asset no coincide con checksums.txt; no se instala" }
 
     Expand-Archive $zip -DestinationPath (Join-Path $tmp 'x') -Force
