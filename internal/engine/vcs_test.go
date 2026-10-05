@@ -22,6 +22,7 @@ type fakeGit struct {
 	dirty  []string
 	calls  []string
 	diff   []string // DiffNames
+	kept   []string // DiffKept
 	lines  int      // DiffLines
 	binary []string // DiffBinaries
 }
@@ -32,8 +33,11 @@ func (g *fakeGit) EnsureBranch(_ context.Context, name, base string) (string, er
 	g.branch = name
 	return "created", nil
 }
-func (g *fakeGit) Dirty(context.Context, []string) ([]string, error)      { return g.dirty, nil }
-func (g *fakeGit) HeadSHA(context.Context) (string, error)                { return "abc", nil }
+func (g *fakeGit) Dirty(context.Context, []string) ([]string, error) { return g.dirty, nil }
+func (g *fakeGit) HeadSHA(context.Context) (string, error)           { return "abc", nil }
+func (g *fakeGit) DiffKept(context.Context, string, []string) ([]string, error) {
+	return g.kept, nil
+}
 func (g *fakeGit) DiffNames(context.Context, string) ([]string, error)    { return g.diff, nil }
 func (g *fakeGit) DiffLines(context.Context, string) (int, error)         { return g.lines, nil }
 func (g *fakeGit) DiffBinaries(context.Context, string) ([]string, error) { return g.binary, nil }
@@ -556,5 +560,46 @@ func TestPanelIssueClosedWithoutMergeKeepsClosedOutside(t *testing.T) {
 	}
 	if len(v.tr.Calls) != 0 {
 		t.Errorf("no se escribe en el tracker: %v", v.tr.Calls)
+	}
+}
+
+func TestDoneRejectsBflowInDiff(t *testing.T) {
+	v := newEnv(t, "vcs: { base_branch: dev }\n")
+	g := &fakeGit{branch: "dev", kept: []string{".bflow/tasks/X/walkthrough.md"}}
+	v.e.Git = g
+	ctx := context.Background()
+	id := v.task(t, "Demo")
+	mustT(t)(v.e.Start(ctx, id, flow.Hotfix, "", ""))
+	_, err := v.e.Report(ctx, id, ReportOpts{Agent: "implementer", Verdict: flow.DoneV})
+	var rj *flow.Rejection
+	if !errors.As(err, &rj) || rj.Code != "bflow_in_diff" || !strings.Contains(rj.Reason, ".bflow/tasks/X/walkthrough.md") || !strings.Contains(rj.Reason, "git rm -r --cached") {
+		t.Fatalf("DONE con .bflow/ en el diff: %v", err)
+	}
+}
+
+func TestBflowInDiffIgnoresDeleted(t *testing.T) {
+	v := newEnv(t, "vcs: { base_branch: dev }\n")
+	g := &fakeGit{branch: "dev", diff: []string{".bflow/tasks/GH-50/walkthrough.md"}} // solo borrados: DiffKept vacío
+	v.e.Git = g
+	ctx := context.Background()
+	id := v.task(t, "Demo")
+	mustT(t)(v.e.Start(ctx, id, flow.Hotfix, "", ""))
+	mustT(t)(v.e.Report(ctx, id, ReportOpts{Agent: "implementer", Verdict: flow.DoneV}))
+}
+
+func TestOpenPRRejectsBflowInDiff(t *testing.T) {
+	v := newEnv(t, "vcs: { base_branch: dev }\n")
+	g, h := &fakeGit{branch: "dev"}, newHost()
+	v.e.Git, v.e.Host = g, h
+	id := v.task(t, "Demo")
+	toWalkthrough(t, v, id)
+	g.kept = []string{".bflow/tasks/X/reports/impl.md"}
+	_, err := v.e.Approve(context.Background(), id, ApproveOpts{})
+	var rj *flow.Rejection
+	if !errors.As(err, &rj) || rj.Code != "bflow_in_diff" {
+		t.Fatalf("aprobar con .bflow/ en el diff: %v", err)
+	}
+	if strings.Contains(strings.Join(g.calls, ";"), "push") || h.opened != 0 {
+		t.Errorf("no debe haber push ni PR: %v opened=%d", g.calls, h.opened)
 	}
 }

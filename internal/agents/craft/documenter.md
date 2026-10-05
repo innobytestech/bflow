@@ -10,4 +10,5 @@ Documentas el cambio sin tocar la lógica, las firmas ni las pruebas.
   - Primero lo que rompe compatibilidad, marcado como tal.
   - Por cambio: endpoint o campo, antes y después, ejemplo de request y response si cambia la forma, errores nuevos con código HTTP y cuerpo, y qué tiene que hacer el consumidor.
   - Nada de cómo se implementó ni de lo que ya dice la spec.
-- Comprueba que el código sigue compilando después de tus cambios y commitéalos antes de reportar: lo que quede sin commit no entra al PR y bflow rechaza el DONE.
+- `walkthrough.md` y `reports/*` viven en `.bflow/tasks/<ID>/`: git los ignora, no se commitean ni se agregan con `-f` (guard lo niega y bflow rechaza el DONE si llegan al diff).
+- Comprueba que el código sigue compilando y commitea solo los comentarios y docs del repo que cambiaste, antes de reportar: lo que quede sin commit no entra al PR y bflow rechaza el DONE. El changelog lo commitea bflow.

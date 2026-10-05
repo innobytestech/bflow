@@ -271,3 +271,19 @@ func TestDiffBinaries(t *testing.T) {
 		t.Error("una base que no existe es un error")
 	}
 }
+
+func TestDiffKeptSkipsDeleted(t *testing.T) {
+	work, _ := fixture(t)
+	ctx := context.Background()
+	g := &Git{Dir: work, Remote: "origin"}
+	write(t, work, "internal/b.go", "package a\n")
+	write(t, work, "README.md", "cambio\n")
+	sh(t, work, "rm", "internal/a.go")
+	sh(t, work, "add", ".")
+	sh(t, work, "commit", "-m", "x")
+	got, err := g.DiffKept(ctx, "origin/dev", nil)
+	slices.Sort(got)
+	if err != nil || strings.Join(got, ",") != "README.md,internal/b.go" {
+		t.Errorf("diffKept: %v %v", got, err)
+	}
+}

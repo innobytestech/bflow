@@ -155,6 +155,11 @@ func (g *Git) DiffNames(ctx context.Context, base string) ([]string, error) {
 	return lines(out), err
 }
 
+func (g *Git) DiffKept(ctx context.Context, base string, paths []string) ([]string, error) {
+	out, err := g.run(ctx, append([]string{"diff", "--name-only", "--diff-filter=d", base + "...HEAD", "--"}, paths...)...)
+	return lines(out), err
+}
+
 func (g *Git) Push(ctx context.Context, branch string) error {
 	if slices.Contains(g.Protected, branch) {
 		return fmt.Errorf("%s es una rama protegida: bflow no empuja a ella", branch)

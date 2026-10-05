@@ -117,6 +117,9 @@ func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug s
 			if files := e.uncommitted(ctx, rec.Flow); len(files) > 0 {
 				return uncommittedRejection(files, "reporta DONE otra vez")
 			}
+			if files := e.bflowInDiff(ctx); len(files) > 0 {
+				return bflowInDiffRejection(files, "reporta DONE otra vez")
+			}
 			if rej := e.docsPending(ctx, id); rej != nil {
 				return rej
 			}
@@ -139,6 +142,9 @@ func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug s
 			}
 			if files := e.uncommitted(ctx, rec.Flow); len(files) > 0 {
 				return uncommittedRejection(files, "reporta DONE otra vez")
+			}
+			if files := e.bflowInDiff(ctx); len(files) > 0 {
+				return bflowInDiffRejection(files, "reporta DONE otra vez")
 			}
 			ev.CheckOK = true
 		}
