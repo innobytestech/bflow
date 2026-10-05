@@ -1,16 +1,39 @@
 # Por qué existe bflow y hacia dónde va
 
-Soy Alfonso, de [Innobytes](https://innobytes.tech). Hice bflow porque el proceso con agentes de IA que usábamos en nuestros repos dependía de que el modelo se acordara de él.
+Soy Alfonso, de [Innobytes](https://innobytes.tech). Hice bflow para mi equipo y para el lugar donde trabajo, y ahora quiero que otros lo prueben.
 
-## El problema
+## Mi historia
 
-Trabajar con agentes de IA en proyectos reales suele terminar en un *harness*: prompts, subagentes y scripts que describen el proceso ("primero pregunta, luego escribe la spec, no edites pruebas, pide revisión…"). Yo tuve uno en dos repos reales, uno de backend y otro de frontend. Los problemas eran siempre los mismos:
+Trabajo con IA desde hace casi un año, y con un *harness* (prompts, subagentes y scripts que guían al agente) para resolver features desde hace 6 o 7 meses. Sé que la IA mejora cada vez más. No quiero inventar nada ni meterme con los modelos: quiero guiarlos para que resuelvan features con spec driven development (SDD).
+
+Empecé con un harness por proyecto. Uno de ellos lo usaba mucho y lo modificaba todo el tiempo, y los de los demás proyectos se quedaban desactualizados. Cada vez que volvía a otro proyecto tenía que actualizar su harness a mano, y eso me quitaba tiempo. Además:
+
+- Las features tardaban mucho en resolverse.
+- Había alucinaciones.
+- Los agentes a veces no seguían el harness al pie de la letra.
+- Se generaba mucha documentación redundante.
+
+No probé otras herramientas. Vi videos de gente que armaba su propio harness para guiar agentes, basados en Kiro o Spec Kit, pero nunca los instalé ni los investigué a fondo. Lo que hice fue ordenar a mi manera lo que ya me funcionaba.
+
+## Para qué lo hice
+
+- Gastar menos tokens, y que el contexto de cada feature pase de un agente a otro sin releer conversaciones completas.
+- Seguir un proceso de desarrollo.
+- Hacer más ameno el desarrollo ahora que el dev ya no programa tanto.
+- Guiar a los agentes por buen camino con spec driven development.
+- Que todos los devs del equipo resuelvan una feature de la misma manera, aunque la IA no sea determinista.
+
+Quiero que otros lo prueben y, si les sirve, sigan esta metodología: SDD a mi manera, sin inventar nada nuevo, con trackers para dar seguimiento a las tareas. También quiero mostrar cómo trabajo y que son trabajos de calidad.
+
+## Lo que medí
+
+Estos datos salen del harness que tenía en dos repos reales, uno de backend y otro de frontend:
 
 - **Las reglas vivían en prosa.** "OBLIGATORIO", "NUNCA", "no saltes la compuerta". El modelo las respetaba casi siempre, y justo ese "casi" es donde se cuelan los errores caros.
 - **El modelo movía el estado a mano.** Cambiaba estados en el tracker, creaba ramas y armaba URLs de PR, cada vez a su manera. En un repo el flujo estaba validado por scripts; en el otro, no.
 - **Gastaba tokens en trabajo mecánico.** Leer el tracker, releer bitácoras, interpretar la salida de 4 comandos de pruebas, mantener archivos de estado. En uno de los repos, unos 7.000 tokens fijos por sesión antes de hacer nada útil.
 - **Llenaba el repo de estado de trabajo.** Entre el 73% y el 80% de los archivos del harness versionados eran bitácoras, reportes y estado, no especificaciones.
-- **Cada repo tenía su copia.** Mantenerlas sincronizadas era tedioso y se desviaban: estados distintos, prefijos de rama distintos, reglas que un repo tenía y el otro no.
+- **Cada repo tenía su copia.** Se desviaban: estados distintos, prefijos de rama distintos, reglas que un repo tenía y el otro no.
 
 ## La meta
 

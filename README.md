@@ -8,7 +8,7 @@
 
 ## Por qué existe
 
-Un harness de prompts y scripts en dos repos reales (backend y frontend) tenía siempre los mismos problemas: reglas en prosa que el modelo respetaba "casi" siempre, estado movido a mano por el modelo, unos 7.000 tokens fijos por sesión en trabajo mecánico, entre 73% y 80% del harness versionado era estado y no especificaciones, y cada repo tenía su copia, que se desviaba.
+Tenía un harness por proyecto y se desactualizaban entre sí; además, las features tardaban, había alucinaciones, los agentes no siempre seguían el harness y se generaba documentación redundante. En los dos repos que medí, el harness gastaba unos 7.000 tokens fijos por sesión y entre 73% y 80% de lo versionado era estado, no especificaciones. Hice bflow para mi equipo en Innobytes: gastar menos tokens y que todos resuelvan una feature igual con spec driven development, aunque la IA no sea determinista.
 
 Byteflow separa lo que **requiere criterio** (entender el problema, diseñar, programar, revisar), que hace el agente, de lo que es **determinista** (estado, transiciones, git, tracker, pruebas, reglas), que hace el CLI. El agente no tiene que recordar el proceso: pregunta a `bflow` qué sigue y lo hace. La historia completa y el rumbo: [Por qué y rumbo](docs/por-que-y-rumbo.md).
 
