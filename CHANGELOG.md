@@ -4,6 +4,10 @@ Los cambios de bflow que ve quien lo usa. Las versiones siguen [semver](https://
 
 ## v0.1.0
 
+### Documentación
+
+- Documentación completa para quien prueba la rc.9: README corto como entrada, y en `docs/` la motivación y rumbo, instalación, conceptos, configuración, referencia de comandos, guía de día a día, cómo probar y reportar issues, y problemas conocidos.
+
 ### Agregado
 
 - **Tokens de la sesión principal repartidos por marcas.** El guard marca la sesión que conduce una tarea (también en subagentes) y `stats` y `watch` reparten los tokens por esas marcas; lo que no cae en ninguna tarea se muestra como «sin tarea». Hace falta correr `bflow install claude` de nuevo para que el matcher de los hooks sea `Task|Agent`.
