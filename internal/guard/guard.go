@@ -19,7 +19,7 @@ const (
 	Bash  = "bash"
 	Edit  = "edit"
 	Write = "write"
-	Read  = "read" // solo la registra el reviewer (guard --reads); Evaluate la permite
+	Read  = "read" // la registran todas las lecturas (guard --reads); Evaluate la permite
 )
 
 // Action es lo que el agente quiere hacer.
@@ -28,7 +28,8 @@ type Action struct {
 	Command  string `json:"command,omitempty"`
 	Path     string `json:"path,omitempty"`
 	Subagent bool   `json:"subagent,omitempty"`
-	Agent    string `json:"agent,omitempty"` // agent_type del hook; "" en la sesión principal
+	Agent    string `json:"agent,omitempty"`   // agent_type del hook; "" en la sesión principal
+	Partial  bool   `json:"partial,omitempty"` // Read con offset o limit; solo la llenan los parsers
 }
 
 // Context es lo que el guard sabe del repo y de la tarea activa.

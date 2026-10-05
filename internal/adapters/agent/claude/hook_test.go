@@ -47,7 +47,7 @@ func TestParsePreToolUseAgent(t *testing.T) {
 // R1: Read llega al guard como acción propia, con el agente que la hizo.
 func TestParsePreToolUseRead(t *testing.T) {
 	a, cwd, ok := ParsePreToolUse([]byte(`{"hook_event_name":"PreToolUse","cwd":"C:\\repo","tool_name":"Read","tool_input":{"file_path":"C:\\repo\\internal\\a.go","offset":10,"limit":50},"agent_type":"bflow-reviewer","agent_id":"abc"}`))
-	want := guard.Action{Tool: guard.Read, Path: `C:\repo\internal\a.go`, Subagent: true, Agent: "bflow-reviewer"}
+	want := guard.Action{Tool: guard.Read, Path: `C:\repo\internal\a.go`, Subagent: true, Agent: "bflow-reviewer", Partial: true}
 	if !ok || a != want || cwd != `C:\repo` {
 		t.Errorf("reviewer: %+v cwd=%q ok=%v, quiero %+v", a, cwd, ok, want)
 	}
@@ -57,5 +57,26 @@ func TestParsePreToolUseRead(t *testing.T) {
 	}
 	if d := guard.Evaluate(a, guard.Context{}); !d.Allow {
 		t.Errorf("el guard permite Read: %+v", d)
+	}
+}
+
+// R7: offset o limit con valor distinto de null marcan la lectura como parcial.
+func TestParseReadPartial(t *testing.T) {
+	cases := []struct {
+		input string
+		want  bool
+	}{
+		{`{"file_path":"x.go","offset":10}`, true},
+		{`{"file_path":"x.go","limit":50}`, true},
+		{`{"file_path":"x.go","offset":10,"limit":50}`, true},
+		{`{"file_path":"x.go","offset":0}`, true},
+		{`{"file_path":"x.go","offset":null,"limit":null}`, false},
+		{`{"file_path":"x.go"}`, false},
+	}
+	for _, c := range cases {
+		a, _, ok := ParsePreToolUse([]byte(`{"tool_name":"Read","tool_input":` + c.input + `}`))
+		if !ok || a.Tool != guard.Read || a.Path != "x.go" || a.Partial != c.want {
+			t.Errorf("%s: %+v ok=%v, Partial debe ser %v", c.input, a, ok, c.want)
+		}
 	}
 }

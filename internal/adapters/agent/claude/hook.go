@@ -3,6 +3,7 @@
 package claude
 
 import (
+	"bytes"
 	"encoding/json"
 
 	"innobytes.tech/bflow/internal/guard"
@@ -14,10 +15,18 @@ type hookInput struct {
 	AgentType string `json:"agent_type"`
 	AgentID   string `json:"agent_id"`
 	ToolInput struct {
-		Command      string `json:"command"`
-		FilePath     string `json:"file_path"`
-		NotebookPath string `json:"notebook_path"`
+		Command      string          `json:"command"`
+		FilePath     string          `json:"file_path"`
+		NotebookPath string          `json:"notebook_path"`
+		Offset       json.RawMessage `json:"offset"`
+		Limit        json.RawMessage `json:"limit"`
 	} `json:"tool_input"`
+}
+
+// present dice si un valor JSON existe y no es null.
+func present(m json.RawMessage) bool {
+	t := bytes.TrimSpace(m)
+	return len(t) > 0 && !bytes.Equal(t, []byte("null"))
 }
 
 // ParsePreToolUse traduce el JSON de un hook PreToolUse. ok es false si la
@@ -35,7 +44,8 @@ func ParsePreToolUse(raw []byte) (a guard.Action, cwd string, ok bool) {
 	case "Edit", "MultiEdit":
 		a = guard.Action{Tool: guard.Edit, Path: in.ToolInput.FilePath, Subagent: sub, Agent: in.AgentType}
 	case "Read":
-		a = guard.Action{Tool: guard.Read, Path: in.ToolInput.FilePath, Subagent: sub, Agent: in.AgentType}
+		a = guard.Action{Tool: guard.Read, Path: in.ToolInput.FilePath, Subagent: sub, Agent: in.AgentType,
+			Partial: present(in.ToolInput.Offset) || present(in.ToolInput.Limit)}
 	case "Write":
 		a = guard.Action{Tool: guard.Write, Path: in.ToolInput.FilePath, Subagent: sub, Agent: in.AgentType}
 	case "NotebookEdit":

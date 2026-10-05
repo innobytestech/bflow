@@ -1,6 +1,7 @@
 package opencode
 
 import (
+	"bytes"
 	"encoding/json"
 	"path/filepath"
 	"strings"
@@ -26,9 +27,11 @@ func (Agent) ParseActions(raw []byte) ([]guard.Action, string, bool) {
 		return nil, "", false
 	}
 	var args struct {
-		Command   string `json:"command"`
-		FilePath  string `json:"filePath"`
-		PatchText string `json:"patchText"`
+		Command   string          `json:"command"`
+		FilePath  string          `json:"filePath"`
+		PatchText string          `json:"patchText"`
+		Offset    json.RawMessage `json:"offset"`
+		Limit     json.RawMessage `json:"limit"`
 	}
 	_ = json.Unmarshal(in.Args, &args)
 	mk := func(tool, path string) guard.Action {
@@ -50,7 +53,9 @@ func (Agent) ParseActions(raw []byte) ([]guard.Action, string, bool) {
 	case "edit", "multiedit":
 		acts = append(acts, mk(guard.Edit, args.FilePath))
 	case "read":
-		acts = append(acts, mk(guard.Read, args.FilePath))
+		a := mk(guard.Read, args.FilePath)
+		a.Partial = present(args.Offset) || present(args.Limit)
+		acts = append(acts, a)
 	case "write":
 		acts = append(acts, mk(guard.Write, args.FilePath))
 	case "patch", "apply_patch":
@@ -82,4 +87,10 @@ func patchPaths(text string) (writes, edits []string) {
 		}
 	}
 	return writes, edits
+}
+
+// present dice si un valor JSON existe y no es null.
+func present(m json.RawMessage) bool {
+	t := bytes.TrimSpace(m)
+	return len(t) > 0 && !bytes.Equal(t, []byte("null"))
 }

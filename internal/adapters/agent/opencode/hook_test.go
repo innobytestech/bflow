@@ -173,3 +173,23 @@ func TestParseActionsRead(t *testing.T) {
 		t.Errorf("ruta absoluta de la sesión principal: %+v", acts)
 	}
 }
+
+// R7: offset o limit con valor distinto de null marcan la lectura como parcial.
+func TestParseActionsReadPartial(t *testing.T) {
+	cases := []struct {
+		args map[string]any
+		want bool
+	}{
+		{map[string]any{"filePath": "x.go", "offset": 10}, true},
+		{map[string]any{"filePath": "x.go", "limit": 50}, true},
+		{map[string]any{"filePath": "x.go", "offset": 5, "limit": 50}, true},
+		{map[string]any{"filePath": "x.go", "offset": nil, "limit": nil}, false},
+		{map[string]any{"filePath": "x.go"}, false},
+	}
+	for _, c := range cases {
+		acts, _, ok := Agent{}.ParseActions(input(t, "read", c.args, nil))
+		if !ok || len(acts) != 1 || acts[0].Tool != guard.Read || acts[0].Path != "x.go" || acts[0].Partial != c.want {
+			t.Errorf("%v: %+v ok=%v, Partial debe ser %v", c.args, acts, ok, c.want)
+		}
+	}
+}

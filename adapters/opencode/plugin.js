@@ -28,8 +28,8 @@ export const BflowPlugin = async ({ client, directory }) => {
     }
     return sessions.get(id) ?? {}
   }
-  const run = (args, input) => {
-    const proc = Bun.spawn(["bflow", ...args], { cwd: directory, stdin: "pipe", stdout: "ignore", stderr: "pipe" })
+  const run = (args, input, wait = true) => { // wait=false: no se lee stderr ni se espera al proceso
+    const proc = Bun.spawn(["bflow", ...args], { cwd: directory, stdin: "pipe", stdout: "ignore", stderr: wait ? "pipe" : "ignore" })
     proc.stdin.write(JSON.stringify(input))
     proc.stdin.end()
     return proc
@@ -83,9 +83,10 @@ export const BflowPlugin = async ({ client, directory }) => {
       try {
         const s = await resolve(input.sessionID)
         const sub = Boolean(s.parentID)
-        if (input.tool === "read" && !(sub && s.agent === "bflow-reviewer")) return // solo se mide al reviewer
-        const proc = run(["guard", "--tool", "opencode", "--reads"], { tool: input.tool, args: output.args, sessionID: input.sessionID,
-          agent: sub ? s.agent ?? "" : "", subagent: sub, cwd: directory })
+        const body = { tool: input.tool, args: output.args, sessionID: input.sessionID, agent: sub ? s.agent ?? "" : "", subagent: sub, cwd: directory }
+        if (input.tool === "read" && !(sub && s.agent === "bflow-reviewer")) { // el read ajeno solo se registra
+          run(["guard", "--tool", "opencode", "--reads"], body, false); return }
+        const proc = run(["guard", "--tool", "opencode", "--reads"], body)
         timer = setTimeout(() => proc.kill(), 10000)
         err = await new Response(proc.stderr).text()
         code = await proc.exited
