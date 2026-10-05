@@ -383,6 +383,13 @@ La validación junta todos los problemas en un solo mensaje, indica la línea de
 
 `bflow help` lista todo; cualquier comando acepta `--json`.
 
+### stats: tiempos, tokens y lecturas
+
+`stats [ID]` muestra tiempo por fase (agente, humano, bloqueada), iteraciones y tokens. Sin ID, lista todas las tareas con una línea cada una.
+
+- `--calls`: con ID, añade una tabla de llamadas al modelo por corrida (agente o sesión principal), con contexto nuevo y caché reutilizada en cada llamada. Útil para ver dónde se repite contexto o si el prefijo varía entre corridas.
+- `--reads`: con ID, muestra qué archivos se leyeron y cuántas veces, cuántos agentes distintos los tocaron, y qué % de las lecturas fueron relecturas (mismo archivo, diferentes agentes). Responde si construir un índice de contexto vale la pena; sin `reads-all.jsonl`, avisa "sin registro de lecturas".
+
 ## Estado y hoja de ruta
 
 El MVP cubre el módulo 1 (motor de flujo) y adelanta las guardas y las métricas:
