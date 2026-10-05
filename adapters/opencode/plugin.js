@@ -4,7 +4,7 @@
 import { appendFileSync, existsSync, mkdirSync } from "node:fs"
 import { join } from "node:path"
 
-const GUARDED = new Set(["bash", "edit", "write", "multiedit", "patch", "apply_patch", "read"])
+const GUARDED = new Set(["bash", "edit", "write", "multiedit", "patch", "apply_patch", "read", "task"])
 const safe = (id) => String(id ?? "").replace(/[^A-Za-z0-9_-]/g, "")
 
 export const BflowPlugin = async ({ client, directory }) => {
@@ -84,7 +84,7 @@ export const BflowPlugin = async ({ client, directory }) => {
         const s = await resolve(input.sessionID)
         const sub = Boolean(s.parentID)
         const body = { tool: input.tool, args: output.args, sessionID: input.sessionID, agent: sub ? s.agent ?? "" : "", subagent: sub, cwd: directory }
-        if (input.tool === "read" && !(sub && s.agent === "bflow-reviewer")) { // el read ajeno solo se registra
+        if (input.tool === "task" || (input.tool === "read" && !(sub && s.agent === "bflow-reviewer"))) { // task y el read ajeno solo se registran
           run(["guard", "--tool", "opencode", "--reads"], body, false); return }
         const proc = run(["guard", "--tool", "opencode", "--reads"], body)
         timer = setTimeout(() => proc.kill(), 10000)

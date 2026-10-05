@@ -33,10 +33,11 @@ func (Agent) TokenSource(raw []byte) metrics.TokenSource {
 		AgentTranscriptPath string `json:"agent_transcript_path"`
 		AgentType           string `json:"agent_type"`
 		AgentID             string `json:"agent_id"`
+		SessionID           string `json:"session_id"`
 	}
 	_ = json.Unmarshal(raw, &in)
 	if in.AgentType == "" && in.AgentID == "" {
-		return metrics.TokenSource{Path: in.TranscriptPath}
+		return metrics.TokenSource{Path: in.TranscriptPath, Session: in.SessionID}
 	}
 	path := in.AgentTranscriptPath
 	if path == "" && in.AgentID != "" && in.TranscriptPath != "" { // versiones que no mandan la ruta
@@ -46,7 +47,7 @@ func (Agent) TokenSource(raw []byte) metrics.TokenSource {
 	if agent == "" {
 		agent = "?"
 	}
-	return metrics.TokenSource{Path: path, Agent: agent} // T4: Session/Parent (R4)
+	return metrics.TokenSource{Path: path, Agent: agent, Session: in.SessionID + ":" + in.AgentID, Parent: in.SessionID}
 }
 
 // ReadUsage devuelve las respuestas nuevas del transcript, con su hora y

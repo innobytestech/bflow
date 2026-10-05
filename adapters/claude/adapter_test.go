@@ -144,7 +144,7 @@ func TestSettingsGuardSeesRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	pre := s.Hooks["PreToolUse"]
-	if len(pre) != 1 || pre[0].Matcher != "Bash|Edit|Write|MultiEdit|NotebookEdit|Read" {
+	if len(pre) != 1 || pre[0].Matcher != "Bash|Edit|Write|MultiEdit|NotebookEdit|Read|Task|Agent" {
 		t.Fatalf("matcher de PreToolUse: %+v", pre)
 	}
 	if len(pre[0].Hooks) != 1 || pre[0].Hooks[0].Command != "bflow guard --reads" {

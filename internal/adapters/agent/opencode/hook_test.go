@@ -90,7 +90,7 @@ func TestParseActionsRutaRelativa(t *testing.T) {
 }
 
 func TestParseActionsHerramientaIgnorada(t *testing.T) {
-	for _, tool := range []string{"grep", "glob", "task", "webfetch", "inventada"} {
+	for _, tool := range []string{"grep", "glob", "webfetch", "inventada"} {
 		acts, _, ok := Agent{}.ParseActions(input(t, tool, map[string]any{"filePath": "a.go", "command": "git reset --hard"}, nil))
 		if !ok || len(acts) != 0 {
 			t.Errorf("%s no le importa al guard: ok=%v acts=%+v", tool, ok, acts)
@@ -149,11 +149,17 @@ func TestParseActionsCaptura(t *testing.T) {
 	if e := got["edit"]; len(e) != 1 || e[0].Tool != guard.Edit || e[0].Path != filepath.Join(cwd, "a.txt") {
 		t.Errorf("edit: %+v", e)
 	}
-	if n := len(got["task"]); n != 0 {
-		t.Errorf("task no genera acciones: %d", n)
+	for _, a := range got["task"] {
+		if a.Tool != guard.Spawn {
+			t.Errorf("task es un lanzamiento: %+v", a)
+		}
 	}
-	want := []guard.Action{{Tool: guard.Write, Path: filepath.Join(cwd, "b.txt")}, {Tool: guard.Edit, Path: filepath.Join(cwd, "a.txt")}}
-	if p := got["apply_patch"]; !reflect.DeepEqual(p, want) {
+	var ses string
+	if p := got["apply_patch"]; len(p) > 0 {
+		ses = p[0].Session
+	}
+	want := []guard.Action{{Tool: guard.Write, Path: filepath.Join(cwd, "b.txt"), Session: ses}, {Tool: guard.Edit, Path: filepath.Join(cwd, "a.txt"), Session: ses}}
+	if p := got["apply_patch"]; ses == "" || !reflect.DeepEqual(p, want) {
 		t.Errorf("apply_patch: %+v, want %+v", p, want)
 	}
 }

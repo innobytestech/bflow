@@ -11,7 +11,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|Read",
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|Read|Task|Agent",
         "hooks": [{ "type": "command", "command": "bflow guard --reads", "timeout": 10 }]
       }
     ],

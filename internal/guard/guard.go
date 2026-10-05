@@ -208,9 +208,35 @@ var HumanOnly = []string{"approve", "reject", "unblock", "start", "new", "drop"}
 // ("approve" en `./bin/bflow.exe --json approve X`), o "" si el segmento no
 // invoca a bflow.
 func BflowSubcommand(seg string) string {
+	t, ok := bflowTokens(seg)
+	if !ok || len(t) == 0 {
+		return ""
+	}
+	return strings.ToLower(t[0])
+}
+
+// BflowArgs devuelve los argumentos sin guion tras el subcomando de un segmento
+// bflow (misma lógica de BflowSubcommand); nil si el segmento no es bflow.
+func BflowArgs(seg string) []string {
+	t, ok := bflowTokens(seg)
+	if !ok || len(t) < 2 {
+		return nil
+	}
+	var out []string
+	for _, w := range t[1:] {
+		if !strings.HasPrefix(w, "-") {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
+// bflowTokens devuelve los tokens de un segmento bflow desde el subcomando
+// (sin los flags previos a él); ok=false si el segmento no invoca a bflow.
+func bflowTokens(seg string) ([]string, bool) {
 	t := skipPrefix(strings.Fields(seg))
 	if len(t) == 0 {
-		return ""
+		return nil, false
 	}
 	parts := func(w string) []string {
 		return strings.Split(strings.ReplaceAll(w, `\`, "/"), "/")
@@ -228,28 +254,21 @@ func BflowSubcommand(seg string) string {
 			t = t[1:]
 		}
 		if len(t) == 0 {
-			return ""
+			return nil, false
 		}
 		ps := parts(strings.TrimRight(strings.ReplaceAll(t[0], `\`, "/"), "/"))
 		if len(ps) < 2 || ps[len(ps)-1] != "bflow" || ps[len(ps)-2] != "cmd" {
-			return ""
+			return nil, false
 		}
 		t = t[1:]
 	default:
-		return ""
+		return nil, false
 	}
 	for len(t) > 0 && strings.HasPrefix(t[0], "-") {
 		t = t[1:]
 	}
-	if len(t) == 0 {
-		return ""
-	}
-	return strings.ToLower(t[0])
+	return t, true
 }
-
-// BflowArgs devuelve los argumentos sin guion tras el subcomando de un segmento
-// bflow (misma lógica de BflowSubcommand); nil si el segmento no es bflow.
-func BflowArgs(seg string) []string { return nil } // T3
 
 // TaskScoped dice si el comando toca algo que bflow maneja por tarea (rama,
 // PR): el guard necesita saber si hay una tarea en curso.
