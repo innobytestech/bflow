@@ -80,3 +80,30 @@ func TestParseReadPartial(t *testing.T) {
 		}
 	}
 }
+
+func TestParsePreToolUseSession(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{`{"session_id":"s1","tool_name":"Bash","tool_input":{"command":"ls"}}`, "s1"},
+		{`{"session_id":"s1","agent_id":"a7","agent_type":"bflow-implementer","tool_name":"Bash","tool_input":{"command":"ls"}}`, "s1:a7"},
+		{`{"tool_name":"Bash","tool_input":{"command":"ls"}}`, ""},
+	} {
+		a, _, ok := ParsePreToolUse([]byte(c.in))
+		if !ok || a.Session != c.want {
+			t.Errorf("%s → Session %q, want %q", c.in, a.Session, c.want)
+		}
+	}
+}
+
+func TestParsePreToolUseSpawn(t *testing.T) {
+	for _, tool := range []string{"Task", "Agent"} {
+		in := `{"session_id":"s1","tool_name":"` + tool + `","tool_input":{"subagent_type":"bflow-reviewer","prompt":"{\"id\":\"GH-3\"}","description":"x"}}`
+		a, _, ok := ParsePreToolUse([]byte(in))
+		want := guard.Action{Tool: guard.Spawn, Target: "bflow-reviewer", Command: `{"id":"GH-3"}`, Session: "s1"}
+		if !ok || a != want {
+			t.Errorf("%s: got %+v ok=%v, want %+v", tool, a, ok, want)
+		}
+		if d := guard.Evaluate(a, guard.Context{}); !d.Allow {
+			t.Errorf("%s: un lanzamiento siempre se permite: %+v", tool, d)
+		}
+	}
+}

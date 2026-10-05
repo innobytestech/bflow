@@ -32,10 +32,12 @@ func (Agent) ParseActions(raw []byte) ([]guard.Action, string, bool) {
 		PatchText string          `json:"patchText"`
 		Offset    json.RawMessage `json:"offset"`
 		Limit     json.RawMessage `json:"limit"`
+		Prompt    string          `json:"prompt"`
+		Subagent  string          `json:"subagent_type"`
 	}
 	_ = json.Unmarshal(in.Args, &args)
 	mk := func(tool, path string) guard.Action {
-		a := guard.Action{Tool: tool, Subagent: in.Subagent, Agent: in.Agent}
+		a := guard.Action{Tool: tool, Subagent: in.Subagent, Agent: in.Agent, Session: in.SessionID}
 		if path != "" {
 			a.Path = path
 			if !filepath.IsAbs(path) && in.Cwd != "" {
@@ -55,6 +57,10 @@ func (Agent) ParseActions(raw []byte) ([]guard.Action, string, bool) {
 	case "read":
 		a := mk(guard.Read, args.FilePath)
 		a.Partial = present(args.Offset) || present(args.Limit)
+		acts = append(acts, a)
+	case "task":
+		a := mk(guard.Spawn, "")
+		a.Target, a.Command = args.Subagent, args.Prompt
 		acts = append(acts, a)
 	case "write":
 		acts = append(acts, mk(guard.Write, args.FilePath))

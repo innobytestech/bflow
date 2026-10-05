@@ -48,7 +48,8 @@ type Sample struct {
 }
 
 // TokenSource es un archivo de uso y de quién es ("" = sesión principal).
-type TokenSource struct{ Path, Agent string }
+// Session es la llave de sesión (R4) y Parent la de la madre ("" = sesión principal).
+type TokenSource struct{ Path, Agent, Session, Parent string }
 
 // MainSession es el nombre con el que se registran los tokens de la sesión
 // principal, para separarlos de los de los agentes.

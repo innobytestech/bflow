@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -133,7 +134,57 @@ func runGuard(c *Ctx) output.Envelope {
 		return env
 	}
 	recordReads(c, cfg, acts, cwd, str(c.Flags, "reads") == "true")
+	markSession(c, cfg, acts)
 	return allowed
+}
+
+var spawnIDRe = regexp.MustCompile(`"id"\s*:\s*"([^"]+)"`)
+
+// markSession anota que la sesión de cada acción condujo una tarea (R1, R2):
+// un comando bflow con el ID de una tarea existente, o el lanzamiento de un
+// subagente bflow-* cuyo prompt trae su "id". Nunca bloquea ni imprime (R3).
+func markSession(c *Ctx, cfg *config.Config, acts []guard.Action) {
+	exists := func(id string) bool {
+		if !store.ValidID(id) {
+			return false
+		}
+		_, err := os.Stat(filepath.Join(cfg.Root, ".bflow", "tasks", id))
+		return err == nil
+	}
+	path := metrics.MarksPath(filepath.Join(cfg.Root, ".bflow"))
+	for _, a := range acts {
+		if a.Session == "" {
+			continue
+		}
+		id := ""
+		switch a.Tool {
+		case guard.Bash:
+			for _, seg := range guard.Segments(a.Command) {
+				if guard.BflowSubcommand(seg) == "" {
+					continue
+				}
+				for _, w := range guard.BflowArgs(seg) {
+					if w == strings.ToUpper(w) && exists(w) {
+						id = w
+						break
+					}
+				}
+				if id != "" {
+					break
+				}
+			}
+		case guard.Spawn:
+			if !strings.HasPrefix(a.Target, flow.SubagentPrefix) {
+				continue
+			}
+			if m := spawnIDRe.FindStringSubmatch(a.Command); m != nil && exists(m[1]) {
+				id = m[1]
+			}
+		}
+		if id != "" {
+			_ = metrics.AppendMark(path, metrics.Mark{TS: time.Now(), Session: a.Session, ID: id})
+		}
+	}
 }
 
 // isReviewer dice si la acción es del subagente reviewer de bflow.

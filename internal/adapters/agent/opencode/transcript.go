@@ -67,7 +67,7 @@ func (Agent) TokenSources(raw []byte, cacheDir string) ([]metrics.TokenSource, b
 				agent = "?"
 			}
 		}
-		out = append(out, metrics.TokenSource{Path: p, Agent: agent})
+		out = append(out, metrics.TokenSource{Path: p, Agent: agent, Session: l.SessionID, Parent: l.ParentID})
 	}
 	return out, main
 }

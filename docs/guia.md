@@ -114,6 +114,8 @@ Tus reglas de arquitectura en CLAUDE.md o en los documentos de `read` son bienve
 
 Mientras trabajas, `bflow watch --open` abre en otra ventana un panel en vivo: el paso actual (quién trabaja o qué gate te espera), lo que sigue, tiempos, tokens por agente y los últimos eventos. Para que `bflow start` lo abra solo, pon `ui: { watch: true }` en tu config global (`%AppData%\bflow\config.yaml` en Windows, `~/.config/bflow/config.yaml` en Linux y macOS) o en `bflow.yaml`. El primer `bflow init` en tu máquina te lo pregunta y lo guarda en la config global.
 
+Cada llamada al modelo se carga a la tarea que su sesión conducía en ese momento: si corriste `bflow <ID>` o iniciaste un subagente `bflow-*` para esa tarea, sus tokens van allí. Si la sesión no condujo ninguna tarea (por ejemplo, contestaste preguntas en el chat sin comando bflow), los tokens van a una línea `sin tarea` visible en el panel. Si muchas llamadas caen en `sin tarea`, quizá haya un problema de configuración del guard o del agente.
+
 Si prefieres el navegador, `bflow ui` abre lo mismo en una página local. En ella está la línea del carril: cada fase es una estación y el tren está en la actual. La página cabe en una sola pantalla (desde 1180x720) y muestra en la franja de arriba, como chips, todos los repos donde usaste bflow (los que te esperan, primero), así que si trabajas en varios ves en cuál te toca. Con `ui: { web: true }` en la config global, la ventana del panel la abre sola al empezar una tarea, y solo una vez aunque tengas varios paneles abiertos.
 
 `bflow stats <ID>` separa el tiempo de cada fase en trabajo del agente, espera tuya y bloqueo, y cuenta:
@@ -122,5 +124,7 @@ Si prefieres el navegador, `bflow ui` abre lo mismo en una página local. En ell
 - **Fricción:** pedidos que el flujo rechazó, bloqueos de `guard` y agentes que terminaron sin reportar. Si sube en un repo, algo del entorno está confundiendo a los agentes: revisa sus skills y reglas.
 - **Revisión:** una línea `revisión:` con la última cobertura del reviewer ("el reviewer leyó N de M archivos del diff", o "no medida"). En `--json` está en `data.stats.review`. Si la tarea no tiene cobertura, la salida no cambia.
 - **Costo:** tokens nuevos y de caché por fase, por agente y por modelo.
+
+Sin ID, `bflow stats` muestra el resumen global de todas las tareas. Si hay llamadas sin asignar a tarea alguna (por ejemplo, porque la sesión solo contestó preguntas en el chat), aparece una línea `sin tarea` con su resumen. Úsala para detectar sesiones que no conducen tareas o cambios de contexto inesperados.
 
 Antes de quitar un paso del flujo para ahorrar tokens, compara varias features: si las métricas de calidad no empeoran, ese paso sobraba.

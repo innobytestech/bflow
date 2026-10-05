@@ -42,7 +42,9 @@ type watchData struct {
 	Stats  metrics.TaskStats
 	Events []store.Entry // de la tarea activa, en orden del log
 	Others []engine.View
-	WebURL string // la página del panel, si esta ventana la sirve
+	// Unassigned son las llamadas del modelo sin tarea (R13).
+	Unassigned metrics.Usage
+	WebURL     string // la página del panel, si esta ventana la sirve
 	// Calls son las corridas de calls.jsonl de la tarea activa; CallsFile dice si el archivo existe.
 	Calls     []metrics.Run
 	CallsFile bool
@@ -117,7 +119,7 @@ func readWatch(c *Ctx) (watchData, error) {
 // readWatchIn lee el panel del repo de e.
 func readWatchIn(e *engine.Engine) (watchData, error) {
 	ctx := context.Background()
-	d := watchData{Repo: filepath.Base(e.Cfg.Root)}
+	d := watchData{Repo: filepath.Base(e.Cfg.Root), Unassigned: metrics.UnassignedUsage(e.Store.Dir())}
 	views, err := e.Views(ctx)
 	if err != nil {
 		return d, err
@@ -393,6 +395,10 @@ func renderWatch(m bannerMode, version string, d watchData, now time.Time, rows 
 				events = append(events, fmt.Sprintf("  %s %s", paint(m, cDim, fmt.Sprintf("%-*s", w, eventTime(evs[i].TS, now))), describeEvent(evs[i])))
 			}
 		}
+	}
+	if d.Unassigned.Total() > 0 {
+		tail.WriteString("\n")
+		dimLabel(&tail, m, metrics.UnassignedLabel, " "+metrics.Summary(d.Unassigned))
 	}
 	watchOthers(&tail, m, d.Others)
 

@@ -253,7 +253,7 @@ type AgentAdapter interface {
 	ParsePreToolUse(raw []byte) (a guard.Action, cwd string, ok bool)
 	// TokenSource dice qué transcript leer en un hook de fin de turno o de
 	// subagente y de quién es (agent vacío = sesión principal).
-	TokenSource(raw []byte) (path, agent string)
+	TokenSource(raw []byte) TokenSource
 	// ReadUsage devuelve las respuestas nuevas del transcript con su hora.
 	ReadUsage(path string, cur *metrics.Cursor) ([]metrics.Sample, error)
 	// Skills lista las skills instaladas (proyecto y usuario).

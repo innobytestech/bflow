@@ -341,3 +341,30 @@ func TestHumanOnlyDrop(t *testing.T) {
 		t.Errorf("HumanOnly: %v", HumanOnly)
 	}
 }
+
+func TestBflowArgs(t *testing.T) {
+	for _, c := range []struct {
+		seg  string
+		want []string
+	}{
+		{"bflow status GH-51", []string{"GH-51"}},
+		{"./bin/bflow.exe --json approve GH-51 --note x", []string{"GH-51", "x"}},
+		{"go run ./cmd/bflow next GH-2", []string{"GH-2"}},
+		{"FOO=1 bflow report GH-7 --agent implementer --verdict DONE", []string{"GH-7", "implementer", "DONE"}},
+		{"bflow status", nil},
+		{"git status GH-51", nil},
+		{"echo bflow status GH-51", nil},
+	} {
+		got := BflowArgs(c.seg)
+		if len(got) != len(c.want) {
+			t.Errorf("%q → %v, want %v", c.seg, got, c.want)
+			continue
+		}
+		for i := range got {
+			if got[i] != c.want[i] {
+				t.Errorf("%q → %v, want %v", c.seg, got, c.want)
+				break
+			}
+		}
+	}
+}

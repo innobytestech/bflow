@@ -109,8 +109,8 @@ func TestTokenSource(t *testing.T) {
 		{`{"transcript_path":"C:/t/s.jsonl","agent_id":"a2","agent_type":"Explore"}`, filepath.Join("C:/t/s", "subagents", "agent-a2.jsonl"), "Explore"},
 		{`nada`, "", ""},
 	} {
-		if p, ag := a.TokenSource([]byte(c.in)); p != c.path || ag != c.agent {
-			t.Errorf("%s → %q %q, want %q %q", c.in, p, ag, c.path, c.agent)
+		if s := a.TokenSource([]byte(c.in)); s.Path != c.path || s.Agent != c.agent {
+			t.Errorf("%s → %q %q, want %q %q", c.in, s.Path, s.Agent, c.path, c.agent)
 		}
 	}
 }
@@ -130,5 +130,17 @@ func TestReadUsageSetsMsg(t *testing.T) {
 	}
 	if !reflect.DeepEqual(ids, []string{"msg_a", "msg_b", "msg_a"}) {
 		t.Errorf("cada muestra lleva el id del mensaje (el delta de msg_a conserva el mismo): %v", ids)
+	}
+}
+
+func TestTokenSourceSession(t *testing.T) {
+	var a Agent
+	main := a.TokenSource([]byte(`{"session_id":"s1","transcript_path":"C:/t/s1.jsonl","hook_event_name":"Stop"}`))
+	if main.Session != "s1" || main.Parent != "" || main.Agent != "" {
+		t.Errorf("principal: %+v", main)
+	}
+	sub := a.TokenSource([]byte(`{"session_id":"s1","transcript_path":"C:/t/s1.jsonl","agent_id":"a7","agent_type":"bflow-implementer","agent_transcript_path":"C:/t/s1/subagents/agent-a7.jsonl"}`))
+	if sub.Session != "s1:a7" || sub.Parent != "s1" || sub.Agent != "bflow-implementer" {
+		t.Errorf("subagente: %+v", sub)
 	}
 }

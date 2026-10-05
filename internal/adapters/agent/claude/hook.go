@@ -14,8 +14,11 @@ type hookInput struct {
 	Cwd       string `json:"cwd"`
 	AgentType string `json:"agent_type"`
 	AgentID   string `json:"agent_id"`
+	SessionID string `json:"session_id"`
 	ToolInput struct {
 		Command      string          `json:"command"`
+		SubagentType string          `json:"subagent_type"`
+		Prompt       string          `json:"prompt"`
 		FilePath     string          `json:"file_path"`
 		NotebookPath string          `json:"notebook_path"`
 		Offset       json.RawMessage `json:"offset"`
@@ -50,6 +53,12 @@ func ParsePreToolUse(raw []byte) (a guard.Action, cwd string, ok bool) {
 		a = guard.Action{Tool: guard.Write, Path: in.ToolInput.FilePath, Subagent: sub, Agent: in.AgentType}
 	case "NotebookEdit":
 		a = guard.Action{Tool: guard.Edit, Path: in.ToolInput.NotebookPath, Subagent: sub, Agent: in.AgentType}
+	case "Task", "Agent":
+		a = guard.Action{Tool: guard.Spawn, Target: in.ToolInput.SubagentType, Command: in.ToolInput.Prompt, Subagent: sub, Agent: in.AgentType}
+	}
+	a.Session = in.SessionID
+	if in.AgentID != "" && in.SessionID != "" {
+		a.Session = in.SessionID + ":" + in.AgentID
 	}
 	return a, in.Cwd, true
 }
