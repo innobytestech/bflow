@@ -173,6 +173,14 @@ func tokensEnv(t *testing.T, startTask bool) (env *Env, e *engine.Engine, id, ca
 	if e, err = env.Build(env.Dir); err != nil {
 		t.Fatal(err)
 	}
+	if startTask { // las sesiones de estas pruebas condujeron la tarea (R5)
+		past := time.Now().Add(-6 * 24 * time.Hour)
+		for _, s := range []string{"s1", "ses_main"} {
+			if err := metrics.AppendMark(metrics.MarksPath(e.Store.Dir()), metrics.Mark{TS: past, Session: s, ID: id}); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
 	cacheDir = filepath.Join(e.Store.Dir(), "cache", "opencode")
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -253,8 +261,8 @@ func TestHookTokensOpenCodePrincipal(t *testing.T) {
 		t.Fatalf("el hook es silencioso: %d %q %q", code, out, errOut)
 	}
 	by, entries := tokensByAgent(t, e, id)
-	if by["main"] != 106 || by["implementer"] != 200 {
-		t.Errorf("la principal a main (incluida la vieja sin leer antes) y el hijo a su agente sin el prefijo bflow-: %v", by)
+	if by["main"] != 101 || by["implementer"] != 200 {
+		t.Errorf("la principal marcada a main (la vieja, sin marca, queda sin tarea) y el hijo a su agente sin el prefijo bflow-: %v", by)
 	}
 	for _, en := range entries {
 		if en.Data["tool"] != "opencode" || en.Data["model"] != "anthropic/claude-sonnet-4" || en.Data["phase"] == nil {
@@ -263,6 +271,9 @@ func TestHookTokensOpenCodePrincipal(t *testing.T) {
 	}
 	if *notified != 1 {
 		t.Errorf("el idle de la principal avisa una vez como el Stop de Claude: %d", *notified)
+	}
+	if u := metrics.UnassignedUsage(e.Store.Dir()); u.Output != 5 || u.Input != 5 {
+		t.Errorf("la sesión vieja sin marca va a sin tarea: %+v", u)
 	}
 	if _, err := os.Stat(old); err == nil {
 		t.Errorf("leído por completo y de hace 8 días: se borra")
@@ -276,7 +287,7 @@ func TestHookTokensOpenCodePrincipal(t *testing.T) {
 	}
 
 	hookRun(t, env, idle, "hook", "tokens", "--tool", "opencode")
-	if by2, _ := tokensByAgent(t, e, id); by2["main"] != 106 || by2["implementer"] != 200 {
+	if by2, _ := tokensByAgent(t, e, id); by2["main"] != 101 || by2["implementer"] != 200 {
 		t.Errorf("un segundo idle sin nada nuevo no suma otra vez: %v", by2)
 	}
 }

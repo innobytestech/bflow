@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -94,7 +93,13 @@ func runStats(c *Ctx) output.Envelope {
 		all = append(all, st)
 		fmt.Fprintf(&b, "%s\n", statsLine(st))
 	}
-	env := output.OK("stats", map[string]any{"tasks": all}, nil)
+	data := map[string]any{"tasks": all}
+	un := metrics.UnassignedUsage(e.Store.Dir())
+	if un.Total() > 0 {
+		data["unassigned"] = un
+		fmt.Fprintf(&b, "%s  %s\n", metrics.UnassignedLabel, metrics.Summary(un))
+	}
+	env := output.OK("stats", data, nil)
 	env.Text = strings.TrimRight(b.String(), "\n")
 	if env.Text == "" {
 		env.Text = "sin historial todavía"
@@ -305,7 +310,7 @@ func runHookTokens(c *Ctx) output.Envelope {
 			defer notifyActive(e)
 			prune = func(cur *metrics.Cursor) { h.Prune(cacheDir, cur, 7*24*time.Hour) }
 		}
-		return tokensFrom(e, h.Name(), srcs, h.ReadUsage, prune)
+		return tokensFrom(e, h.Name(), srcs, h.ReadUsage, prune, main)
 	}
 	if c.Agent == nil {
 		return quiet
@@ -321,13 +326,16 @@ func runHookTokens(c *Ctx) output.Envelope {
 	if src.Agent == "" {
 		defer notifyActive(e)
 	}
-	return tokensFrom(e, c.Agent.Name(), []TokenSource{src}, c.Agent.ReadUsage, nil)
+	return tokensFrom(e, c.Agent.Name(), []TokenSource{src}, c.Agent.ReadUsage, nil, src.Agent == "")
 }
 
-// tokensFrom lee las líneas nuevas de cada fuente bajo el lock del cursor y las
-// suma a la tarea activa; prune (si hay) limpia la caché antes de guardar el cursor.
+// tokensFrom lee las líneas nuevas de cada fuente bajo el lock del cursor y
+// reparte cada llamada a la tarea que marcó su sesión (R5-R7); las que no
+// tienen tarea van a .bflow/metrics/calls.jsonl (R9). prune (si hay) limpia la
+// caché y main borra las marcas viejas, ambos antes de guardar el cursor, que
+// solo se guarda si todas las escrituras salieron bien (R10).
 func tokensFrom(e *engine.Engine, tool string, srcs []TokenSource,
-	read func(string, *metrics.Cursor) ([]metrics.Sample, error), prune func(*metrics.Cursor)) output.Envelope {
+	read func(string, *metrics.Cursor) ([]metrics.Sample, error), prune func(*metrics.Cursor), main bool) output.Envelope {
 	quiet := output.Envelope{OK: true, Code: "tokens", Quiet: true}
 	curPath := filepath.Join(e.Store.Dir(), "cache", "tokens-cursor.json")
 	_ = store.EnsureDirFor(curPath)
@@ -341,7 +349,7 @@ func tokensFrom(e *engine.Engine, tool string, srcs []TokenSource,
 		_ = json.Unmarshal(b, &cur)
 	}
 	type batch struct {
-		agent   string
+		src     TokenSource
 		run     string
 		samples []metrics.Sample
 	}
@@ -352,11 +360,53 @@ func tokensFrom(e *engine.Engine, tool string, srcs []TokenSource,
 			return quiet
 		}
 		if len(samples) > 0 {
-			batches = append(batches, batch{src.Agent, metrics.RunKey(tool, src.Path), samples})
+			batches = append(batches, batch{src, metrics.RunKey(tool, src.Path), samples})
+		}
+	}
+	if len(batches) > 0 {
+		marks := metrics.ReadMarks(metrics.MarksPath(e.Store.Dir()))
+		exists := map[string]bool{}
+		for _, b := range batches {
+			groups := map[string][]metrics.Sample{}
+			var order []string
+			for _, sm := range b.samples {
+				id := metrics.TaskFor(marks, b.src, sm.TS)
+				if id != "" {
+					ok, seen := exists[id]
+					if !seen {
+						_, lerr := e.Store.Load(id)
+						ok = lerr == nil
+						exists[id] = ok
+					}
+					if !ok {
+						id = ""
+					}
+				}
+				if _, ok := groups[id]; !ok {
+					order = append(order, id)
+				}
+				groups[id] = append(groups[id], sm)
+			}
+			for _, id := range order {
+				if id == "" {
+					if addUnassigned(e, tool, b.run, b.src.Agent, groups[id]) != nil {
+						return quiet
+					}
+					continue
+				}
+				u, name, err := addTokens(e, id, tool, b.run, groups[id], b.src.Agent)
+				if err != nil {
+					return quiet
+				}
+				quiet.Data = map[string]any{"id": id, "agent": name, "tokens": u}
+			}
 		}
 	}
 	if prune != nil {
 		prune(&cur)
+	}
+	if main {
+		_ = metrics.PruneMarks(metrics.MarksPath(e.Store.Dir()), 7*24*time.Hour, time.Now())
 	}
 	if len(cur.Seen) > 5000 { // los offsets evitan releer; los ids viejos ya no hacen falta
 		cur.Seen = nil
@@ -364,28 +414,48 @@ func tokensFrom(e *engine.Engine, tool string, srcs []TokenSource,
 	if b, err := json.Marshal(cur); err == nil {
 		_ = store.WriteAtomic(curPath, b)
 	}
-	if len(batches) == 0 {
-		return quiet
-	}
-	id, err := e.Active(context.Background())
-	if err != nil {
-		return quiet
-	}
-	for _, b := range batches {
-		if u, name, ok := addTokens(e, id, tool, b.run, b.samples, b.agent); ok {
-			quiet.Data = map[string]any{"id": id, "agent": name, "tokens": u}
-		}
-	}
 	return quiet
+}
+
+// addUnassigned agrega las llamadas sin tarea a .bflow/metrics/calls.jsonl (R9).
+// Corre bajo el lock del cursor, que ya está tomado.
+func addUnassigned(e *engine.Engine, tool, run, agent string, samples []metrics.Sample) error {
+	name := metrics.MainSession
+	if agent != "" {
+		name = strings.TrimPrefix(agent, flow.SubagentPrefix)
+	}
+	var buf []byte
+	for _, s := range samples {
+		b, err := json.Marshal(metrics.Call{TS: s.TS, Run: run, Tool: tool, Agent: name, Model: s.Model, Msg: s.Msg,
+			Input: s.Input, CacheWrite: s.CacheWrite, CacheRead: s.CacheRead, Output: s.Output})
+		if err != nil {
+			return err
+		}
+		buf = append(append(buf, b...), '\n')
+	}
+	p := metrics.UnassignedPath(e.Store.Dir())
+	if err := store.EnsureDirFor(p); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(p, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(buf)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	return err
 }
 
 // addTokens reparte las muestras en las fases donde ocurrieron, las anota como
 // entradas `tokens` de la tarea y suma el total a su caché. agent "" es la sesión principal.
-func addTokens(e *engine.Engine, id, tool, run string, samples []metrics.Sample, agent string) (metrics.Usage, string, bool) {
+// Un error de escritura se devuelve para que el cursor no avance.
+func addTokens(e *engine.Engine, id, tool, run string, samples []metrics.Sample, agent string) (metrics.Usage, string, error) {
 	var u metrics.Usage
 	log, err := e.Store.Log(id)
 	if err != nil {
-		return u, "", false
+		return u, "", err
 	}
 	name := metrics.MainSession
 	if agent != "" {
@@ -409,7 +479,9 @@ func addTokens(e *engine.Engine, id, tool, run string, samples []metrics.Sample,
 		entries = append(entries, store.Entry{TS: now, ID: id, Event: "tokens", Agent: name, By: e.User, Data: d})
 		u.Add(s.Usage)
 	}
-	_ = e.Store.Append(entries...)
+	if err := e.Store.Append(entries...); err != nil {
+		return u, "", err
+	}
 	var lines [][]byte
 	phases := metrics.Phases(log, id, strings.TrimPrefix(agent, flow.SubagentPrefix), samples)
 	for i, s := range samples {
@@ -419,7 +491,9 @@ func addTokens(e *engine.Engine, id, tool, run string, samples []metrics.Sample,
 			lines = append(lines, b)
 		}
 	}
-	_ = e.Store.AppendFile(id, metrics.CallsFile, lines)
+	if err := e.Store.AppendFile(id, metrics.CallsFile, lines); err != nil {
+		return u, "", err
+	}
 	e.AddTokens(id, u.New(), u.CacheRead)
-	return u, name, true
+	return u, name, nil
 }

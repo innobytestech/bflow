@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"innobytes.tech/bflow/internal/metrics"
 )
 
 func transcriptLine(id string, in, out, cr, cw int) string {
@@ -25,6 +27,7 @@ func TestStatsTokensAndStatusline(t *testing.T) {
 	r.writeConfig("")
 	id := r.ok("task", "add", "Borrador pre-folio").Data["id"].(string)
 	r.ok("start", id, "--lane", "full")
+	r.writeMarks(metrics.Mark{TS: time.Now(), Session: "sess", ID: id}) // la sesión principal condujo la tarea
 	os.WriteFile(filepath.Join(r.dir, "d.md"), []byte("d"), 0o644)
 	r.ok("approve", id, "--file", "d.md")
 	r.ok("report", id, "--agent", "spec-author", "--verdict", "READY")
@@ -35,9 +38,9 @@ func TestStatsTokensAndStatusline(t *testing.T) {
 	subs := filepath.Join(r.dir, "sess", "subagents")
 	os.MkdirAll(subs, 0o755)
 	os.WriteFile(tr, []byte(transcriptLine("m1", 10, 500, 20000, 3000)+transcriptLine("m1", 10, 900, 20000, 3000)), 0o644)
-	stop := fmt.Sprintf(`{"hook_event_name":"Stop","transcript_path":%q}`, tr)
+	stop := fmt.Sprintf(`{"hook_event_name":"Stop","session_id":"sess","transcript_path":%q}`, tr)
 	subStop := func(agent, file string) string {
-		return fmt.Sprintf(`{"hook_event_name":"SubagentStop","transcript_path":%q,"agent_id":"x","agent_type":"bflow-%s","agent_transcript_path":%q}`,
+		return fmt.Sprintf(`{"hook_event_name":"SubagentStop","session_id":"sess","transcript_path":%q,"agent_id":"x","agent_type":"bflow-%s","agent_transcript_path":%q}`,
 			tr, agent, filepath.Join(subs, file))
 	}
 	os.WriteFile(filepath.Join(subs, "agent-s.jsonl"), []byte(transcriptLine("s1", 5, 100, 10000, 0)), 0o644)
@@ -119,6 +122,7 @@ func TestQualityFrictionAndModelMetrics(t *testing.T) {
 	r.writeConfig("")
 	feat := r.ok("task", "add", "Alta de clientes").Data["id"].(string)
 	r.ok("start", feat, "--lane", "light")
+	r.writeMarks(metrics.Mark{TS: time.Now(), Session: "sess", ID: feat})
 
 	// Fricción: un pedido que el flujo rechaza y una acción que bloquea guard.
 	if env := r.run("approve", feat); env.exit != 2 {
@@ -138,8 +142,8 @@ func TestQualityFrictionAndModelMetrics(t *testing.T) {
 	os.WriteFile(tr, []byte(line("m1", "claude-opus-5-5", 300)), 0o644)
 	os.MkdirAll(filepath.Join(r.dir, "sess", "subagents"), 0o755)
 	os.WriteFile(filepath.Join(r.dir, "sess", "subagents", "agent-x.jsonl"), []byte(line("s1", "claude-haiku-4-5", 99)), 0o644)
-	r.hook(fmt.Sprintf(`{"hook_event_name":"Stop","transcript_path":%q}`, tr), "hook", "tokens")
-	r.hook(fmt.Sprintf(`{"hook_event_name":"SubagentStop","transcript_path":%q,"agent_id":"x","agent_type":"Explore","agent_transcript_path":%q}`,
+	r.hook(fmt.Sprintf(`{"hook_event_name":"Stop","session_id":"sess","transcript_path":%q}`, tr), "hook", "tokens")
+	r.hook(fmt.Sprintf(`{"hook_event_name":"SubagentStop","session_id":"sess","transcript_path":%q,"agent_id":"x","agent_type":"Explore","agent_transcript_path":%q}`,
 		tr, filepath.Join(r.dir, "sess", "subagents", "agent-x.jsonl")), "hook", "tokens")
 
 	r.ok("report", feat, "--agent", "spec-author", "--verdict", "READY")

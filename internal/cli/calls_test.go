@@ -66,6 +66,9 @@ func rawCalls(t *testing.T, e *engine.Engine, id string) []metrics.Call {
 
 func claudeHook(t *testing.T, env *Env, payload map[string]string) {
 	t.Helper()
+	if _, ok := payload["session_id"]; !ok {
+		payload["session_id"] = "s1"
+	}
 	b, _ := json.Marshal(payload)
 	if code, out, errOut := hookRun(t, env, string(b), "hook", "tokens"); code != 0 || out != "" || errOut != "" {
 		t.Fatalf("el hook es silencioso: %d %q %q", code, out, errOut)

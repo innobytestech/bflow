@@ -115,7 +115,7 @@ func TaskFor(marks []Mark, src TokenSource, ts time.Time) string
   - `internal/adapters/agent/opencode`: `TestParseActionsSpawn`, `TestTokenSourcesSession`.
   - `internal/metrics`: `TestTaskForMain`, `TestTaskForSubagent`, `TestMarksAppendPrune`, `TestUnassignedUsage`.
   - `cmd/bflow` (e2e): `TestGuardMarksSession`, `TestHookTokensOnlyMarkedSession`, `TestHookTokensUnassignedWithoutActive`, `TestHookTokensSplitByTime`, `TestHookTokensSubagentFollowsParent`, `TestHookTokensDroppedTaskUnassigned`, `TestHookTokensCursorHeldOnWriteError`, `TestStatsUnassigned`, `TestWatchUnassigned`.
-- [ ] **T2 Marcas en metrics** (R6, R7, R11): `marks.go` completo (append con lock, lectura tolerante, prune, `TaskFor`).
-- [ ] **T3 Guard y adaptadores** (R1-R4, R14): parseo de sesión y lanzamientos en Claude y OpenCode, `BflowArgs`, `markSession` en `runGuard`; matcher `Task|Agent` en `adapters/claude/settings.json` y `task` en `adapters/opencode/plugin.js`.
-- [ ] **T4 Reparto en hook tokens** (R4-R10, R15): nueva `TokenSource` en ambos adaptadores, `tokensFrom` sin `e.Active()`, `addTokens` con error, `addUnassigned`, cursor tras escribir, prune de marcas en Stop principal.
-- [ ] **T5 Vistas** (R12, R13): `UnassignedUsage`, línea y `data.unassigned` en `stats` global, línea en `watch`.
+- [x] **T2 Marcas en metrics** (R6, R7, R11): `marks.go` completo (append con lock, lectura tolerante, prune, `TaskFor`).
+- [x] **T3 Guard y adaptadores** (R1-R4, R14): parseo de sesión y lanzamientos en Claude y OpenCode, `BflowArgs`, `markSession` en `runGuard`; matcher `Task|Agent` en `adapters/claude/settings.json` y `task` en `adapters/opencode/plugin.js`.
+- [x] **T4 Reparto en hook tokens** (R4-R10, R15): nueva `TokenSource` en ambos adaptadores, `tokensFrom` sin `e.Active()`, `addTokens` con error, `addUnassigned`, cursor tras escribir, prune de marcas en Stop principal.
+- [x] **T5 Vistas** (R12, R13): `UnassignedUsage`, línea y `data.unassigned` en `stats` global, línea en `watch`.
