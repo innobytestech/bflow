@@ -2,21 +2,15 @@
 
 **Motor de flujo Spec-Driven Development para trabajar con agentes de IA.** Un solo binario en Go que lleva cada tarea de la idea al PR mergeado (discovery, spec, contrato, implementación, revisión, walkthrough), decide las transiciones, habla con tu tracker y con git, y le dice al agente exactamente qué hacer después, en pocas líneas de JSON.
 
-> Estado: **MVP**. Funciona de punta a punta con el tracker local, Plane y GitHub, y con Claude Code y OpenCode como agente. La API de comandos puede cambiar antes de la 1.0.
+> Estado: **prerelease v0.1.0-rc.9**. Funciona de punta a punta con el tracker local, Plane y GitHub, y con Claude Code y OpenCode como agente. La API de comandos puede cambiar antes de la 1.0. Si lo vas a probar, empieza por [cómo probar y reportar](docs/como-probar-y-reportar.md).
 
 ---
 
 ## Por qué existe
 
-Trabajar con agentes de IA en proyectos reales suele terminar en un *harness*: un conjunto de prompts, subagentes y scripts que describen el proceso ("primero pregunta, luego escribe la spec, no edites pruebas, pide revisión…"). Nosotros tuvimos uno en dos repos, uno de backend y otro de frontend, y los problemas eran siempre los mismos:
+Tenía un harness por proyecto y se desactualizaban entre sí; además, las features tardaban, había alucinaciones, los agentes no siempre seguían el harness y se generaba documentación redundante. En los dos repos que medí, el harness gastaba unos 7.000 tokens fijos por sesión y entre 73% y 80% de lo versionado era estado, no especificaciones. Hice bflow para mi equipo en Innobytes: gastar menos tokens y que todos resuelvan una feature igual con spec driven development, aunque la IA no sea determinista.
 
-- **Las reglas vivían en prosa.** "OBLIGATORIO", "NUNCA", "no saltes la compuerta". El modelo las respetaba casi siempre, y justo ese "casi" es donde se cuelan los errores caros.
-- **El modelo movía el estado a mano.** Cambiaba estados en el tracker, creaba ramas y armaba URLs de PR, cada vez a su manera. En un repo el flujo estaba validado por scripts; en el otro, no.
-- **Gastaba tokens en trabajo mecánico.** Leer el tracker, releer bitácoras, interpretar la salida de 4 comandos de pruebas, mantener archivos de estado. En uno de los repos, unos 7.000 tokens fijos por sesión antes de hacer nada útil.
-- **Llenaba el repo de estado de trabajo.** Entre el 73% y el 80% de los archivos del harness versionados eran bitácoras, reportes y estado, no especificaciones.
-- **Cada repo tenía su copia.** Mantenerlas sincronizadas era tedioso y se desviaban: estados distintos, prefijos de rama distintos, reglas que un repo tenía y el otro no.
-
-Byteflow separa lo que **requiere criterio** (entender el problema, diseñar, programar, revisar), que hace el agente, de lo que es **determinista** (estado, transiciones, git, tracker, pruebas, reglas), que hace el CLI. El agente no tiene que recordar el proceso: pregunta a `bflow` qué sigue y lo hace.
+Byteflow separa lo que **requiere criterio** (entender el problema, diseñar, programar, revisar), que hace el agente, de lo que es **determinista** (estado, transiciones, git, tracker, pruebas, reglas), que hace el CLI. El agente no tiene que recordar el proceso: pregunta a `bflow` qué sigue y lo hace. La historia completa y el rumbo: [Por qué y rumbo](docs/por-que-y-rumbo.md).
 
 ## Para quién es (y para quién no)
 
@@ -25,217 +19,44 @@ bflow es opinado a propósito: tiene un flujo definido y gates humanas fijas. Mu
 **Te sirve si:**
 
 - Desarrollas features con agentes de IA y quieres que las decisiones importantes (qué se construye, el contrato, qué se mergea) las tome una persona, sin leer todo lo que el agente genera.
-- Trabajas con git y PRs, y con Claude Code como agente.
+- Trabajas con git y PRs, y con Claude Code u OpenCode como agente.
 - Quieres saber cuánto cuesta cada feature (tiempo, tokens, iteraciones) y dónde se atora.
 
 **No te sirve si:**
 
 - Buscas que el agente trabaje solo de punta a punta, sin aprobaciones.
 - Tu flujo no pasa por ramas y PRs.
-- Usas otra herramienta de agente y necesitas todas las garantías: hoy solo Claude Code tiene adaptador (ver la tabla de abajo).
+- Usas otra herramienta de agente y necesitas todas las garantías: hoy solo Claude Code y OpenCode tienen adaptador (ver [qué garantiza](docs/conceptos.md#qué-garantiza-y-qué-no)).
 
-## Qué garantiza (y qué no)
+## Instalar
 
-Lo que vive en el CLI se cumple con cualquier herramienta. Lo que depende de hooks, solo donde hay hooks.
-
-| Garantía | Claude Code con los hooks de bflow | OpenCode con el plugin de bflow | Sin hooks (otra herramienta) |
-|---|---|---|---|
-| El estado, las fases y las gates los maneja bflow, no el modelo | ✅ | ✅ | ✅ |
-| `DONE` exige un check verde sobre el commit actual | ✅ | ✅ | ✅ |
-| Las pruebas del contrato no cambian después de aprobarlo | ✅ se bloquea la edición y se revisa al reportar | ✅ se bloquea la edición y se revisa al reportar | ✅ se revisa al reportar |
-| `git reset --hard`, push forzado o a ramas protegidas, `.env`, `.bflow/` | ✅ se bloquea antes de que ocurra | ✅ se bloquea antes de que ocurra (si `bflow` no está en el PATH el guard no actúa y el plugin avisa) | ❌ |
-| Ramas y PR solo los crea bflow mientras hay una tarea en curso | ✅ | ✅ | ❌ |
-| Un agente que termina sin reportar sigue trabajando (2 avisos, luego decide una persona) | ✅ | ❌ OpenCode no tiene evento de fin de subagente; lo cubren `bflow report`, `bflow check --verify` y el bloque de AGENTS.md | ❌ |
-| El reviewer abrió las 🔴 del diff antes de aprobar (si no, `review_incomplete`) | ✅ mide `Read` y Bash del reviewer en quality | ✅ el plugin manda `read` solo de la subsesión `bflow-reviewer` | ❌ no se mide y no se exige |
-| Tokens por fase, agente y modelo | ✅ | ✅ | ❌ (solo tiempos) |
-
-**Lo que bflow no garantiza:**
-
-- **La calidad del código.** La revisan los agentes de calidad y tú en el walkthrough; bflow asegura que esos pasos ocurran, no que acierten.
-- **Que el agente siga su oficio.** Cómo programa o revisa está en prosa; bflow hace cumplir el contrato (qué reporta, qué archivos toca, cuándo puede decir DONE), no el estilo.
-- **Contención ante un agente malintencionado.** `guard` es una barandilla contra errores comunes, no un sandbox: revisa comandos y rutas conocidos, y un comando rebuscado puede pasar.
-
-La guía [Cómo trabajar con bflow](docs/guia.md) explica el día a día: qué haces tú en cada gate, cómo configurar el oficio de los agentes, qué skills conviene tener y qué hacer cuando algo se atora.
-
-## Qué hace
-
-- **Máquina de estados con gates humanos.** Cada tarea recorre fases; en los puntos de decisión (aprobar la spec, aprobar el contrato, aprobar el PR…) el flujo se detiene hasta que una persona decide.
-- **Carriles.** Una feature normal (`full`), una pequeña (`light`) o un defecto ya mergeado (`hotfix`) recorren fases distintas. Ninguno se salta la revisión de calidad.
-- **`next`: una sola instrucción para el agente.** Cada comando responde qué preguntar (con las opciones y el comando exacto de cada una), qué agentes lanzar (con sus argumentos y cómo deben reportar), qué esperar o que no hay nada pendiente.
-- **Tracker y git sin el modelo.** Mueve la tarea en el tracker, sella la fecha de inicio, comenta los rechazos, crea la rama al aprobar la spec, abre el PR con el review-map y el walkthrough, y cierra la tarea cuando el PR se mergea.
-- **Compuerta de calidad determinista (`bflow check`).** Corre los pasos del proyecto (lint, pruebas, build, vulnerabilidades, secretos), resume los fallos en pocas líneas y liga el resultado a un commit. El agente no puede reportar "terminé" sin un check verde del código actual.
-- **Reglas que se cumplen con código (`bflow guard`).** Un hook bloquea antes de que ocurra: `git reset --hard`, push forzado o a ramas protegidas, editar `.env` o `.bflow/`, modificar las pruebas que se aprobaron en el contrato que un subagente apruebe, rechace, desbloquee o empiece tareas (eso lo responde una persona) y, con una tarea en curso, crear ramas o PRs a mano (eso lo hace bflow). Las pruebas congeladas también se verifican sin hook: `report DONE` y `check --verify` comparan su contenido con el del contrato, y solo una persona acepta un cambio con `bflow freeze`.
-- **Métricas.** Tiempo por fase separado en trabajo del agente, espera del humano y bloqueo; iteraciones (rechazos por gate, rondas, decisiones); hotfixes ligados a la feature que corrigen (`start --fixes`); fricción (pedidos que el flujo rechazó y bloqueos de `guard`), y tokens por fase, por agente y por modelo leídos de los transcripts, con lo nuevo separado de la caché leída.
-- **Salida pensada para gastar pocos tokens.** JSON compacto y sin campos redundantes. Una respuesta típica pesa ~480 bytes, y un check fallido le entrega al agente solo las líneas de fallo, sin repetir; el detalle completo queda en un archivo.
-
-## Cómo funciona
-
-### Núcleo neutral y adaptadores
-
-El núcleo solo conoce conceptos propios: tarea, fase, gate, carril, veredicto y comentario en Markdown. Todo lo externo es un adaptador que traduce. Una prueba de arquitectura falla si algún paquete del núcleo importa un adaptador.
-
-```mermaid
-flowchart LR
-  subgraph Núcleo
-    F[flow<br/>fases, gates, carriles] --> E[engine<br/>efectos y reintentos]
-    E --> S[store<br/>.bflow/]
-    C[check] --- E
-    G[guard] --- E
-  end
-  E -- Tracker --> T1[local]
-  E -- Tracker --> T2[Plane]
-  E -- VCSHost --> H1[GitHub]
-  E -- Git --> GI[git]
-  A[Agente: Claude Code] -- "bflow ... --json" --> E
-  E -- "next" --> A
-```
-
-| Eje | Hoy | Previsto |
-|---|---|---|
-| Tracker | `local` (archivos en el repo, sin cuenta), Plane, GitHub Issues y Projects | Jira, Linear, Notion |
-| Repositorio y PR | GitHub (sin token, deja la URL de compare y la descripción lista) | GitLab, Gitea |
-| Agente | Claude Code y OpenCode (agentes, comando `/bflow` y plugin con guard y tokens) | Codex |
-| Stack | Go, Angular, Node (defaults de check y rutas de código) | otros |
-
-### Fases
-
-```mermaid
-stateDiagram-v2
-  [*] --> backlog
-  backlog --> discovery: start (full)
-  backlog --> spec: start (light)
-  backlog --> implementing: start (hotfix)
-  discovery --> spec: ⏸ cerrar discovery
-  spec --> contract: ⏸ aprobar spec (crea la rama)
-  contract --> implementing: ⏸ aprobar contrato T1
-  implementing --> paused: DONE con check verde
-  paused --> quality: ⏸ permiso de revisión
-  quality --> documenting: revisores APPROVED
-  quality --> implementing: algún REJECTED (ronda +1)
-  documenting --> walkthrough
-  walkthrough --> in_review: ⏸ aprobar PR (abre el PR)
-  walkthrough --> implementing: rechazo
-  in_review --> done: PR mergeado
-```
-
-`⏸` marca un gate humano. Cualquier fase puede pasar a `blocked` y volver a donde estaba. Si la revisión de calidad rechaza dos rondas seguidas, `bflow` pregunta si dividir la feature, volver a spec o hacer otra ronda. Nadie marca `done` a mano: se cierra al detectar el merge. Una tarea también puede pasar a `dropped` (retirada sin terminar) desde cualquier fase de trabajo con `bflow drop`, o automáticamente cuando se aprueba un split que crea tareas hijas.
-
-| Carril | Fases |
-|---|---|
-| `full` | discovery → spec → contract → implementing → paused → quality → documenting → walkthrough → in_review → done |
-| `light` | spec → implementing → quality → documenting → walkthrough → in_review → done |
-| `hotfix` | implementing → quality → documenting → walkthrough → in_review → done |
-
-### El contrato con el agente: `next`
-
-Todo comando acepta `--json` y responde con el mismo envelope. Los códigos de salida son `0` si todo salió bien, `1` si hubo un error y `2` si fue un rechazo del flujo (por ejemplo, aprobar algo que no está pendiente).
-
-```json
-{"ok":true,"code":"advanced","data":{"id":"API-12","phase":"spec"},
- "next":{"action":"ask","gate":"spec","skill":"approve",
-   "show":["bflow show API-12 brief"],
-   "question":"¿Apruebas el spec?",
-   "options":[
-     {"id":"approve","label":"Aprobar","command":"bflow approve API-12 --gate spec"},
-     {"id":"changes","label":"Pedir cambios puntuales","needs_note":true,
-      "command":"bflow reject API-12 --gate spec --note \"<motivo>\""}]}}
-```
-
-La sesión principal del agente solo interpreta `next`:
-
-- `ask`: muestra lo que indica `show`, pregunta al humano y ejecuta el comando de la opción elegida.
-- `spawn`: lanza los subagentes con sus argumentos. Cada uno reporta con `bflow report`.
-- `wait`: explica qué se espera.
-- `done`: no hay nada pendiente.
-
-Ningún subagente le pregunta nada al humano: devuelve su veredicto y `bflow` decide.
-
-### Qué queda en el repo y qué no
-
-- **En el repo:** solo `specs/<ID>-<slug>/spec.md`, con encabezados fijos (brief, discovery, requirements, design, tasks y ui-blueprint si el stack tiene UI). `bflow show <ID> spec --section design` corta por encabezado para que el agente lea solo lo que necesita.
-- **En la descripción del PR:** el review-map, el walkthrough, las decisiones tomadas en vuelo y el contrato para los equipos que consumen el cambio.
-- **En el tracker:** el discovery completo, los rechazos y los recordatorios de gates que llevan más de 24 horas esperando.
-- **En `.bflow/`,** que se ignora sola en git: el estado de cada tarea, `log.jsonl`, el contrato, los reportes y el resultado del check.
-
-## Instalación
-
-Como agente, bflow requiere Claude Code 2.1.271 o posterior; `bflow doctor` revisa la versión. Para instalarlo no hace falta Go.
-
-Linux y macOS (en `~/.local/bin`; `BFLOW_INSTALL_DIR` lo cambia):
+Linux y macOS (en `~/.local/bin`):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/innobytestech/bflow/main/install.sh | sh
 ```
 
-Windows (en `%LOCALAPPDATA%\Programs\bflow`, que agrega a tu `PATH`):
+Windows (en `%LOCALAPPDATA%\Programs\bflow`):
 
 ```powershell
 irm https://raw.githubusercontent.com/innobytestech/bflow/main/install.ps1 | iex
 ```
 
-Los dos scripts verifican el SHA-256 del archivo contra `checksums.txt` antes de instalar. También puedes bajar el archivo de tu plataforma de [Releases](https://github.com/innobytestech/bflow/releases). Cada release trae una atestación de procedencia: `gh attestation verify <archivo> --repo innobytestech/bflow` comprueba que lo compiló el workflow del repo.
-
-Los scripts instalan la última versión. Mientras solo haya prereleases publicadas (`v0.1.0-rc.*`), que GitHub no cuenta como "latest", instalan la más reciente. `BFLOW_VERSION` fija una versión, con o sin la `v`:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/innobytestech/bflow/main/install.sh | BFLOW_VERSION=v0.1.0-rc.9 sh
-```
-
-```powershell
-$env:BFLOW_VERSION = 'v0.1.0-rc.9'; irm https://raw.githubusercontent.com/innobytestech/bflow/main/install.ps1 | iex
-```
-
-En Windows, `BFLOW_INSTALL_NO_PATH=1` evita que el script toque tu `PATH`.
-
-Para actualizar:
-
-```bash
-bflow update           # --check solo dice si hay una versión nueva
-```
-
-`bflow update` elige el canal según lo que tienes instalado: con una prerelease recibes la siguiente (`rc.9` → `rc.10` o `v0.1.0`); con una estable nunca recibes prereleases.
-
-Con Go 1.25 o superior:
-
-```bash
-go install innobytes.tech/bflow/cmd/bflow@latest
-```
-
-O desde el código:
-
-```bash
-git clone https://github.com/innobytestech/bflow.git
-cd bflow
-go install ./cmd/bflow
-```
-
-Comprueba que quedó en tu `PATH`:
-
-```bash
-bflow version
-```
-
-Se instala una vez por máquina. Cada repo solo necesita un `bflow.yaml` corto; nunca se copia código de bflow al repo.
+Los scripts verifican el SHA-256 del archivo antes de instalar. Versión fija, Go, actualizar y desinstalar: [Instalación](docs/instalacion.md).
 
 ## Inicio rápido
 
-### 1. Configurar un repo
-
 ```bash
 cd mi-repo
-bflow init           # detecta stack, remoto, rama base y propone los pasos de check
-bflow doctor         # valida config, herramientas, conexiones y hooks
+bflow init                 # detecta stack, remoto, rama base y propone los pasos de check
+bflow doctor               # valida config, herramientas, conexiones y hooks
+bflow install claude       # o: bflow install opencode (skill o comando, y hooks)
 ```
 
-`bflow init` pregunta solo lo que no pudo detectar; con `--yes` no pregunta nada. Sin `bflow.yaml`, bflow funciona con el tracker local y solo con git.
-
-### 2. Recorrer una tarea (tracker local)
+Sin `bflow.yaml`, bflow funciona con el tracker local y solo con git. Para recorrer una tarea:
 
 ```bash
-bflow task add "Validación de RFC en el alta de clientes"   # crea LOCAL-1
-bflow new --lane light --title "Validación de RFC" --file idea.md   # crea la tarea y la arranca, en un paso
-bflow task list                                              # tareas abiertas del tracker
-bflow start LOCAL-1 --lane light
+bflow new --lane light --title "Validación de RFC" --file idea.md   # crea la tarea y la arranca
 bflow report LOCAL-1 --agent spec-author --verdict READY    # lo corre el agente
 bflow show LOCAL-1 brief
 bflow approve LOCAL-1                                        # crea la rama
@@ -244,162 +65,28 @@ bflow report LOCAL-1 --agent implementer --verdict DONE     # con pasos de check
 bflow status
 ```
 
-Cada comando imprime el siguiente paso. Con `--json`, ese paso llega en `next`.
+Cada comando imprime el siguiente paso; con `--json`, ese paso llega en `next`. En la práctica le dices a tu agente "qué sigue" y él lo corre. Para conectar Plane o GitHub: [Configuración](docs/configuracion.md).
 
-### 3. Conectar Plane y GitHub (opcional)
+## Qué garantiza
 
-```bash
-bflow connect plane --url https://plane.example.com --workspace mi-workspace
-bflow connect github --from-gh      # o --token
-bflow tracker states                # cómo se traducen las fases a tus estados
-bflow tracker setup --dry-run       # qué estados faltarían crear
-```
+Lo que vive en el CLI se cumple con cualquier herramienta (el estado y las gates los maneja bflow, `DONE` exige un check verde, las pruebas del contrato no cambian). Lo que depende de hooks, solo donde hay hooks (Claude Code y OpenCode): bloquear `git reset --hard`, push forzado, `.env` y `.bflow/`. bflow no garantiza la calidad del código ni contiene a un agente malintencionado. La tabla completa: [Conceptos](docs/conceptos.md#qué-garantiza-y-qué-no).
 
-Los tokens se validan antes de guardarse en el llavero del sistema (Credential Manager, Keychain o Secret Service) y nunca se escriben en YAML. En CI se usan variables de entorno: `BFLOW_PLANE_TOKEN`, `GH_TOKEN`.
+## Rumbo
 
-#### Tracker de GitHub Issues y Projects
+Hoy: v0.1.0-rc.9. Previsto: v0.1.0 (primera release anunciada); Fase 1, legible para el mundo (inglés); Fase 2, que exista para alguien; Fase 3, adopción en equipo (Linear, Codex); Fase 4, medir y decidir; y la 1.0 con la API de comandos estable. Cada fase y su criterio de salida: [Por qué y rumbo](docs/por-que-y-rumbo.md#rumbo).
 
-Las tareas pueden vivir en los issues del repo (`GH-42` es el issue #42), con o sin un Project v2. Exige `vcs.host: github`; de ahí salen el repo, la API (`vcs.api_url`) y el token de `bflow connect github`.
+## Documentación
 
-```yaml
-vcs: { host: github }
-tracker:
-  adapter: github
-  project: mi-org/7        # opcional; sin él, la fase es una etiqueta bflow:<fase>
-  # prefix: GH             # prefijo de los IDs (GH por defecto)
-  # start_field: Start date  # campo de fecha del project donde se sella el inicio
-```
-
-- **Sin project:** la fase es la etiqueta `bflow:<fase>`. `bflow tracker setup` crea las que falten. Un issue abierto sin etiqueta es backlog; uno cerrado, done. No hay fecha de inicio.
-- **Con project:** la fase es una opción del campo de selección única Status, con los mismos nombres que Plane (`tracker.states` los cambia). `bflow tracker setup` agrega las opciones que falten si la API conserva los ids de las existentes; si no, no escribe nada y lista qué crear a mano (`crea a mano en el project mi-org/7, campo Status:`). Al empezar, el issue entra al project y se sella la fecha de inicio si existe el campo.
-- Al llegar a done se cierra el issue (bflow nunca reabre uno cerrado) y el PR lleva `Closes #N`.
-- **Token:** el mismo de `bflow connect github`. Para Projects de una organización hace falta un token fine-grained con el permiso de organización Projects; para Projects de un usuario, un token clásico con el scope `project`. `bflow doctor` lo revisa.
-- `bflow init` ofrece `github` cuando el remoto es de GitHub y deja elegir el project (o ninguno).
-
-### 4. Usarlo con Claude Code
-
-Corre `bflow install claude` dentro del repo. Instala la skill en `~/.claude/skills/bflow/SKILL.md` (una vez por máquina), fusiona los hooks, el permiso y la barra de estado en `<repo>/.claude/settings.json` sin tocar lo tuyo, y corre `bflow render` si el repo tiene `agent: claude`. Es idempotente: córrelo otra vez cuando quieras. `bflow install claude --skill-only` instala solo la skill; `bflow update` la refresca sola si ya estaba instalada. Los archivos fuente están en [`adapters/claude/`](adapters/claude/).
-
-Cuando un gate avanza la fase, `next` trae `clear: true` y la skill sugiere /clear: el hook de inicio devuelve el estado (`next:` compacto y `Sigue con /bflow.`) y `approve --note` deja el motivo en `decisions.md`. La skill tiene unas 30 líneas: no contiene reglas del flujo, solo cómo interpretar `next`. Los hooks corren `bflow hook session-start` al abrir la sesión, `bflow guard --reads` antes de cada edición, comando o `Read` (de los `Read` solo registra los del reviewer en quality, para medir cuánto del diff abrió), `bflow hook tokens` al terminar cada turno y cada subagente (cada uno cuenta solo su transcript), `bflow hook subagent-stop` cuando termina un agente de bflow (si no reportó, lo hace seguir hasta 2 veces con lo que le falta y después bloquea la tarea para que decida una persona) y la barra de estado con `bflow statusline`:
-
-```
-API-12 · implementing · 1h42m · ronda 1 · 145.1k nuevos · 2.9M caché
-```
-
-#### OpenCode
-
-`agent:` acepta una herramienta (`agent: claude`) o una lista (`agent: [claude, opencode]`); vacío equivale a `claude`. Con `opencode` en la lista, `bflow render` escribe también `.opencode/agents/bflow-<agente>.md` (subagentes con permisos `edit` y `bash` según lo que hace cada agente) y `bflow render --check` cubre los dos conjuntos. `bflow init` detecta `.opencode/`, `opencode.json` y `opencode.jsonc`, y `--agent claude,opencode` acepta varias.
-
-Corre `bflow install opencode` para dejar el comando `/bflow` en `$XDG_CONFIG_HOME/opencode/commands/bflow.md` (o `~/.config/opencode/commands/bflow.md`); con `opencode` en `agent:` también corre `render`. `bflow update` lo refresca solo si ya estaba instalado. Sale del mismo cuerpo que la skill de Claude.
-
-OpenCode pide el modelo como `proveedor/modelo`, así que los alias de los agentes (`sonnet`, `haiku`) se traducen con `models.opencode`, en `bflow.yaml`, en un perfil o en la config global (gana el repo, por alias):
-
-```yaml
-models:
-  opencode:
-    sonnet: anthropic/claude-sonnet-4
-    haiku: anthropic/claude-haiku-4
-```
-
-Un valor con `/` se usa tal cual. Un alias sin equivalente deja al agente sin `model:` (usa el de tu OpenCode) y `render` y `bflow doctor` lo avisan. Con `opencode` en `agent:`, `render` también escribe `.opencode/plugins/bflow.js` (se commitea y no se edita): el guard antes de bash, edit, write y patch, y los tokens por fase y agente. OpenCode no tiene nudge de subagente; el plugin inyecta `bflow hook session-start` al crear una sesión raíz (sin pedir respuesta), así que un /clear no pierde el hilo. Los archivos fuente están en [`adapters/opencode/`](adapters/opencode/).
-
-Para seguir la tarea sin leer la conversación, `bflow watch` es un panel en vivo en otra terminal: quién trabaja y desde cuándo, o qué gate espera tu decisión; lo que sigue; tiempos por fase; tokens por agente; fricción, y los últimos eventos. `bflow watch --open` lo abre en otra pestaña o ventana (Windows Terminal, PowerShell, Terminal de macOS o la terminal de Linux) si no hay uno abierto. Con `ui: { watch: true }`, `bflow start` lo abre solo; nunca en CI ni sin escritorio. Como es una preferencia personal, va en la config global, no en `bflow.yaml`. El primer `bflow init` en cada máquina pregunta qué abrir y guarda la respuesta ahí: panel y navegador, solo el panel o nada. No vuelve a preguntar, pero puedes cambiarla editando `ui:`.
-
-`bflow ui` muestra el panel en el navegador, en una página local de solo lectura.
-- **Tablero.** Arriba, quién tiene la tarea ahora y qué sigue.
-- **Línea del carril.** Cada fase es una estación, con su tiempo y las que terminan en tu decisión.
-- **Métricas.** Tiempos, tokens por agente y bitácora.
-- **Tus repos.** Aparecen todos los repos donde usaste bflow, agrupados por perfil, así que ves de un vistazo en cuál te toca.
-
-Con `ui: { web: true }`, la ventana del panel también la abre al empezar una tarea. Si ya hay una página abierta, no abre otra.
-
-Cuando la tarea espera tu decisión (una gate o un bloqueo) y Claude termina su turno, bflow manda una notificación del sistema que dice qué hay que decidir, una vez por espera. `ui: { notify: false }` la apaga.
-
-Los agentes los genera bflow en el repo:
-
-```bash
-bflow render           # escribe .claude/agents/bflow-<agente>.md; commitéalos
-bflow render --check   # en CI: falla si no coinciden con la configuración
-```
-
-Cada agente tiene dos capas. El **contrato** con bflow (qué recibe, qué archivos escribe, qué veredictos puede reportar y cómo) sale del flujo y no se configura. El **oficio** (cómo hace su trabajo) trae un default y cada repo lo complementa:
-
-```yaml
-# bflow.yaml
-agents:
-  implementer:
-    model: sonnet
-    effort: medium
-    read: [docs/architecture/]           # el agente los lee antes de empezar
-    extra: docs/bflow/implementer.md     # instrucciones propias, se copian al agente
-  documenter: { model: haiku, effort: low }
-```
-
-Con `read`, el agente no carga CLAUDE.md (`omit_claude_md: false` lo cambia): las reglas del repo le llegan por esas rutas. Un agente propio se agrega a una fase en `flow.agents` y define su oficio en `extra`; bflow le antepone el contrato. Los agentes generados llevan el prefijo `bflow-` para no chocar con los tuyos; `render` nunca pisa un archivo que no generó. Si el repo tiene `AGENTS.md` (lo leen Codex y OpenCode), `render` mantiene en él un bloque que dice cómo retomar una tarea con bflow. `bflow doctor` avisa si los agentes están desactualizados y si alguna skill instalada parece de proceso (ramas, PR, tracker, specs), porque puede chocar con el flujo; `doctor.ignore_skills` silencia las que no chocan.
-
-## Configuración
-
-Hay tres capas; la última gana:
-
-1. **Global** (`~/.config/bflow/config.yaml`, en Windows `%AppData%\bflow\config.yaml`), con perfiles compartidos entre repos.
-2. **Perfil**, el que cada repo referencia.
-3. **Repo** (`bflow.yaml`), solo con lo propio de ese repo.
-
-```yaml
-# global (bflow profile add acme --tracker plane --url ... --host github --base dev)
-profiles:
-  acme:
-    tracker: { adapter: plane, url: https://plane.example.com, workspace: acme }
-    vcs: { host: github, base_branch: dev }
-    agent: claude
-```
-
-```yaml
-# bflow.yaml del repo (lo genera bflow init)
-profile: acme
-stack: go
-tracker: { project: API }        # identificador legible, nunca UUID
-check:
-  steps:
-    - { name: vet,   run: "go vet ./..." }
-    - { name: test,  run: "go test -count=1 {race} ./..." }
-    - { name: lint,  run: "golangci-lint run --new-from-rev={base}", needs: golangci-lint }
-    - { name: vulns, run: "govulncheck ./...", needs: govulncheck, optional: true }
-```
-
-La validación junta todos los problemas en un solo mensaje, indica la línea de los campos desconocidos y rechaza cualquier clave que parezca un secreto.
-
-## Comandos
-
-| Grupo | Comandos |
+| Documento | Para qué |
 |---|---|
-| Flujo | `status [ID] [--brief]` · `start <ID> --lane [--fixes ID]` · `approve` · `reject --note` · `report --agent --verdict` · `block` / `unblock` · `drop --note` · `freeze` · `show` · `new --lane --title [--file]` · `task add` · `task list` · `sync` · `import --from harness` |
-| Agentes | `render [--check]` |
-| Git y PR | `pr` · `panel [--sla]` (cierra lo mergeado o lo que el tracker ya dio por hecho, aunque esté en otra fase; recuerda gates vencidos) |
-| Calidad | `check [--quick pkg] [--verify]` · `env check` · `guard` |
-| Métricas | `stats [ID] [--calls] [--reads]` · `statusline` · `watch [--open] [--web]` (panel en vivo) · `ui` (panel en el navegador, con todos tus repos) |
-| Configuración | `init` · `doctor` · `connect plane\|github` · `profile add\|list\|use` · `tracker setup` · `tracker states` |
-| Hooks | `hook session-start` · `hook tokens` |
-
-`bflow help` lista todo; cualquier comando acepta `--json`.
-
-### stats: tiempos, tokens y lecturas
-
-`stats [ID]` muestra tiempo por fase (agente, humano, bloqueada), iteraciones y tokens. Sin ID, lista todas las tareas con una línea cada una.
-
-- `--calls`: con ID, añade una tabla de llamadas al modelo por corrida (agente o sesión principal), con contexto nuevo y caché reutilizada en cada llamada. Útil para ver dónde se repite contexto o si el prefijo varía entre corridas.
-- `--reads`: con ID, muestra qué archivos se leyeron y cuántas veces, cuántos agentes distintos los tocaron, y qué % de las lecturas fueron relecturas (mismo archivo, diferentes agentes). Responde si construir un índice de contexto vale la pena; sin `reads-all.jsonl`, avisa "sin registro de lecturas".
-
-## Estado y hoja de ruta
-
-El MVP cubre el módulo 1 (motor de flujo) y adelanta las guardas y las métricas:
-
-1. ✅ Motor de flujo: estado, gates, tracker local y Plane, git y GitHub.
-2. ✅ Guardas (versión inicial): git destructivo, `.env`, `.bflow/`, pruebas congeladas (también sin hooks), ramas y PR a mano, tamaño de diff, agentes que terminan sin reportar.
-3. 🟡 Distribuidor: `bflow render` genera los agentes para Claude Code (contrato de bflow + oficio del repo). Binarios por plataforma con checksums y atestación, instaladores y `bflow update`. Pendiente: otras herramientas y la firma de código en Windows y macOS (falta el certificado).
-4. ✅ Métricas: tiempo, tokens por fase, agente y modelo, calidad (rechazos por gate, hotfixes) y fricción.
-5. ⏳ Contexto: índice del código para el planner y el reviewer.
-6. ⏳ Planeación: ordenar el backlog y repartirlo en ciclos balanceados.
+| [Por qué y rumbo](docs/por-que-y-rumbo.md) | La motivación, la meta y las fases. |
+| [Instalación](docs/instalacion.md) | Requisitos, instalar, actualizar, verificar, desinstalar. |
+| [Conceptos](docs/conceptos.md) | Núcleo y adaptadores, fases y carriles, gates, `next`, qué queda en el repo, garantías. |
+| [Cómo trabajar con bflow](docs/guia.md) | El día a día: qué haces en cada gate, ajustar agentes, qué hacer cuando algo se atora. |
+| [Configuración](docs/configuracion.md) | `bflow.yaml`, perfiles, trackers, agentes, check, Claude Code y OpenCode. |
+| [Comandos](docs/comandos.md) | Referencia de todos los comandos. |
+| [Marcas de sesión](docs/marcas-sesion.md) | Cómo se reparten los tokens entre tareas. |
+| [Cómo probar y reportar](docs/como-probar-y-reportar.md) | Qué esperamos de quien prueba, cómo reportar y problemas conocidos. |
 
 ## Desarrollo
 

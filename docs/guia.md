@@ -1,6 +1,6 @@
 # Cómo trabajar con bflow
 
-Esta guía es para quien ya instaló bflow y configuró un repo (ver el [README](../README.md)). Explica qué haces tú y qué hace bflow en cada paso, cómo ajustar a los agentes y qué hacer cuando algo se atora.
+Esta guía es para quien ya instaló bflow y configuró un repo (ver el [README](../README.md) y la [instalación](instalacion.md)). Para los conceptos (fases, carriles, `next`, garantías) ve a [conceptos](conceptos.md); para `bflow.yaml` y los trackers, a [configuración](configuracion.md); para cada comando, a [comandos](comandos.md). Explica qué haces tú y qué hace bflow en cada paso, cómo ajustar a los agentes y qué hacer cuando algo se atora.
 
 ## Quién hace qué
 
@@ -36,6 +36,8 @@ Antes de tus respuestas, el walkthrough te dice cuánto del diff abrió el revie
 Nadie marca una tarea como terminada a mano: bflow la cierra cuando detecta el merge (`bflow panel`). Si la terminaste en otra máquina o sesión, `bflow panel` también cierra la copia local cuando el tracker ya la da por hecha o cerrada, o cuando el PR de su rama está mergeado, en cualquier fase en que haya quedado, y lo dice ("terminada fuera de esta copia").
 
 ## Ajustar a los agentes
+
+La configuración completa de los agentes está en [configuración](configuracion.md#agentes); aquí, cómo escribir su oficio.
 
 `bflow render` genera los agentes en `.claude/agents/bflow-<agente>.md` y, si `agent:` es una lista con `opencode` (`agent: [claude, opencode]`), también en `.opencode/agents/bflow-<agente>.md`. Para OpenCode, `bflow install opencode` instala el comando `/bflow` y `models.opencode` traduce los alias (`sonnet`, `haiku`) a `proveedor/modelo`; `render` también escribe `.opencode/plugins/bflow.js`, el plugin que le da a OpenCode el guard y el conteo de tokens (si `bflow` no está en el PATH, el guard no actúa y el plugin avisa una vez por sesión). OpenCode no tiene nudge de subagente ni hook de inicio: lo cubren `bflow report`, `bflow check --verify` y el bloque de AGENTS.md. Commitéalos para que todo el equipo use los mismos, y no los edites: cada archivo tiene dos partes.
 
@@ -112,6 +114,8 @@ Tus reglas de arquitectura en CLAUDE.md o en los documentos de `read` son bienve
 | El tracker no respondió | El cambio queda pendiente y se reintenta en orden | `bflow sync` o el siguiente comando lo reintenta |
 
 ## Medir
+
+Todos los comandos de métricas están en [comandos](comandos.md#métricas); el reparto de tokens entre tareas, en [marcas de sesión](marcas-sesion.md).
 
 Mientras trabajas, `bflow watch --open` abre en otra ventana un panel en vivo: el paso actual (quién trabaja o qué gate te espera), lo que sigue, tiempos, tokens por agente y los últimos eventos. Para que `bflow start` lo abra solo, pon `ui: { watch: true }` en tu config global (`%AppData%\bflow\config.yaml` en Windows, `~/.config/bflow/config.yaml` en Linux y macOS) o en `bflow.yaml`. El primer `bflow init` en tu máquina te lo pregunta y lo guarda en la config global.
 
