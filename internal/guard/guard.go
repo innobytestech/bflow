@@ -185,6 +185,7 @@ var (
 	stashDrop    = regexp.MustCompile(`^git\s+(-\S+\s+)*stash\s+(drop|clear)\b`)
 	pushRe       = regexp.MustCompile(`^git\s+(-\S+\s+)*push\b(.*)$`)
 	forceRe      = regexp.MustCompile(`(^|\s)(--force(-with-lease)?|-f)(\s|$|=)`)
+	addRe        = regexp.MustCompile(`^git\s+(-[cC]\s+\S+\s+|-\S+\s+)*(add|stage)\b(.*)$`)
 	commitRe     = regexp.MustCompile(`^git\s+(-\S+\s+)*commit\b`)
 	coauthorRe   = regexp.MustCompile(`(?i)co-authored-by`)
 	rmRe         = regexp.MustCompile(`^(rm|del|git\s+rm|mv|git\s+mv)\s`)
@@ -281,6 +282,23 @@ func bash(a Action, c Context) Decision {
 				if slices.Contains(c.Protected, target) {
 					return deny("protected_branch", "no se empuja a %s: los cambios llegan por PR (bflow pr).", target)
 				}
+			}
+		}
+		if m := addRe.FindStringSubmatch(s); m != nil {
+			bad := false
+			for _, f := range strings.Fields(m[3]) {
+				if f == "--force" || (strings.HasPrefix(f, "-") && !strings.HasPrefix(f, "--") && strings.Contains(f, "f")) {
+					bad = true
+					break
+				}
+				r := strings.ReplaceAll(rel(c.Root, f), `\`, "/")
+				if r == ".bflow" || strings.HasPrefix(r, ".bflow/") {
+					bad = true
+					break
+				}
+			}
+			if bad {
+				return deny("bflow_tracked", "`%s` metería archivos que git ignora: lo de .bflow/ (walkthrough, reportes) se queda fuera del repo; bflow commitea la spec y el changelog. Agrega solo código y docs, sin -f.", s)
 			}
 		}
 		if commitRe.MatchString(s) {

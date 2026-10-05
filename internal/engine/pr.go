@@ -91,6 +91,9 @@ func (e *Engine) openPR(ctx context.Context, rec *store.Record) ([]string, error
 	if files := e.uncommitted(ctx, rec.Flow); len(files) > 0 {
 		return nil, uncommittedRejection(files, "aprueba otra vez para abrir el PR")
 	}
+	if files := e.bflowInDiff(ctx); len(files) > 0 {
+		return nil, bflowInDiffRejection(files, "aprueba otra vez para abrir el PR")
+	}
 	if err := e.Git.Push(ctx, rec.Branch); err != nil {
 		return nil, fmt.Errorf("push de %s: %w", rec.Branch, err)
 	}
@@ -160,6 +163,30 @@ func (e *Engine) uncommitted(ctx context.Context, s flow.State) []string {
 		}
 	}
 	return out
+}
+
+// bflowInDiff lista archivos de .bflow/ agregados o modificados contra la base.
+func (e *Engine) bflowInDiff(ctx context.Context) []string {
+	if e.Git == nil {
+		return nil
+	}
+	base := e.diffBase()
+	if base == "" {
+		return nil
+	}
+	files, err := e.Git.DiffKept(ctx, base, []string{".bflow"})
+	if err != nil {
+		return nil
+	}
+	for i, f := range files {
+		files[i] = strings.ReplaceAll(f, `\`, "/")
+	}
+	return files
+}
+
+func bflowInDiffRejection(files []string, when string) *flow.Rejection {
+	return &flow.Rejection{Code: "bflow_in_diff", Reason: ".bflow/ no va en el PR; el diff contra la base trae:\n" + strings.Join(files, "\n") +
+		"\nSácalos del índice con `git rm -r --cached <ruta>`, commitea y " + when + "."}
 }
 
 func uncommittedRejection(files []string, when string) *flow.Rejection {

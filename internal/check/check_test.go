@@ -49,6 +49,9 @@ type fakeGit struct {
 func (g *fakeGit) HeadSHA(context.Context) (string, error)             { return g.sha, nil }
 func (g *fakeGit) Dirty(context.Context, []string) ([]string, error)   { return g.dirty, nil }
 func (g *fakeGit) DiffNames(context.Context, string) ([]string, error) { return g.diff, nil }
+func (g *fakeGit) DiffKept(context.Context, string, []string) ([]string, error) {
+	return nil, nil
+}
 func (g *fakeGit) ChangedSince(context.Context, string, []string) ([]string, error) {
 	return g.changed, nil
 }

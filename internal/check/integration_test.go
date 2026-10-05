@@ -29,6 +29,9 @@ func (g realGit) Dirty(_ context.Context, p []string) ([]string, error) {
 	return strings.Split(out, "\n"), nil
 }
 func (g realGit) DiffNames(context.Context, string) ([]string, error) { return nil, nil }
+func (g realGit) DiffKept(context.Context, string, []string) ([]string, error) {
+	return nil, nil
+}
 func (g realGit) ChangedSince(_ context.Context, sha string, p []string) ([]string, error) {
 	out := g.git(append([]string{"diff", "--name-only", sha, "HEAD", "--"}, p...)...)
 	if out == "" {

@@ -43,6 +43,15 @@ func TestBashRules(t *testing.T) {
 		{"go vet ./... && git push origin master", false, "protected_branch"},
 		{`git commit -m "feat: x" -m "Co-Authored-By: Claude <noreply@anthropic.com>"`, false, "coauthor"},
 		{`git commit -m "feat: x"`, true, ""},
+		{"git add -f .bflow/tasks/X/walkthrough.md", false, "bflow_tracked"},
+		{"git add --force a.go", false, "bflow_tracked"},
+		{"git add -fA", false, "bflow_tracked"},
+		{"git -C . add .bflow/x", false, "bflow_tracked"},
+		{`cd x && git add .bflow\x`, false, "bflow_tracked"},
+		{"git stage .bflow", false, "bflow_tracked"},
+		{"git add internal/a.go", true, ""},
+		{"git add -A", true, ""},
+		{"git add -p", true, ""},
 	}
 	for _, c := range cases {
 		d := Evaluate(Action{Tool: Bash, Command: c.cmd}, ctx())
