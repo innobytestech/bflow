@@ -87,23 +87,51 @@ func Segments(cmd string) []string { return segments(cmd, 0) }
 
 var heredocRe = regexp.MustCompile(`<<-?\s*(?:'([^']+)'|"([^"]+)"|([A-Za-z_][A-Za-z0-9_]*))`)
 
-// stripHeredocs quita el cuerpo de los heredocs: es texto, no comandos.
+var shellNames = map[string]bool{"bash": true, "sh": true, "zsh": true, "dash": true, "ksh": true}
+
+// feedsShell dice si algún segmento de la línea ejecuta un shell (bash <<EOF,
+// cat <<EOF | bash): entonces el cuerpo del heredoc son comandos.
+func feedsShell(line string) bool {
+	for _, seg := range segSplit.Split(line, -1) {
+		for _, f := range strings.Fields(seg) {
+			if strings.Contains(f, "=") && !strings.HasPrefix(f, "-") {
+				continue
+			}
+			f = strings.Trim(f, `"'`)
+			f = strings.ToLower(f[strings.LastIndexAny(f, `/\`)+1:])
+			f = strings.TrimSuffix(f, ".exe")
+			if shellNames[f] {
+				return true
+			}
+			if f != "sudo" && f != "env" && f != "exec" {
+				break
+			}
+		}
+	}
+	return false
+}
+
+// stripHeredocs quita el cuerpo de los heredocs que leen otros programas: es
+// texto. Si el heredoc alimenta a un shell, el cuerpo se conserva (se ejecuta).
 func stripHeredocs(cmd string) string {
 	if !strings.Contains(cmd, "<<") {
 		return cmd
 	}
 	var out []string
-	end := ""
+	end, run := "", false
 	for _, line := range strings.Split(cmd, "\n") {
 		if end != "" {
 			if strings.TrimSpace(line) == end {
 				end = ""
+			} else if run {
+				out = append(out, line)
 			}
 			continue
 		}
 		out = append(out, line)
 		if m := heredocRe.FindStringSubmatch(line); m != nil {
 			end = m[1] + m[2] + m[3]
+			run = feedsShell(line)
 		}
 	}
 	return strings.Join(out, "\n")

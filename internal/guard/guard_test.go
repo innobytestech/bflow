@@ -375,3 +375,26 @@ func TestBflowArgs(t *testing.T) {
 		}
 	}
 }
+
+// El cuerpo de un heredoc que ejecuta un shell son comandos; si lo lee otro
+// programa, es texto.
+func TestHeredocExecutedByShell(t *testing.T) {
+	active := ctx()
+	active.Phase = flow.Implementing
+	cases := []struct {
+		cmd, rule string
+	}{
+		{"bash <<EOF\ngit add -f .bflow/x\nEOF", "bflow_tracked"},
+		{"sh <<'EOF'\nbflow approve X\nEOF", "human_only"},
+		{"cat <<EOF | bash\ngit add -f .bflow/x\nEOF", "bflow_tracked"},
+		{"bash -s <<EOF\ngit push --force origin x\nEOF", "force_push"},
+		{"cat <<EOF | tee n.md\ngit add -f .bflow/x\nEOF", ""},
+		{"python - <<EOF\ngit add -f .bflow/x\nEOF", ""},
+	}
+	for _, c := range cases {
+		d := Evaluate(Action{Tool: Bash, Command: c.cmd, Subagent: true, Agent: "implementer"}, active)
+		if c.rule == "" && !d.Allow || c.rule != "" && (d.Allow || d.Rule != c.rule) {
+			t.Errorf("%q → %+v, quería regla %q", c.cmd, d, c.rule)
+		}
+	}
+}
