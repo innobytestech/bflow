@@ -2,6 +2,8 @@ package flow
 
 import (
 	"fmt"
+	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -18,6 +20,22 @@ func SpecPath(id, slug string) string {
 
 // TaskDir es la carpeta de trabajo (ignorada por git) de una tarea.
 func TaskDir(id string) string { return ".bflow/tasks/" + id }
+
+// AllowRe encuentra `freeze --allow <archivo>` en el texto de una decisión.
+var AllowRe = regexp.MustCompile("freeze\\s+--allow\\s+[`'\"]?([^\\s`'\"]+)")
+
+// AllowFiles son los archivos que el texto pide dejar cambiar con
+// `freeze --allow`, con `/`, sin repetidos y en orden de aparición.
+func AllowFiles(text string) []string {
+	var out []string
+	for _, m := range AllowRe.FindAllStringSubmatch(text, -1) {
+		f := strings.ReplaceAll(m[1], `\`, "/")
+		if !slices.Contains(out, f) {
+			out = append(out, f)
+		}
+	}
+	return out
+}
 
 // NextFor dice qué debe hacer la sesión principal con la tarea en el estado s.
 func NextFor(cfg Config, s State) output.Next {
@@ -154,8 +172,14 @@ func gateNext(cfg Config, s State) output.Next {
 	case GateDecision:
 		n.Question = fmt.Sprintf("%s necesita una decisión: %s", g.Agent, g.Note)
 		for i, o := range g.Options {
-			n.Options = append(n.Options, output.Option{ID: "opt" + strconv.Itoa(i+1), Label: o,
-				Command: cmd("approve", id, "--gate", "decision", "--choice", strconv.Itoa(i+1))})
+			opt := output.Option{ID: "opt" + strconv.Itoa(i+1), Label: o,
+				Command: cmd("approve", id, "--gate", "decision", "--choice", strconv.Itoa(i+1))}
+			var lines []string
+			for _, f := range AllowFiles(o) {
+				lines = append(lines, "Antes de relanzar al agente, una persona corre en su terminal: bflow freeze --allow "+f)
+			}
+			opt.Description = strings.Join(lines, "\n")
+			n.Options = append(n.Options, opt)
 		}
 		n.Options = append(n.Options, output.Option{ID: "other", Label: "Otra decisión", NeedsNote: true,
 			Command: cmd("approve", id, "--gate", "decision", `--note "<decisión>"`)})

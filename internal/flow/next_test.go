@@ -308,3 +308,33 @@ func TestSuggestClear(t *testing.T) {
 		t.Error("next done: no clear")
 	}
 }
+
+func TestDecisionOptionWarnsFreezeAllow(t *testing.T) {
+	s := stateFor(row{lane: Light, from: Implementing, gate: GateDecision})
+	s.Gate.Options = []string{"Aprobar el cambio con `bflow freeze --allow internal/x_test.go`", "Dejarlo así"}
+	n := NextFor(testConfig(), s)
+	if d := n.Options[0].Description; !strings.Contains(d, "internal/x_test.go") || !strings.Contains(d, "bflow freeze --allow") {
+		t.Errorf("description: %q", d)
+	}
+	if d := n.Options[1].Description; d != "" {
+		t.Errorf("sin comando no hay aviso: %q", d)
+	}
+}
+
+func TestAllowFiles(t *testing.T) {
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{"bflow freeze --allow internal/a_test.go", "internal/a_test.go"},
+		{"corre `bflow freeze --allow 'internal/a_test.go'` ya", "internal/a_test.go"},
+		{`freeze --allow "internal\cli\a_test.go"`, "internal/cli/a_test.go"},
+		{"freeze --allow a_test.go y freeze  --allow b_test.go y freeze --allow a_test.go", "a_test.go,b_test.go"},
+		{"sin comando, solo --allow", ""},
+	}
+	for _, c := range cases {
+		if got := strings.Join(AllowFiles(c.in), ","); got != c.want {
+			t.Errorf("%q: %q, want %q", c.in, got, c.want)
+		}
+	}
+}
