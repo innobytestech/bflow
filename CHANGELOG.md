@@ -8,6 +8,7 @@ Los cambios de bflow que ve quien lo usa. Las versiones siguen [semver](https://
 
 - **Tokens de la sesión principal repartidos por marcas.** El guard marca la sesión que conduce una tarea (también en subagentes) y `stats` y `watch` reparten los tokens por esas marcas; lo que no cae en ninguna tarea se muestra como «sin tarea». Hace falta correr `bflow install claude` de nuevo para que el matcher de los hooks sea `Task|Agent`.
 - **Lecturas de todos los agentes y relectura por archivo.** Las lecturas de archivos de todos los agentes (Claude Code y OpenCode) se registran, y `stats` muestra cuántas veces se releyó cada archivo.
+- **Gate `freeze_allow`.** Si la opción elegida en el gate `decision` pide `bflow freeze --allow <archivo>` de una prueba congelada, la opción lo avisa antes de elegirla y el `next` no relanza al implementer hasta que una persona corre el comando en su terminal (el guard se lo niega a todo agente). Ofrece "Ya lo corrí" o dejar la tarea bloqueada.
 - **Tracker de GitHub Issues y Projects.** `tracker: github` lleva el estado de cada tarea con etiquetas `bflow:*` en el issue o, con `project`, en las columnas de un GitHub Project. `init` lo ofrece, `doctor` revisa el acceso y `setup` crea lo que falta; los errores 422 de GitHub ahora dicen qué campo falló.
 - **OpenCode como segundo agente.** `agent:` acepta una lista (`claude`, `opencode`) y una tabla `models` con alias de modelo. `bflow render` escribe los agentes y el comando `/bflow` de OpenCode, `bflow install opencode` los instala y `init`, `doctor` y `update` lo entienden.
 - **Plugin de OpenCode con guard y tokens.** `bflow render` escribe `.opencode/plugins/bflow.js` (se commitea, no se edita): aplica el guard a bash, edit, write, multiedit, patch y apply_patch, y mide los tokens por fase, agente y modelo en `bflow stats`. OpenCode no tiene aviso de subagente sin reporte ni hook de inicio de sesión: cierra con `bflow report` explícito.
@@ -66,6 +67,9 @@ Los cambios de bflow que ve quien lo usa. Las versiones siguen [semver](https://
 
 ### Cambiado
 
+- **`guard` no deja meter `.bflow/` al repo.** Niega `git add -f`/`--force` y `git add` de rutas bajo `.bflow/`; `report DONE` y la aprobación que abre el PR se rechazan si el diff trae archivos de `.bflow/`.
+- **`guard` corta los comandos respetando comillas y heredocs.** Un `grep`, `echo` o `rg` que menciona un comando prohibido entre comillas, o el cuerpo de un heredoc que lee otro programa (`cat`, `tee`, `gh`), ya no se rechazan. Sí se revisan el cuerpo de un heredoc que ejecuta un shell (`bash <<EOF`, `cat <<EOF | bash`) y las sustituciones `$(…)` dentro de comillas dobles.
+- **`install.ps1` calcula el SHA256 con .NET**, sin `Get-FileHash`: instala también desde `powershell` 5.1 lanzado por pwsh 7.
 - **`guard` evalúa el comando dentro de `bash -c` / `sh -c`.** Las reglas de Bash (`git reset --hard`, push forzado, `bflow approve` desde un subagente) ya no se saltan envolviéndolas, y la medición de lecturas del reviewer cuenta el archivo leído, no «bash».
 - **El tope de 1,500 líneas de lectura se respeta también al medir `.` y carpetas.**
 - **Una tarea cuyo PR se mergeó queda en `bflow:done`**, no en `bflow:in-review`, en el tracker.
