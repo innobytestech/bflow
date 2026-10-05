@@ -23,7 +23,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|Read",
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|Read|Task|Agent",
         "hooks": [
           {
             "type": "command",
