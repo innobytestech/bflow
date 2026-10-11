@@ -87,6 +87,8 @@ func (Agent) RenderAgents(specs []agents.Spec) (map[string][]byte, error) {
 		out[agentsDir+"/"+s.Subagent+".md"] = b.Bytes()
 	}
 	out[pluginFile] = files.Plugin
+	out[plugin2File] = files.Plugin2
+	out[plugin2Package] = files.Plugin2Package
 	return out, nil
 }
 
@@ -99,8 +101,10 @@ func (Agent) GeneratedAgents(root string) []string {
 			out = append(out, agentsDir+"/"+filepath.Base(m))
 		}
 	}
-	if b, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(pluginFile))); err == nil && bytes.Contains(b, []byte(agents.GeneratedMark)) {
-		out = append(out, pluginFile)
+	for _, p := range PluginFiles {
+		if b, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(p))); err == nil && bytes.Contains(b, []byte(agents.GeneratedMark)) {
+			out = append(out, p)
+		}
 	}
 	return out
 }

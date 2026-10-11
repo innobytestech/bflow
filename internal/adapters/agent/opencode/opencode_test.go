@@ -46,7 +46,7 @@ func TestOpenCodeRender(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(out) != 4 { // tres agentes y el plugin
+	if len(out) != 6 { // tres agentes y los tres archivos del plugin
 		t.Fatalf("un archivo por agente y el plugin: %d", len(out))
 	}
 

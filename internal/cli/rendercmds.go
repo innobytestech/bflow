@@ -177,6 +177,9 @@ func writeRender(cfg *config.Config, p *renderPlan) error {
 		if err := os.Remove(filepath.Join(cfg.Root, filepath.FromSlash(rel))); err != nil {
 			return err
 		}
+		if dir := filepath.ToSlash(filepath.Dir(filepath.FromSlash(rel))); dir == ".opencode/plugins/bflow2" {
+			_ = os.Remove(filepath.Join(cfg.Root, filepath.FromSlash(dir))) // falla si no está vacía: se deja
+		}
 	}
 	return nil
 }
