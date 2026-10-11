@@ -98,6 +98,6 @@ No hay un comando `uninstall`. A mano:
 1. Borra el binario `bflow` (la carpeta de instalación de arriba).
 2. Borra la skill: `~/.claude/skills/bflow` y, si usas OpenCode, `bflow.md` en la carpeta `commands` de OpenCode.
 3. En cada repo, quita las entradas de bflow de `.claude/settings.json` (hooks, permiso y barra de estado).
-4. Borra lo que escribió `bflow render`: los archivos `bflow-*.md` de `.claude/agents/` y `.opencode/agents/`, `.opencode/plugins/bflow.js` y el bloque de bflow en `AGENTS.md`.
+4. Borra lo que escribió `bflow render`: los archivos `bflow-*.md` de `.claude/agents/` y `.opencode/agents/`, `.opencode/plugins/bflow.js`, `.opencode/plugins/bflow2/` y el bloque de bflow en `AGENTS.md`.
 5. Borra `bflow.yaml` y la carpeta `.bflow/` del repo, y la config global (`~/.config/bflow/`, en Windows `%AppData%\bflow\`) si ya no la quieres.
 6. Quita las credenciales del llavero del sistema (Credential Manager, Keychain o Secret Service): las que guardó `bflow connect`.

@@ -141,7 +141,7 @@ Los archivos fuente están en [`adapters/claude/`](../adapters/claude/).
 
 ### OpenCode
 
-Con `opencode` en `agent:`, `bflow render` escribe `.opencode/agents/bflow-<agente>.md` (subagentes con permisos `edit` y `bash` según lo que hace cada agente) y `bflow render --check` cubre los dos conjuntos. También escribe `.opencode/plugins/bflow.js` (se commitea y no se edita): el guard antes de bash, edit, write y patch, y los tokens por fase y agente. OpenCode no tiene nudge de subagente; el plugin inyecta `bflow hook session-start` al crear una sesión raíz (sin pedir respuesta), así que un `/clear` no pierde el hilo.
+Con `opencode` en `agent:`, `bflow render` escribe `.opencode/agents/bflow-<agente>.md` (subagentes con permisos `edit` y `bash` según lo que hace cada agente) y `bflow render --check` cubre los dos conjuntos. También escribe `.opencode/plugins/bflow.js` (OpenCode 1.x) y `.opencode/plugins/bflow2/` (OpenCode 2.x, que además inyecta el estado de la tarea al primer prompt); se commitean y no se editan: el guard antes de bash, edit, write y patch, y los tokens por fase y agente. OpenCode no tiene nudge de subagente; el plugin inyecta `bflow hook session-start` al crear una sesión raíz (sin pedir respuesta), así que un `/clear` no pierde el hilo.
 
 OpenCode pide el modelo como `proveedor/modelo`, así que los alias de los agentes (`sonnet`, `haiku`) se traducen con `models.opencode`, en `bflow.yaml`, en un perfil o en la config global (gana el repo, por alias):
 
