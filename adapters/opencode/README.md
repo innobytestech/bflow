@@ -5,7 +5,8 @@
 | Archivo (embebido en el binario) | Dónde lo deja `bflow install opencode` | Para qué |
 |---|---|---|
 | `command_head.md` + [`../leader/bflow.md`](../leader/bflow.md) | `$XDG_CONFIG_HOME/opencode/commands/bflow.md`, o `~/.config/opencode/commands/bflow.md` (una vez por máquina) | La sesión principal interpreta `next`; es el mismo cuerpo que la skill de Claude, con la herramienta `question` |
-| [`plugin.js`](plugin.js) | `<repo>/.opencode/plugins/bflow.js` (lo escribe `bflow render`) | Guard y medición de tokens |
+| [`plugin.js`](plugin.js) | `<repo>/.opencode/plugins/bflow.js` (lo escribe `bflow render`) | Guard y medición de tokens (OpenCode 1.x) |
+| [`plugin2/index.js`](plugin2/index.js) + [`plugin2/package.json`](plugin2/package.json) | `<repo>/.opencode/plugins/bflow2/` (lo escribe `bflow render`) | Lo mismo para OpenCode 2.x, más la inyección del estado al primer prompt |
 
 ## Modelos
 
@@ -21,6 +22,8 @@ models:
 Un valor con `/` se usa tal cual. Un alias sin equivalente deja al agente sin `model:` y `bflow render` y `bflow doctor` lo avisan.
 
 ## Plugin: guard y tokens
+
+OpenCode 2.x no carga `bflow.js` (pide `export default { id, setup }`) y 1.x ignora la carpeta `bflow2/`, así que `bflow render` escribe los dos y cada versión usa el suyo. El de 2.x hace lo mismo con la API de 2.x: `ctx.tool.hook("execute.before")` (herramientas `shell`, `edit`, `write`, `patch`, `read`, `subagent`; los argumentos vienen en `x.input`), eventos `session.step.ended` y `session.execution.succeeded` para los tokens, y `ctx.session.hook("prompt")` con `ctx.session.synthetic` para inyectar el estado una vez por sesión raíz. Lo que sigue describe el de 1.x.
 
 `bflow render` también escribe `<repo>/.opencode/plugins/bflow.js` (de [`plugin.js`](plugin.js); se commitea y no se edita). Solo le pasa datos a bflow por stdin, sin dependencias de npm:
 

@@ -16,7 +16,6 @@ import (
 	"strings"
 	"time"
 
-	opencode "innobytes.tech/bflow/internal/adapters/agent/opencode"
 	"innobytes.tech/bflow/internal/agents"
 	"innobytes.tech/bflow/internal/config"
 	"innobytes.tech/bflow/internal/envcheck"
@@ -799,10 +798,14 @@ func doctorOpenCode(c *Ctx, cfg *config.Config, add func(string, string, string,
 	case err != nil:
 	default:
 		var bad, stale []string
-		for _, f := range opencode.PluginFiles {
-			if slices.Contains(p.Conflicts, f) {
+		const pluginDir = ".opencode/plugins/" // los archivos del plugin de 1.x y de 2.x
+		for _, f := range p.Conflicts {
+			if strings.HasPrefix(f, pluginDir) {
 				bad = append(bad, f)
-			} else if slices.Contains(p.Changed, f) {
+			}
+		}
+		for _, f := range p.Changed {
+			if strings.HasPrefix(f, pluginDir) {
 				stale = append(stale, f)
 			}
 		}
@@ -812,7 +815,7 @@ func doctorOpenCode(c *Ctx, cfg *config.Config, add func(string, string, string,
 		case len(stale) > 0:
 			add("plugin", "warn", "opencode: el plugin %s falta o difiere del de este bflow (guard y tokens); corre bflow render", strings.Join(stale, ", "))
 		default:
-			add("plugin", "ok", "opencode: plugin de guard y tokens al día (%s)", strings.Join(opencode.PluginFiles, ", "))
+			add("plugin", "ok", "opencode: plugin de guard y tokens al día (1.x y 2.x)")
 		}
 	}
 	add("cobertura", "ok", "opencode no tiene nudge de subagente ni hook de inicio de sesión; lo cubren bflow report, bflow check --verify y el bloque de AGENTS.md")
