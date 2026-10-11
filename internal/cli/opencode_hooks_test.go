@@ -190,8 +190,9 @@ func tokensEnv(t *testing.T, startTask bool) (env *Env, e *engine.Engine, id, ca
 
 // usageEntry es una línea de la caché que escribe el plugin.
 func usageEntry(id, session, parent, agent string, in, out int64) string {
+	created := time.Now().Add(-time.Minute).UnixMilli() // fecha relativa: la ventana de marcas depende de hoy
 	b, _ := json.Marshal(map[string]any{"id": id, "sessionID": session, "parentID": parent, "agent": agent,
-		"providerID": "anthropic", "modelID": "claude-sonnet-4", "created": 1790877056000, "completed": 1790877056500,
+		"providerID": "anthropic", "modelID": "claude-sonnet-4", "created": created, "completed": created + 500,
 		"tokens": map[string]any{"input": in, "output": out, "reasoning": 0, "cache": map[string]any{"read": 0, "write": 0}}})
 	return string(b) + "\n"
 }
