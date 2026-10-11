@@ -321,3 +321,8 @@ type SettingsResult struct {
 	Changed  bool
 	Warnings []string
 }
+
+// LogFinding es un hallazgo al leer el log de una herramienta de agente.
+// Area: agente|log|proveedor; Level: ok|warn. Vive aquí para que los
+// adaptadores no importen cli.
+type LogFinding struct{ Area, Level, Msg string }

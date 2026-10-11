@@ -488,3 +488,49 @@ func TestOpenCodeGuardRecordsReads(t *testing.T) {
 		}
 	}
 }
+
+func TestDoctorOpenCodeLog(t *testing.T) {
+	setHome(t)
+	data := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", data)
+	env := toolsEnv(t, "agent: [claude, opencode]\n")
+	dir := filepath.Join(data, "opencode", "log")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	esc := func(rel string) string {
+		return strings.ReplaceAll(filepath.Join(env.Dir, filepath.FromSlash(rel)), `\`, `\\`)
+	}
+	ts := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	write := func(s string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(dir, "opencode.log"), []byte(s), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	warns := func(area string) int {
+		n := 0
+		for _, it := range doctorChecks(t, env)[area] {
+			if it["status"] == "warn" {
+				n++
+			}
+		}
+		return n
+	}
+
+	// Solo el fallo normal de bflow.js en 2.x: sin warn.
+	write("timestamp=" + ts + ` level=WARN message="failed to load plugin" target="` + esc(".opencode/plugins/bflow.js") + `" cause="must export a default definition"` + "\n")
+	if n := warns("log"); n != 0 {
+		t.Errorf("fallo normal de bflow.js: sin warn en log, hay %d", n)
+	}
+	// Fallo real de bflow2.
+	write("timestamp=" + ts + ` level=WARN message="failed to load plugin" target="` + esc(".opencode/plugins/bflow2") + `" cause="boom"` + "\n")
+	if n := warns("log"); n != 1 {
+		t.Errorf("fallo de bflow2: un warn en log, hay %d", n)
+	}
+	// Certificado autofirmado reciente.
+	write("timestamp=" + ts + ` level=ERROR message="x" error="self signed certificate in certificate chain"` + "\n")
+	if n := warns("proveedor"); n != 1 {
+		t.Errorf("certificado: un warn en proveedor, hay %d", n)
+	}
+}

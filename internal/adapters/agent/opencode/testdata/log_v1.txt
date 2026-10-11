@@ -1,0 +1,2 @@
+INFO  {{LOC-2h}} +0ms service=default version=1.1.53 args=run
+ERROR {{LOC-1h}} +3ms service=llm providerID=opencode error=self signed certificate in certificate chain

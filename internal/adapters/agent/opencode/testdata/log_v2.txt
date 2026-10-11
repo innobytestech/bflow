@@ -1,0 +1,7 @@
+timestamp={{UTC-3h}} level=INFO message="cli starting" version=2.0.21 args="viejo"
+timestamp={{UTC-2h}} level=INFO message="cli starting" version=2.0.22 args="PROMPT-SECRETO-NO-FILTRAR"
+timestamp={{UTC-2h}} level=WARN message="failed to load plugin" target="{{T:.opencode/plugins/bflow.js}}" cause="must export a default definition"
+timestamp={{UTC-1h}} level=WARN message="failed to load plugin" target="{{T:.opencode/plugins/bflow2}}" cause="Cannot find module x"
+timestamp={{UTC-1h}} level=WARN message="failed to load plugin" target="{{T:../otro/plugins/x.js}}" cause="de otro repo"
+timestamp={{UTC-1h}} level=ERROR message="request failed" error="This Go model requires Global regions. Select Global in your workspace Privacy settings to use it."
+linea que no es logfmt =

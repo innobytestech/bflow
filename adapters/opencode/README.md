@@ -32,3 +32,10 @@ OpenCode 2.x no carga `bflow.js` (pide `export default { id, setup }`) y 1.x ign
 - No hay evento de fin de subagente ni de inicio de sesión: el nudge y el resumen de inicio no existen en OpenCode; lo cubren `bflow report`, `bflow check --verify` y el bloque de AGENTS.md.
 
 `bflow doctor` muestra el estado del plugin.
+
+## Problemas comunes
+
+- **El plugin no carga.** `bflow doctor` avisa (`log warn`) si OpenCode registró `failed to load plugin` para un archivo de `.opencode/plugins/` después del último `bflow render`, con el motivo. Corre `bflow render` y, si sigue, revisa el log. En 2.x, el fallo de `bflow.js` con `must export a default definition` es normal: 2.x carga `bflow2/` y `bflow.js` es para 1.x.
+- **El modelo de Go pide regiones Global.** El log dice `requires Global regions` y el agente se queda quieto. Activa Global en Privacy de tu workspace de OpenCode; `bflow doctor` lo avisa si pasó en los últimos 7 días.
+- **Certificado autofirmado.** El log dice `self signed certificate in certificate chain`, casi siempre por la inspección HTTPS de un antivirus o proxy. Define `NODE_EXTRA_CA_CERTS=<ruta a la CA del antivirus o proxy>` antes de abrir OpenCode.
+- **Cómo confirmarlo en el log.** Está en `$XDG_DATA_HOME/opencode/log/` o, si no existe esa variable, en `~/.local/share/opencode/log/` (también en Windows). 2.x escribe `opencode.log`; 1.x, un archivo por corrida (`2026-10-11T022342.log`). Busca `failed to load plugin`, `requires Global regions` o `self signed certificate`.

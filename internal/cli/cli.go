@@ -220,6 +220,14 @@ func (c *Ctx) tool(name string) ToolAdapter {
 	return nil
 }
 
+// LogFinding es un hallazgo del log de una herramienta (ver agents.LogFinding).
+type LogFinding = agents.LogFinding
+
+// LogDoctor la implementan los adaptadores que saben leer el log de su herramienta.
+type LogDoctor interface {
+	DoctorLog(root string, now time.Time) []LogFinding
+}
+
 // TokenSource vive en metrics para que los adaptadores no importen cli.
 type TokenSource = metrics.TokenSource
 
