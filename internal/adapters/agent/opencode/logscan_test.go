@@ -206,7 +206,7 @@ func TestDoctorLogNoFiltraPrompt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.WriteString(line)
+	_, _ = f.WriteString(line)
 	f.Close()
 	sawLong := false
 	for _, f := range (Agent{}).DoctorLog(root, now) {
