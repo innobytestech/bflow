@@ -27,6 +27,16 @@ const agentsDir = ".opencode/agents"
 // pluginFile es el plugin de guard y tokens que bflow render escribe.
 const pluginFile = ".opencode/plugins/bflow.js"
 
+// El plugin de OpenCode 2.x es un directorio (2.x lo carga; 1.x lo ignora).
+const (
+	plugin2Dir     = ".opencode/plugins/bflow2"
+	plugin2File    = plugin2Dir + "/index.js"
+	plugin2Package = plugin2Dir + "/package.json"
+)
+
+// PluginFiles son las rutas del plugin que bflow render escribe: 1.x y 2.x.
+var PluginFiles = []string{pluginFile, plugin2File, plugin2Package}
+
 // Agent implementa cli.ToolAdapter para OpenCode.
 type Agent struct{}
 
@@ -77,6 +87,8 @@ func (Agent) RenderAgents(specs []agents.Spec) (map[string][]byte, error) {
 		out[agentsDir+"/"+s.Subagent+".md"] = b.Bytes()
 	}
 	out[pluginFile] = files.Plugin
+	out[plugin2File] = files.Plugin2
+	out[plugin2Package] = files.Plugin2Package
 	return out, nil
 }
 
@@ -89,8 +101,10 @@ func (Agent) GeneratedAgents(root string) []string {
 			out = append(out, agentsDir+"/"+filepath.Base(m))
 		}
 	}
-	if b, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(pluginFile))); err == nil && bytes.Contains(b, []byte(agents.GeneratedMark)) {
-		out = append(out, pluginFile)
+	for _, p := range PluginFiles {
+		if b, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(p))); err == nil && bytes.Contains(b, []byte(agents.GeneratedMark)) {
+			out = append(out, p)
+		}
 	}
 	return out
 }

@@ -794,15 +794,29 @@ func doctorOpenCode(c *Ctx, cfg *config.Config, add func(string, string, string,
 			add("modelos", "ok", "opencode: modelos de los agentes resueltos")
 		}
 	}
-	plugin := ".opencode/plugins/bflow.js"
 	switch p, err := planRender(c, cfg); {
 	case err != nil:
-	case slices.Contains(p.Conflicts, plugin):
-		add("plugin", "fail", "opencode: %s existe y no lo generó bflow; renómbralo o bórralo y corre bflow render", plugin)
-	case slices.Contains(p.Changed, plugin):
-		add("plugin", "warn", "opencode: el plugin %s falta o difiere del de este bflow (guard y tokens); corre bflow render", plugin)
 	default:
-		add("plugin", "ok", "opencode: plugin de guard y tokens al día (%s)", plugin)
+		var bad, stale []string
+		const pluginDir = ".opencode/plugins/" // los archivos del plugin de 1.x y de 2.x
+		for _, f := range p.Conflicts {
+			if strings.HasPrefix(f, pluginDir) {
+				bad = append(bad, f)
+			}
+		}
+		for _, f := range p.Changed {
+			if strings.HasPrefix(f, pluginDir) {
+				stale = append(stale, f)
+			}
+		}
+		switch {
+		case len(bad) > 0:
+			add("plugin", "fail", "opencode: %s existe y no lo generó bflow; renómbralo o bórralo y corre bflow render", strings.Join(bad, ", "))
+		case len(stale) > 0:
+			add("plugin", "warn", "opencode: el plugin %s falta o difiere del de este bflow (guard y tokens); corre bflow render", strings.Join(stale, ", "))
+		default:
+			add("plugin", "ok", "opencode: plugin de guard y tokens al día (1.x y 2.x)")
+		}
 	}
 	add("cobertura", "ok", "opencode no tiene nudge de subagente ni hook de inicio de sesión; lo cubren bflow report, bflow check --verify y el bloque de AGENTS.md")
 }

@@ -30,3 +30,14 @@ func must(b []byte, err error) []byte {
 	}
 	return b
 }
+
+// Plugin2 es el plugin de OpenCode 2.x que bflow render escribe en
+// .opencode/plugins/bflow2/index.js.
+//
+//go:embed plugin2/index.js
+var Plugin2 []byte
+
+// Plugin2Package es el package.json que acompaña a Plugin2 en bflow2/.
+//
+//go:embed plugin2/package.json
+var Plugin2Package []byte

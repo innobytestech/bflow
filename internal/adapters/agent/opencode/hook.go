@@ -29,6 +29,8 @@ func (Agent) ParseActions(raw []byte) ([]guard.Action, string, bool) {
 	var args struct {
 		Command   string          `json:"command"`
 		FilePath  string          `json:"filePath"`
+		Path      string          `json:"path"`
+		Agent     string          `json:"agent"`
 		PatchText string          `json:"patchText"`
 		Offset    json.RawMessage `json:"offset"`
 		Limit     json.RawMessage `json:"limit"`
@@ -36,6 +38,10 @@ func (Agent) ParseActions(raw []byte) ([]guard.Action, string, bool) {
 		Subagent  string          `json:"subagent_type"`
 	}
 	_ = json.Unmarshal(in.Args, &args)
+	file := args.FilePath // 2.x manda path en lugar de filePath
+	if file == "" {
+		file = args.Path
+	}
 	mk := func(tool, path string) guard.Action {
 		a := guard.Action{Tool: tool, Subagent: in.Subagent, Agent: in.Agent, Session: in.SessionID}
 		if path != "" {
@@ -48,22 +54,25 @@ func (Agent) ParseActions(raw []byte) ([]guard.Action, string, bool) {
 	}
 	var acts []guard.Action
 	switch in.Tool {
-	case "bash":
+	case "bash", "shell":
 		a := mk(guard.Bash, "")
 		a.Command = args.Command
 		acts = append(acts, a)
 	case "edit", "multiedit":
-		acts = append(acts, mk(guard.Edit, args.FilePath))
+		acts = append(acts, mk(guard.Edit, file))
 	case "read":
-		a := mk(guard.Read, args.FilePath)
+		a := mk(guard.Read, file)
 		a.Partial = present(args.Offset) || present(args.Limit)
 		acts = append(acts, a)
-	case "task":
+	case "task", "subagent":
 		a := mk(guard.Spawn, "")
 		a.Target, a.Command = args.Subagent, args.Prompt
+		if a.Target == "" {
+			a.Target = args.Agent
+		}
 		acts = append(acts, a)
 	case "write":
-		acts = append(acts, mk(guard.Write, args.FilePath))
+		acts = append(acts, mk(guard.Write, file))
 	case "patch", "apply_patch":
 		writes, edits := patchPaths(args.PatchText)
 		for _, w := range writes {
