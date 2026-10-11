@@ -72,6 +72,7 @@ Los cambios de bflow que ve quien lo usa. Las versiones siguen [semver](https://
 
 ### Cambiado
 
+- **`doctor` lee el log de OpenCode.** Revisa `$XDG_DATA_HOME/opencode/log/` (o `~/.local/share/opencode/log/`) y avisa si el plugin no cargó después del último `bflow render` (`log warn`), si el modelo pide regiones Global o si hay un certificado autofirmado en los últimos 7 días (`proveedor warn`). El fallo normal de `bflow.js` en 2.x no avisa. La versión de OpenCode dice qué plugin le toca (`bflow.js` en 1.x, `bflow2/` en 2.x). Los casos y su arreglo están en `adapters/opencode/README.md`, en «Problemas comunes».
 - **`guard` no deja meter `.bflow/` al repo.** Niega `git add -f`/`--force` y `git add` de rutas bajo `.bflow/`; `report DONE` y la aprobación que abre el PR se rechazan si el diff trae archivos de `.bflow/`.
 - **`guard` corta los comandos respetando comillas y heredocs.** Un `grep`, `echo` o `rg` que menciona un comando prohibido entre comillas, o el cuerpo de un heredoc que lee otro programa (`cat`, `tee`, `gh`), ya no se rechazan. Sí se revisan el cuerpo de un heredoc que ejecuta un shell (`bash <<EOF`, `cat <<EOF | bash`) y las sustituciones `$(…)` dentro de comillas dobles.
 - **`install.ps1` calcula el SHA256 con .NET**, sin `Get-FileHash`: instala también desde `powershell` 5.1 lanzado por pwsh 7.
