@@ -104,6 +104,7 @@ Tus reglas de arquitectura en CLAUDE.md o en los documentos de `read` son bienve
 |---|---|---|
 | Un comando sale con código 2 | El flujo no permite eso ahora (por ejemplo, aprobar algo que no está pendiente) | Lee el motivo; repetir el mismo comando dará el mismo rechazo |
 | `guard` bloqueó una acción | El agente intentó algo peligroso o que le toca a bflow | Nada: el agente recibe el motivo y qué hacer en su lugar. Un subagente que intenta `approve`, `reject`, `unblock`, `start` o `new` recibe que la decisión es de una persona y debe terminar con `bflow report` |
+| OpenCode no hace nada o el guard no actúa | El plugin no cargó, o el proveedor falló (regiones Global, certificado autofirmado) y el agente quedó quieto | Corre `bflow doctor`: avisa en `log` y `proveedor` lo que encuentra en el log de OpenCode. Los casos y su arreglo están en `adapters/opencode/README.md`, sección «Problemas comunes» |
 | DONE rechazado con `check_required` | No hay un check verde del commit actual | El agente corre `bflow check` y commitea |
 | DONE rechazado con `frozen_changed` | Cambió una prueba congelada al aprobar el contrato | Si fue un error, se deja como estaba. Si la cambiaste tú a propósito, corre `bflow freeze` desde tu terminal (un agente no puede) |
 | El implementer pide cambiar una prueba congelada (NEEDS_DECISION) | La prueba del contrato está mal o quedó vieja | Si estás de acuerdo, corre `bflow freeze --allow <archivo>` desde tu terminal: el implementer la puede cambiar una vez y se vuelve a congelar cuando reporta DONE |

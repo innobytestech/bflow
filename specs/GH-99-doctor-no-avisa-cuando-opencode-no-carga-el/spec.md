@@ -41,7 +41,7 @@ Carril light: el detalle va en Tasks.
 
 ## Tasks
 
-- [ ] T1 Contrato. En `internal/cli/cli.go`, la interfaz opcional:
+- [x] T1 Contrato. En `internal/cli/cli.go`, la interfaz opcional:
   ```go
   // LogDoctor la implementan los adaptadores que saben leer el log de su herramienta.
   type LogDoctor interface {
@@ -56,7 +56,7 @@ Carril light: el detalle va en Tasks.
 
   Fixtures en `testdata/log_v2.txt` y `testdata/log_v1.txt`, copiadas de las líneas reales de arriba, con `{{TS-1h}}` o algo parecido para que las fechas sean relativas, como en `v2_units.txt`.
 
-- [ ] T2 Lectura del log en el adaptador (R1-R7).
+- [x] T2 Lectura del log en el adaptador (R1-R7).
   - R1: `LogDir()` DEBE devolver `$XDG_DATA_HOME/opencode/log` si la variable está definida y, si no, `~/.local/share/opencode/log` en todos los sistemas operativos.
   - R2: DEBE leer como máximo el último 1 MiB de `opencode.log` (2.x) y del `*.log` con fecha más reciente (1.x). Sin carpeta o sin archivos, DEBE devolver un solo `log ok` que diga que no hay log en esa ruta, sin error.
   - R3: CUANDO `opencode.log` tiene `message="cli starting" version=X`, DEBE devolver `agente ok "opencode 2.x (opencode.log): versión X, usa .opencode/plugins/bflow2/"` con el último X. CUANDO el major (primer número de la versión) es mayor que 2, DEBE dar `warn` "formato de plugin no probado en esa versión".
@@ -66,10 +66,10 @@ Carril light: el detalle va en Tasks.
   - R7: Ningún mensaje DEBE incluir texto de la línea fuera de `target`, `cause` y `version`, y cada campo se recorta a 160 caracteres. Una línea que no se puede leer se ignora. La función no escribe nada.
   - Quitar los skips de las pruebas de `logscan_test.go`.
 
-- [ ] T3 Doctor (R8-R9).
+- [x] T3 Doctor (R8-R9).
   - R8: `doctorOpenCode`, cuando el adaptador implementa `LogDoctor`, DEBE agregar cada `LogFinding` con `add(area, level, msg)` después del check `plugin` y antes de `cobertura`.
   - R9: El check de versión del CLI DEBE decir qué plugin le toca: `opencode: versión 1.1.53, usa .opencode/plugins/bflow.js` si el major es 1, y `bflow2/` si es 2 o más.
   - Quitar el skip de `TestDoctorOpenCodeLog`, que cubre: fallo reciente de `bflow2` → `log warn`, solo el fallo normal de `bflow.js` → sin `warn` en `log`, certificado reciente → `proveedor warn`.
 
-- [ ] T4 Docs (R10).
+- [x] T4 Docs (R10).
   - R10: `adapters/opencode/README.md` DEBE tener `## Problemas comunes` con cuatro casos de 1 a 3 líneas cada uno: plugin que no carga (qué dice doctor, `bflow render`, y que el fallo de `bflow.js` en 2.x es normal), modelo de Go que pide regiones Global, certificado autofirmado (`NODE_EXTRA_CA_CERTS=<ruta a la CA del antivirus o proxy>`) y cómo confirmar en el log (ruta de R1, `opencode.log` para 2.x y un archivo por corrida para 1.x, qué buscar). `docs/guia.md`, en "Cuando algo se atora", DEBE sumar la fila "OpenCode no hace nada o el guard no actúa" que remite a `bflow doctor` y a esa sección. También DEBE quedar una entrada en el changelog.

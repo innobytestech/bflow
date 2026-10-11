@@ -771,7 +771,11 @@ func doctorOpenCode(c *Ctx, cfg *config.Config, add func(string, string, string,
 	case err != nil:
 		add("agente", "warn", "opencode: no se pudo leer la versión (%v); ¿está instalado y en el PATH?", err)
 	default:
-		add("agente", "ok", "opencode: versión %s", have)
+		plug := ".opencode/plugins/bflow2/"
+		if n, _ := strconv.Atoi(strings.SplitN(strings.TrimPrefix(have, "v"), ".", 2)[0]); n == 1 {
+			plug = ".opencode/plugins/bflow.js"
+		}
+		add("agente", "ok", "opencode: versión %s, usa %s", have, plug)
 	}
 	if home, err := os.UserHomeDir(); err == nil || os.Getenv("XDG_CONFIG_HOME") != "" {
 		switch path, state := t.SkillState(home); state {
@@ -816,6 +820,11 @@ func doctorOpenCode(c *Ctx, cfg *config.Config, add func(string, string, string,
 			add("plugin", "warn", "opencode: el plugin %s falta o difiere del de este bflow (guard y tokens); corre bflow render", strings.Join(stale, ", "))
 		default:
 			add("plugin", "ok", "opencode: plugin de guard y tokens al día (1.x y 2.x)")
+		}
+	}
+	if ld, ok := t.(LogDoctor); ok {
+		for _, f := range ld.DoctorLog(cfg.Root, time.Now()) {
+			add(f.Area, f.Level, "%s", f.Msg)
 		}
 	}
 	add("cobertura", "ok", "opencode no tiene nudge de subagente ni hook de inicio de sesión; lo cubren bflow report, bflow check --verify y el bloque de AGENTS.md")
