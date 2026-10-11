@@ -27,6 +27,16 @@ const agentsDir = ".opencode/agents"
 // pluginFile es el plugin de guard y tokens que bflow render escribe.
 const pluginFile = ".opencode/plugins/bflow.js"
 
+// El plugin de OpenCode 2.x es un directorio (2.x lo carga; 1.x lo ignora).
+const (
+	plugin2Dir     = ".opencode/plugins/bflow2"
+	plugin2File    = plugin2Dir + "/index.js"
+	plugin2Package = plugin2Dir + "/package.json"
+)
+
+// PluginFiles son las rutas del plugin que bflow render escribe: 1.x y 2.x.
+var PluginFiles = []string{pluginFile, plugin2File, plugin2Package}
+
 // Agent implementa cli.ToolAdapter para OpenCode.
 type Agent struct{}
 

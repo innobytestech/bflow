@@ -213,3 +213,97 @@ func TestParseActionsSpawn(t *testing.T) {
 		t.Errorf("toda acción lleva el sessionID: %+v", acts)
 	}
 }
+
+// La captura real de OpenCode 2.0.22 (testdata/tool_before_v2.jsonl): cada línea es
+// el x de tool.execute.before ({tool, sessionID, agent, input}). El plugin manda
+// x.input como args.
+func TestParseActionsV2Captura(t *testing.T) {
+	f, err := os.Open(filepath.Join("testdata", "tool_before_v2.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	cwd := t.TempDir()
+	got := map[string][]guard.Action{}
+	sc := bufio.NewScanner(f)
+	sc.Buffer(nil, 1<<20)
+	for sc.Scan() {
+		var x struct {
+			Tool      string          `json:"tool"`
+			SessionID string          `json:"sessionID"`
+			Input     json.RawMessage `json:"input"`
+		}
+		if err := json.Unmarshal(sc.Bytes(), &x); err != nil {
+			t.Fatal(err)
+		}
+		acts, _, ok := Agent{}.ParseActions(input(t, x.Tool, x.Input, map[string]any{"cwd": cwd, "sessionID": x.SessionID, "subagent": true, "agent": "bflow-implementer"}))
+		if !ok {
+			t.Fatalf("la captura de %s debe reconocerse", x.Tool)
+		}
+		got[x.Tool] = append(got[x.Tool], acts...)
+	}
+	if b := got["shell"]; len(b) != 1 || b[0].Tool != guard.Bash || b[0].Command != "echo hola" || !b[0].Subagent {
+		t.Errorf("shell es bash: %+v", b)
+	}
+	if w := got["write"]; len(w) != 1 || w[0].Tool != guard.Write || w[0].Path != filepath.Join(cwd, "b.txt") {
+		t.Errorf("write con path: %+v", w)
+	}
+	if e := got["edit"]; len(e) != 1 || e[0].Tool != guard.Edit || e[0].Path != filepath.Join(cwd, "b.txt") {
+		t.Errorf("edit con path: %+v", e)
+	}
+	if r := got["read"]; len(r) != 1 || r[0].Tool != guard.Read || r[0].Path != filepath.Join(cwd, "a.txt") || !r[0].Partial {
+		t.Errorf("read con path, offset y limit es parcial: %+v", r)
+	}
+	if s := got["subagent"]; len(s) != 1 || s[0].Tool != guard.Spawn || s[0].Target != "general" || s[0].Command != "SUBTASK responde ok" {
+		t.Errorf("subagent es un lanzamiento (agent y prompt): %+v", s)
+	}
+	p := got["patch"]
+	if len(p) != 1 || p[0].Tool != guard.Write || p[0].Path != filepath.Join(cwd, "c.txt") {
+		t.Errorf("patch (patchText) con Add File es una escritura: %+v", p)
+	}
+}
+
+func TestParseActionsPathV2(t *testing.T) {
+	cwd := t.TempDir()
+	for _, tool := range []string{"edit", "write", "read"} {
+		acts, _, ok := Agent{}.ParseActions(input(t, tool, map[string]any{"path": "src/a.go"}, map[string]any{"cwd": cwd}))
+		if !ok || len(acts) != 1 || acts[0].Path != filepath.Join(cwd, "src", "a.go") {
+			t.Errorf("%s: path relativo contra cwd: %+v", tool, acts)
+		}
+		abs := filepath.Join(cwd, "ya", "absoluta.go")
+		acts, _, _ = Agent{}.ParseActions(input(t, tool, map[string]any{"path": abs}, map[string]any{"cwd": "otra"}))
+		if len(acts) != 1 || acts[0].Path != abs {
+			t.Errorf("%s: path absoluto no se toca: %+v", tool, acts)
+		}
+	}
+	acts, _, _ := Agent{}.ParseActions(input(t, "write", map[string]any{"filePath": "uno.go", "path": "dos.go"}, map[string]any{"cwd": cwd}))
+	if len(acts) != 1 || acts[0].Path != filepath.Join(cwd, "uno.go") {
+		t.Errorf("filePath manda sobre path: %+v", acts)
+	}
+}
+
+// Los nombres y argumentos de 1.x dan las mismas acciones que antes de GH-98.
+func TestParseActionsV1SinCambios(t *testing.T) {
+	cwd := t.TempDir()
+	a := filepath.Join(cwd, "a.go")
+	cases := []struct {
+		tool string
+		args map[string]any
+		want []guard.Action
+	}{
+		{"bash", map[string]any{"command": "ls"}, []guard.Action{{Tool: guard.Bash, Command: "ls"}}},
+		{"edit", map[string]any{"filePath": "a.go"}, []guard.Action{{Tool: guard.Edit, Path: a}}},
+		{"multiedit", map[string]any{"filePath": "a.go"}, []guard.Action{{Tool: guard.Edit, Path: a}}},
+		{"write", map[string]any{"filePath": "a.go"}, []guard.Action{{Tool: guard.Write, Path: a}}},
+		{"read", map[string]any{"filePath": "a.go", "limit": 5}, []guard.Action{{Tool: guard.Read, Path: a, Partial: true}}},
+		{"task", map[string]any{"subagent_type": "bflow-reviewer", "prompt": "p"}, []guard.Action{{Tool: guard.Spawn, Target: "bflow-reviewer", Command: "p"}}},
+		{"apply_patch", map[string]any{"patchText": "*** Begin Patch\n*** Add File: n.go\n*** End Patch"}, []guard.Action{{Tool: guard.Write, Path: filepath.Join(cwd, "n.go")}}},
+		{"grep", map[string]any{"pattern": "x"}, nil},
+	}
+	for _, c := range cases {
+		acts, _, ok := Agent{}.ParseActions(input(t, c.tool, c.args, map[string]any{"cwd": cwd}))
+		if !ok || !reflect.DeepEqual(acts, c.want) {
+			t.Errorf("%s: ok=%v %+v, want %+v", c.tool, ok, acts, c.want)
+		}
+	}
+}

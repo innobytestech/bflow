@@ -1,0 +1,6 @@
+{"tool":"shell","sessionID":"ses_ed758bc3dffegpo0s1huRnlsTL","agent":"build","messageID":"msg_128a7497a001XNPxgO2bkmRSi1","id":"call_0","input":{"command":"echo hola"}}
+{"tool":"write","sessionID":"ses_ed758bc3dffegpo0s1huRnlsTL","agent":"build","messageID":"msg_128a74aa3001lo35ZyIb9312Jq","id":"call_1","input":{"path":"b.txt","content":"x\n"}}
+{"tool":"edit","sessionID":"ses_ed758bc3dffegpo0s1huRnlsTL","agent":"build","messageID":"msg_128a74ad8001rk8cCGcLqQDqLX","id":"call_2","input":{"path":"b.txt","oldString":"x","newString":"y"}}
+{"tool":"read","sessionID":"ses_ed758bc3dffegpo0s1huRnlsTL","agent":"build","messageID":"msg_128a74b120014IfpkNrBIR2Ldr","id":"call_3","input":{"path":"a.txt","offset":1,"limit":1}}
+{"tool":"subagent","sessionID":"ses_ed758bc3dffegpo0s1huRnlsTL","agent":"build","messageID":"msg_128a74b51001dQOxg4MLtoW9WX","id":"call_4","input":{"agent":"general","description":"sub","prompt":"SUBTASK responde ok"}}
+{"tool":"patch","sessionID":"ses_ed758a6beffePO9Y36fCCf862v","agent":"build","messageID":"msg_128a75e05001LC86V6yQisi3Xh","id":"call_0","input":{"patchText":"*** Begin Patch\n*** Add File: c.txt\n+z\n*** End Patch"}}

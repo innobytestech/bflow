@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -322,5 +323,45 @@ func TestTokenSourcesSession(t *testing.T) {
 	want := map[string][2]string{"ses_main.jsonl": {"ses_main", ""}, "ses_kid.jsonl": {"ses_kid", "ses_main"}, "ses_anon.jsonl": {"ses_anon", "ses_main"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Session y Parent salen de la primera línea de cada archivo: %v, want %v", got, want)
+	}
+}
+
+// R10, R12: una línea escrita por el plugin 2.x (testdata/usage_v2.jsonl, armada de
+// events_v2.jsonl con la regla de R10) cuenta cada paso como una llamada con providerID/modelID.
+func TestReadUsageLineaV2(t *testing.T) {
+	path := filepath.Join("testdata", "usage_v2.jsonl")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cur metrics.Cursor
+	got, err := Agent{}.ReadUsage(path, &cur)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := len(strings.Split(strings.TrimSpace(string(raw)), "\n"))
+	if n < 2 || len(got) != n {
+		t.Fatalf("una muestra por paso: %d líneas, %d muestras", n, len(got))
+	}
+	u := total(got)
+	if u.Calls != int64(n) || u.Input != 100+101+102+103+104+105 || u.Output != 10+11+12+13+14+15 {
+		t.Errorf("suma de pasos: %+v", u)
+	}
+	for _, s := range got {
+		if s.Model != "mock/mock" || !strings.HasPrefix(s.Msg, "opencode:evt_") {
+			t.Errorf("modelo providerID/modelID y clave por el id del evento: %+v", s)
+		}
+	}
+	if again, _ := (Agent{}).ReadUsage(path, &cur); len(again) != 0 {
+		t.Errorf("segunda lectura sin nada nuevo: %d", len(again))
+	}
+	// R12 con TokenSources: la caché de 2.x se lee como la de 1.x.
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "ses_ed758bc3dffegpo0s1huRnlsTL.jsonl"), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	srcs, main := Agent{}.TokenSources([]byte(`{"sessionID":"ses_ed758bc3dffegpo0s1huRnlsTL","parentID":""}`), dir)
+	if !main || len(srcs) != 1 || srcs[0].Agent != "" {
+		t.Errorf("TokenSources de la raíz: %v %+v", main, srcs)
 	}
 }
