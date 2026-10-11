@@ -51,3 +51,18 @@ func TestSkillReglaClear(t *testing.T) {
 		}
 	}
 }
+
+func TestSkillReglaSubagenteFalla(t *testing.T) {
+	for _, v := range []string{"AskUserQuestion", "la herramienta `question`"} {
+		b, err := Render([]byte("---\n---\n\n"), map[string]string{"ask_tool": v})
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := string(b)
+		for _, w := range []string{"falla sin reportar", "no hagas su trabajo", "tal cual", "models.opencode", "bflow render", "bflow doctor", "cuenta o región del proveedor", v} {
+			if !strings.Contains(out, w) {
+				t.Errorf("con ask_tool %q falta %q", v, w)
+			}
+		}
+	}
+}
