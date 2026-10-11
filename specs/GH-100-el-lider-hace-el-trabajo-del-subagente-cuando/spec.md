@@ -36,7 +36,7 @@ Carril light: no hay discovery. El scout ubicó el cuerpo común (`adapters/lead
 
 ## Tasks
 
-- [ ] **T1** Regla en el cuerpo común. En `adapters/leader/bflow.md`, inmediatamente después de la viñeta `- \`spawn\`` (antes de `- \`wait\``), agrega una subviñeta o un párrafo con este contenido. La redacción puede ajustarse, pero estas palabras deben aparecer literalmente:
+- [x] **T1** Regla en el cuerpo común. En `adapters/leader/bflow.md`, inmediatamente después de la viñeta `- \`spawn\`` (antes de `- \`wait\``), agrega una subviñeta o un párrafo con este contenido. La redacción puede ajustarse, pero estas palabras deben aparecer literalmente:
   - "falla sin reportar" (la condición: el agente terminó con error o sin correr su `report`);
   - "no hagas su trabajo", y que eso incluye no leer el repo en su lugar, no escribir código, no revisar y no correr su `report`;
   - "tal cual" (mostrar el error sin resumirlo);
@@ -46,7 +46,7 @@ Carril light: no hay discovery. El scout ubicó el cuerpo común (`adapters/lead
   Criterios:
   - CUANDO se lee `bflow.md`, DEBE contener cada frase anterior.
   - CUANDO se corre `Render`, no DEBE quedar ningún `{{…}}` sin reemplazar (`TestLeaderRender` sigue pasando).
-- [ ] **T2** Prueba `TestSkillReglaSubagenteFalla` en `adapters/leader/leader_test.go` (package `leader`). Para cada `ask_tool` de `{"AskUserQuestion", "la herramienta \`question\`"}`, llama a `Render([]byte("---\n---\n\n"), map[string]string{"ask_tool": v})`. Luego, por cada palabra de `{"falla sin reportar", "no hagas su trabajo", "tal cual", "models.opencode", "bflow render", "bflow doctor", "cuenta o región del proveedor"}` y por el propio valor de `v`, hace `t.Errorf` si la salida no la contiene.
+- [x] **T2** Prueba `TestSkillReglaSubagenteFalla` en `adapters/leader/leader_test.go` (package `leader`). Para cada `ask_tool` de `{"AskUserQuestion", "la herramienta \`question\`"}`, llama a `Render([]byte("---\n---\n\n"), map[string]string{"ask_tool": v})`. Luego, por cada palabra de `{"falla sin reportar", "no hagas su trabajo", "tal cual", "models.opencode", "bflow render", "bflow doctor", "cuenta o región del proveedor"}` y por el propio valor de `v`, hace `t.Errorf` si la salida no la contiene.
   - Criterio: CUANDO se quita la regla de `bflow.md`, la prueba DEBE fallar para los dos adaptadores.
   - Criterio: `go test ./adapters/...` y `go vet ./...` pasan.
-- [ ] **T3** En `CHANGELOG.md`, en `## v0.1.0`, agrega en la subsección que toque (`### Cambiado`, o créala después de `### Agregado`) una viñeta: si un subagente falla sin reportar, el líder ya no hace su trabajo; muestra el error y la causa probable y lo relanza cuando el humano lo confirma. Hace falta correr `bflow render` (o reinstalar el adaptador) para regenerar la skill y el comando.
+- [x] **T3** En `CHANGELOG.md`, en `## v0.1.0`, agrega en la subsección que toque (`### Cambiado`, o créala después de `### Agregado`) una viñeta: si un subagente falla sin reportar, el líder ya no hace su trabajo; muestra el error y la causa probable y lo relanza cuando el humano lo confirma. Hace falta correr `bflow render` (o reinstalar el adaptador) para regenerar la skill y el comando.

@@ -8,6 +8,10 @@ Los cambios de bflow que ve quien lo usa. Las versiones siguen [semver](https://
 
 - Documentación completa para quien prueba la rc.9: README corto como entrada, y en `docs/` la motivación y rumbo, instalación, conceptos, configuración, referencia de comandos, guía de día a día, cómo probar y reportar issues, y problemas conocidos.
 
+### Cambiado
+
+- **El líder no hace el trabajo del subagente que falla.** Si un subagente falla sin reportar, el líder muestra el error y la causa probable y lo relanza cuando el humano lo confirma. Hace falta correr `bflow render` (o reinstalar el adaptador) para regenerar la skill y el comando.
+
 ### Agregado
 
 - **Tokens de la sesión principal repartidos por marcas.** El guard marca la sesión que conduce una tarea (también en subagentes) y `stats` y `watch` reparten los tokens por esas marcas; lo que no cae en ninguna tarea se muestra como «sin tarea». Hace falta correr `bflow install claude` de nuevo para que el matcher de los hooks sea `Task|Agent`.
