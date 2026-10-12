@@ -95,14 +95,14 @@
 
 ## Tasks
 
-- [ ] **T1 Contrato.** Firmas en stub: `Config.PersonalModels`, `Config.ProfileModelsIgnored`, `opencode.ModelSync`, `Agent.SyncModels`, `Agent.ModelsState`, `cli.ModelOverrider`, `renderPlan.Overrides`. Pruebas, que fallan hasta T2–T5:
+- [x] **T1 Contrato.** Firmas en stub: `Config.PersonalModels`, `Config.ProfileModelsIgnored`, `opencode.ModelSync`, `Agent.SyncModels`, `Agent.ModelsState`, `cli.ModelOverrider`, `renderPlan.Overrides`. Pruebas, que fallan hasta T2–T5:
   - `config`: `TestModelsRepoOnly` (R1), `TestModelsProfileIgnored` (R2), `TestModelsValidate` ampliada con la global (R3). `TestModelsMerge` se reescribe a la semántica nueva.
   - `opencode`: `TestSyncModelsCreate` (R6, R9), `TestSyncModelsPreserve` (R7), `TestSyncModelsNoop` (R7), `TestSyncModelsJSONC` (R9), `TestSyncModelsBadJSON` (R9), `TestModelsState` (R11).
   - `cli`: `TestRenderIgnoresGlobalModels` (R4, R5), `TestRenderSyncsPersonalModels` (R6, R8, R10), `TestRenderCheckNoUserConfig` (R5), `TestRenderConflictNoSync` (R12), `TestInstallOpenCodeSyncsModels` (R6), `TestDoctorOpenCodeModels` (R10, R11, R2).
   - e2e: `cmd/bflow/e2e_render_test.go: TestRenderAgentsGlobalModelsNotVersioned` (R4, R5).
   - Todas fijan `XDG_CONFIG_HOME` y `BFLOW_CONFIG_HOME` a `t.TempDir()`.
-- [ ] **T2 config.** Separar las tablas en `Load`, el aviso del perfil y `validateModels` (R1, R2, R3).
-- [ ] **T3 opencode.json.** `configDir`, `SyncModels` y `ModelsState` en `models.go` (R6, R7, R9).
-- [ ] **T4 render, install y check.** `planRender` con `Overrides` y `Unresolved` filtrado, `syncPersonalModels` en `runRender` y `runInstall`, `data.personal_models` y los textos (R4–R6, R8, R10, R12, R13).
-- [ ] **T5 doctor e init.** El área `modelos` con `ModelsState`, el aviso del perfil, y los textos de `setupcmds.go:367` y `:796` (R2, R11, R15).
-- [ ] **T6 Migración y docs.** Re-render de este repo (los 4 agentes sin `model:`), `render --check` en verde con `BFLOW_CONFIG_HOME` vacío y `go install` desde la rama antes de quality. Comprobar a mano en OpenCode que el override se aplica y si aparecen agentes fantasma en un repo sin bflow, y anotar el resultado en el README del adaptador. Actualizar `docs/configuracion.md`, `docs/guia.md`, `adapters/opencode/README.md`, el CHANGELOG y la nota en GH-13 R3 (R14, R15).
+- [x] **T2 config.** Separar las tablas en `Load`, el aviso del perfil y `validateModels` (R1, R2, R3).
+- [x] **T3 opencode.json.** `configDir`, `SyncModels` y `ModelsState` en `models.go` (R6, R7, R9).
+- [x] **T4 render, install y check.** `planRender` con `Overrides` y `Unresolved` filtrado, `syncPersonalModels` en `runRender` y `runInstall`, `data.personal_models` y los textos (R4–R6, R8, R10, R12, R13).
+- [x] **T5 doctor e init.** El área `modelos` con `ModelsState`, el aviso del perfil, y los textos de `setupcmds.go:367` y `:796` (R2, R11, R15).
+- [x] **T6 Migración y docs.** Re-render de este repo (los 4 agentes sin `model:`), `render --check` en verde con `BFLOW_CONFIG_HOME` vacío y `go install` desde la rama antes de quality. Comprobar a mano en OpenCode que el override se aplica y si aparecen agentes fantasma en un repo sin bflow, y anotar el resultado en el README del adaptador. Actualizar `docs/configuracion.md`, `docs/guia.md`, `adapters/opencode/README.md`, el CHANGELOG y la nota en GH-13 R3 (R14, R15).
