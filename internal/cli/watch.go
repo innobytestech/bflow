@@ -488,6 +488,9 @@ func describeEvent(e store.Entry) string {
 	case "approve":
 		return "aprobada gate " + e.Gate + arrow
 	case "reject":
+		if e.Gate == "" {
+			return "regresada" + note + arrow
+		}
 		return "rechazada gate " + e.Gate + note + arrow
 	case "block":
 		return "bloqueada" + note

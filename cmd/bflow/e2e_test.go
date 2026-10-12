@@ -358,3 +358,22 @@ func TestBrokenConfigIsReadable(t *testing.T) {
 		t.Errorf("config con secreto: exit %d %v", env.exit, env.Data)
 	}
 }
+
+func TestRejectBackToImplementingWithoutGate(t *testing.T) {
+	r := newRepo(t)
+	r.writeConfig("")
+	id := r.ok("task", "add", "Defecto tardio").Data["id"].(string)
+	r.ok("start", id, "--lane", "hotfix")
+	r.ok("report", "--agent", "implementer", "--verdict", "DONE")
+	env := r.ok("report", "--agent", "reviewer", "--verdict", "APPROVED")
+	spawned(t, env, "documenter")
+	if env := r.run("reject", id, "--to", "implementing"); env.exit != 2 || env.Code != "note_required" {
+		t.Errorf("sin --note: exit %d code %s", env.exit, env.Code)
+	}
+	env = r.ok("reject", id, "--to", "implementing", "--note", "x")
+	spawned(t, env, "implementer")
+	st := r.ok("status", id)
+	if st.Data["task"].(map[string]any)["phase"] != "implementing" {
+		t.Errorf("status: %v", st.Data)
+	}
+}

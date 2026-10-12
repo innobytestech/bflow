@@ -42,7 +42,7 @@ Carril light, sin discovery. Ver el reporte del scout (`bflow show GH-54 scout`)
 
 ## Tasks
 
-- [ ] T1 · Regreso sin gate en la máquina de estados (internal/flow/machine.go, internal/flow/machine_test.go)
+- [x] T1 · Regreso sin gate en la máquina de estados (internal/flow/machine.go, internal/flow/machine_test.go)
   - En `tx.reject`, antes de `pendingGate`: si `s.Gate == nil`, `ev.Gate == ""` y `s.Phase` está en `backTargets` (nuevo `var backTargets = map[Phase][]Phase{Quality: {Implementing}, Documenting: {Implementing}}`), llamar a un nuevo `t.back(ev)`. En cualquier otro caso, el camino actual sin cambios (`no_gate`, `gate_mismatch`, etc.).
   - `t.back(ev)`:
     - R1. CUANDO la nota está vacía, DEBE rechazar con `note_required`.
@@ -52,11 +52,11 @@ Carril light, sin discovery. Ver el reporte del scout (`bflow show GH-54 scout`)
   - R5. En spec/contract/implementing sin gate, `reject` sigue dando `no_gate`; con `--gate x` en documenting sin gate, también `no_gate`.
   - R6. Con gate pendiente en cualquier fase, el comportamiento de `reject` no cambia (las pruebas existentes siguen verdes).
   - Pruebas: `TestRejectBackToImplementingFromDocumenting`, `TestRejectBackToImplementingFromQuality` (con un reporte a medias: `Reports` queda vacío, `Round` igual), `TestRejectBackNeedsNote`, `TestRejectBackInvalidTarget`, `TestRejectWithoutGateElsewhereIsNoGate`.
-- [ ] T2 · Bitácora y panel (internal/engine, internal/cli/watch.go)
+- [x] T2 · Bitácora y panel (internal/engine, internal/cli/watch.go)
   - R7. El evento `reject` sin gate se registra con `from`, `to=implementing` y `note`, sin `gate` (ya lo hace `entry`; prueba de engine que lo verifica).
   - R8. `describeEvent` con `Event == "reject"` y `Gate == ""` devuelve `"regresada" + note + arrow`; con gate, igual que hoy. Prueba en el test de watch existente.
   - R9. Prueba e2e en cmd/bflow/e2e_test.go: tarea light llevada a documenting, `bflow reject --to implementing --note x` sale con código 0 y deja la fase en implementing; sin `--note` sale con código 2.
-- [ ] T3 · Docs y CHANGELOG
+- [x] T3 · Docs y CHANGELOG
   - R10. docs/comandos.md: la fila de `reject` dice que en quality y documenting, sin gate pendiente, regresa la tarea a implementing.
   - R11. docs/como-probar-y-reportar.md: quitar la viñeta de #54.
   - R12. CHANGELOG.md, sección de la versión en curso, en «Agregado»: `bflow reject --note` regresa a implementing desde quality o documenting sin gate pendiente.

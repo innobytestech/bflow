@@ -275,6 +275,9 @@ func decisionTargets(cfg Config, lane Lane, phase Phase) []Phase {
 
 func (t *tx) reject(ev Event) error {
 	s := &t.s
+	if s.Gate == nil && ev.Gate == "" && len(backTargets[s.Phase]) > 0 {
+		return t.back(ev)
+	}
 	g, err := t.pendingGate(ev)
 	if err != nil {
 		return err
@@ -317,6 +320,34 @@ func (t *tx) reject(ev Event) error {
 		s.Resume = to == Implementing
 	}
 	s.Note = note
+	return nil
+}
+
+// backTargets: fases sin gate desde las que un humano puede regresar a implementing.
+var backTargets = map[Phase][]Phase{Quality: {Implementing}, Documenting: {Implementing}}
+
+// back regresa a implementing desde quality o documenting sin gate pendiente.
+// La ronda de calidad no cambia: no es un rechazo de la compuerta.
+func (t *tx) back(ev Event) error {
+	s := &t.s
+	note := strings.TrimSpace(ev.Note)
+	if note == "" {
+		return reject("note_required", "regresar a implementing necesita --note con el motivo")
+	}
+	to := Implementing
+	if ev.To != "" {
+		to = ev.To
+	}
+	if !slices.Contains(backTargets[s.Phase], to) || !t.cfg.has(s.Lane, to) {
+		return reject("invalid_target", "desde %s sin gate solo se regresa a %s (carril %s)", s.Phase, joinPhases(backTargets[s.Phase]), s.Lane)
+	}
+	from := s.Phase
+	round := s.Round
+	t.enter(Implementing)
+	s.Round = round
+	s.Resume = true
+	s.Note = note
+	t.comments = append(t.comments, fmt.Sprintf("**Regresada a implementing desde %s:** %s", from, note))
 	return nil
 }
 
