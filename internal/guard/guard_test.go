@@ -273,6 +273,7 @@ func TestBflowSubcommand(t *testing.T) {
 		{"go run ./cmd/other approve", ""},
 		{"go test ./...", ""},
 		{"", ""},
+		{`"C:\Program Files\bflow\bflow.exe" approve X`, "approve"},
 	}
 	for _, c := range cases {
 		if got := BflowSubcommand(c.seg); got != c.want {
@@ -304,6 +305,9 @@ func TestShellWrapped(t *testing.T) {
 			t.Errorf("%q → allow=%v rule=%q, quería %q", cmd, d.Allow, d.Rule, rule)
 		}
 	}
+	if d := sub(`"C:\Program Files\Git\bin\bash.exe" -c "bflow approve X"`); d.Allow || d.Rule != "human_only" {
+		t.Errorf("bash entre comillas con espacios → %+v", d)
+	}
 	if !TaskScoped(`bash -c "gh pr create"`) {
 		t.Error("TaskScoped debe ver dentro de bash -c")
 	}
@@ -325,6 +329,47 @@ func TestSegmentsUnwrap(t *testing.T) {
 	for _, cmd := range []string{`bash script.sh`, `bashx -c x`, `echo bash -c x`, `bash -x script.sh`, `bash -o pipefail`} {
 		if got := Segments(cmd); len(got) != 1 || got[0] != cmd {
 			t.Errorf("%q debía quedar igual, dio %q", cmd, got)
+		}
+	}
+}
+
+func TestSegmentsQuotedExe(t *testing.T) {
+	for _, cmd := range []string{
+		`'C:\Program Files\Git\bin\sh.exe' -c "x y"`,
+		`"C:\Program Files\Git\bin\bash.exe" -l -c 'x y'`,
+	} {
+		if got := Segments(cmd); len(got) != 1 || got[0] != "x y" {
+			t.Errorf("%q → %q", cmd, got)
+		}
+	}
+	if !feedsShell(`"C:\Program Files\Git\bin\bash.exe" <<EOF`) {
+		t.Error("feedsShell no reconoce el shell entre comillas con espacios")
+	}
+}
+
+func TestQuotedFields(t *testing.T) {
+	for _, c := range []struct {
+		in   string
+		want []string
+	}{
+		{`"C:\Program Files\Git\bin\bash.exe" -c "bflow approve X"`, []string{`"C:\Program Files\Git\bin\bash.exe"`, `-c`, `"bflow approve X"`}},
+		{`a  b	c`, []string{"a", "b", "c"}},
+		{`a"b c"d e`, []string{`a"b c"d`, "e"}},
+		{`'a b' "c d"`, []string{`'a b'`, `"c d"`}},
+		{`a "b c`, []string{"a", `"b c`}},
+		{`"C:\dir\" x`, []string{`"C:\dir\"`, "x"}},
+		{`""`, []string{`""`}},
+		{"", nil},
+		{"   ", nil},
+	} {
+		got := quotedFields(c.in)
+		if !slices.Equal(got, c.want) {
+			t.Errorf("quotedFields(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+	for _, in := range []string{"git status -s", " a  b ", "x=1 y"} {
+		if !slices.Equal(quotedFields(in), strings.Fields(in)) {
+			t.Errorf("sin comillas debe igualar strings.Fields: %q", in)
 		}
 	}
 }
@@ -364,6 +409,7 @@ func TestBflowArgs(t *testing.T) {
 		{"bflow status", nil},
 		{"git status GH-51", nil},
 		{"echo bflow status GH-51", nil},
+		{`bflow new "título con espacios"`, []string{`título con espacios`}},
 	} {
 		got := BflowArgs(c.seg)
 		if len(got) != len(c.want) {
@@ -453,6 +499,7 @@ func TestBashFrozenWrites(t *testing.T) {
 		{"git apply con heredoc", "git apply <<EOF\n--- a/internal/a_test.go\n+++ b/internal/a_test.go\nEOF"},
 		{"dentro de bash -c", `bash -c "sed -i 's/a/b/' internal/a_test.go"`},
 		{"cadena con &&", `go vet ./... && echo x > internal/a_test.go`},
+		{"bash entre comillas con espacios", `"C:\Program Files\Git\bin\bash.exe" -c "echo x > internal/a_test.go"`},
 		{"ruta absoluta bajo Root", `sed -i 's/a/b/' ` + root + `/internal/a_test.go`},
 	}
 	for _, tc := range cases {
@@ -462,6 +509,16 @@ func TestBashFrozenWrites(t *testing.T) {
 		if d.Allow || d.Rule != "frozen_test" {
 			t.Errorf("%s: %q → allow=%v rule=%q", tc.name, tc.cmd, d.Allow, d.Rule)
 		}
+	}
+}
+
+// R12: redirección a una ruta entre comillas con espacios.
+func TestBashFrozenQuotedPath(t *testing.T) {
+	c := frozenCtx()
+	c.Frozen = []string{"dir con espacio/a_test.go"}
+	d := Evaluate(bashCmd(`echo x > "dir con espacio/a_test.go"`), c)
+	if d.Allow || d.Rule != "frozen_test" {
+		t.Errorf("allow=%v rule=%q", d.Allow, d.Rule)
 	}
 }
 
