@@ -15,6 +15,7 @@ Los cambios de bflow que ve quien lo usa. Las versiones siguen [semver](https://
 - **El líder no hace el trabajo del subagente que falla.** Si un subagente falla sin reportar, el líder muestra el error y la causa probable y lo relanza cuando el humano lo confirma. Hace falta correr `bflow render` (o reinstalar el adaptador) para regenerar la skill y el comando.
 
 ### Agregado
+- **`bflow reject --note` regresa a implementing desde quality o documenting sin gate pendiente.** Antes daba `no_gate`. El motivo queda en la bitácora y en el tracker, y el implementer retoma con él; la ronda de calidad no cambia.
 - **El guard niega escrituras a pruebas congeladas desde Bash y las restaura si se escapan.** En implementing y fases siguientes, `sed -i`, `perl -pi`, redirecciones, `tee`, `cp`, `git apply`/`patch` y los intérpretes con `-c`/`-e` o heredoc que nombran una prueba congelada se niegan con `frozen_test`; leerla (`cat`, `grep`, `go test`) sigue igual. Si un comando la cambia de todos modos, un hook posterior a Bash (`bflow guard --post`) la restaura desde la copia que bflow guarda al congelar y avisa al agente en ese paso. Hace falta correr `bflow install claude` y `bflow render` en cada repo.
 
 - **Tokens de la sesión principal repartidos por marcas.** El guard marca la sesión que conduce una tarea (también en subagentes) y `stats` y `watch` reparten los tokens por esas marcas; lo que no cae en ninguna tarea se muestra como «sin tarea». Hace falta correr `bflow install claude` de nuevo para que el matcher de los hooks sea `Task|Agent`.

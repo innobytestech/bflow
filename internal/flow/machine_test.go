@@ -102,6 +102,11 @@ func commonRows(l Lane) []row {
 		{lane: l, from: Quality, reports: ok, ev: rep(sec, RejectedV), want: Implementing, wantRound: 1, fx: []EffectKind{ts, cm}},
 		{lane: l, from: Quality, reports: ko, round: 1, ev: rep(sec, Approved), want: Implementing, wantGate: GateRounds, wantRound: 2, fx: []EffectKind{ts, cm}},
 		{lane: l, from: Quality, reports: ok, round: 1, ev: rep(sec, RejectedV), want: Implementing, wantGate: GateRounds, wantRound: 2, fx: []EffectKind{ts, cm}},
+		// regreso humano sin gate
+		{lane: l, from: Quality, ev: rej("falta X"), want: Implementing, fx: []EffectKind{ts, cm}},
+		{lane: l, from: Quality, reports: ko, round: 1, ev: rej("falta X"), want: Implementing, wantRound: 1, fx: []EffectKind{ts, cm}},
+		{lane: l, from: Documenting, ev: rej("defecto"), want: Implementing, fx: []EffectKind{ts, cm}},
+		{lane: l, from: Documenting, ev: rejTo(Implementing), want: Implementing, fx: []EffectKind{ts, cm}},
 		// cortacircuito
 		{lane: l, from: Implementing, gate: GateRounds, round: 2, ev: approve(), want: Implementing, wantRound: 2},
 		// documenting
@@ -663,4 +668,70 @@ func TestClosedOutsideRejectsBacklogAndDone(t *testing.T) {
 			t.Errorf("%s: %v, want %s", phase, err, code)
 		}
 	}
+}
+
+func TestRejectBackToImplementingFromDocumenting(t *testing.T) {
+	s := stateFor(row{lane: Light, from: Documenting})
+	res, err := Apply(testConfig(), s, Event{Kind: EvReject, To: Implementing, Note: "defecto en X"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := res.State
+	if st.Phase != Implementing || !st.Resume || st.Note != "defecto en X" || st.Gate != nil {
+		t.Errorf("estado: %+v", st)
+	}
+	k := kinds(res.Effects)
+	if slices.Contains(k, cs) || slices.Contains(k, ss) || !slices.Contains(k, ts) {
+		t.Errorf("efectos: %v", k)
+	}
+	found := false
+	for _, e := range res.Effects {
+		if e.Kind == cm && strings.Contains(e.Body, "**Regresada a implementing desde documenting:** defecto en X") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("falta comentario: %+v", res.Effects)
+	}
+}
+
+func TestRejectBackToImplementingFromQuality(t *testing.T) {
+	s := stateFor(row{lane: Full, from: Quality, reports: ko, round: 1})
+	res, err := Apply(testConfig(), s, rej("volver"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.State.Phase != Implementing || len(res.State.Reports) != 0 || res.State.Round != 1 || !res.State.Resume {
+		t.Errorf("estado: %+v", res.State)
+	}
+}
+
+func TestRejectBackNeedsNote(t *testing.T) {
+	_, err := Apply(testConfig(), stateFor(row{lane: Full, from: Documenting}), Event{Kind: EvReject})
+	var rj *Rejection
+	if !errors.As(err, &rj) || rj.Code != "note_required" {
+		t.Errorf("err=%v", err)
+	}
+}
+
+func TestRejectBackInvalidTarget(t *testing.T) {
+	_, err := Apply(testConfig(), stateFor(row{lane: Full, from: Documenting}), rejTo(Spec))
+	var rj *Rejection
+	if !errors.As(err, &rj) || rj.Code != "invalid_target" {
+		t.Errorf("err=%v", err)
+	}
+}
+
+func TestRejectWithoutGateElsewhereIsNoGate(t *testing.T) {
+	check := func(r row, ev Event) {
+		_, err := Apply(testConfig(), stateFor(r), ev)
+		var rj *Rejection
+		if !errors.As(err, &rj) || rj.Code != "no_gate" {
+			t.Errorf("%s %+v: err=%v", r.from, ev, err)
+		}
+	}
+	for _, p := range []Phase{Spec, Contract, Implementing} {
+		check(row{lane: Full, from: p}, rej("x"))
+	}
+	check(row{lane: Full, from: Documenting}, Event{Kind: EvReject, Gate: GateWalkthrough, Note: "x"})
 }

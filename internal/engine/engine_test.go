@@ -540,3 +540,20 @@ func TestApproveNoteEnDecisions(t *testing.T) {
 		t.Errorf("la nota de questions no va a decisions.md: %q", b)
 	}
 }
+
+func TestRejectBackLogsWithoutGate(t *testing.T) {
+	v := newEnv(t, "")
+	ctx := context.Background()
+	id := v.task(t, "Demo regreso")
+	mustT(t)(v.e.Start(ctx, id, flow.Hotfix, "", ""))
+	mustT(t)(v.e.Report(ctx, id, ReportOpts{Agent: "implementer", Verdict: flow.DoneV}))
+	mustT(t)(v.e.Reject(ctx, id, RejectOpts{To: "implementing", Note: "defecto"}))
+	log, err := v.e.Store.Log(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	last := log[len(log)-1]
+	if last.Event != "reject" || last.Gate != "" || last.From == last.To || last.To != flow.Implementing || last.Note != "defecto" {
+		t.Errorf("entrada: %+v", last)
+	}
+}

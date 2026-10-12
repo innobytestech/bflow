@@ -110,6 +110,9 @@ func TestEventTimeOtherDay(t *testing.T) {
 	if got := describeEvent(store.Entry{Event: "reject", Gate: "spec", Note: "falta\nel caso de 409", From: flow.Spec, To: flow.Spec}); got != "rechazada gate spec: falta el caso de 409" {
 		t.Errorf("%q", got)
 	}
+	if got := describeEvent(store.Entry{Event: "reject", Note: "defecto", From: flow.Documenting, To: flow.Implementing}); got != "regresada: defecto → implementing" {
+		t.Errorf("%q", got)
+	}
 }
 
 func TestRenderWatchFitsRows(t *testing.T) {
