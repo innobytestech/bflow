@@ -290,3 +290,35 @@ func TestPlugin2Package(t *testing.T) {
 		t.Error("una línea con salto final")
 	}
 }
+
+// GH-103: los tokens de ejecuciones fallidas o interrumpidas también se reportan.
+func TestPlugin2TokensEnFallos(t *testing.T) {
+	src := string(files.Plugin2)
+	re := regexp.MustCompile(`ev\.type === "session\.execution\.(\w+)"`)
+	got := map[string]bool{}
+	for _, m := range re.FindAllStringSubmatch(src, -1) {
+		got[m[1]] = true
+	}
+	for _, n := range []string{"succeeded", "failed", "interrupted"} {
+		if !got[n] {
+			t.Errorf("session.execution.%s debe disparar bflow hook tokens", n)
+		}
+	}
+	i := strings.Index(src, `"session.execution.succeeded"`)
+	if i < 0 || !strings.Contains(src[i:], `"hook", "tokens", "--tool", "opencode"`) {
+		t.Error("las ejecuciones lanzan hook tokens")
+	}
+}
+
+func TestPlugin2StepFailedEscribeCache(t *testing.T) {
+	src := string(files.Plugin2)
+	if !regexp.MustCompile(`ev\.type === "session\.step\.ended"\s*\|\|\s*ev\.type === "session\.step\.failed"`).MatchString(src) {
+		t.Fatal("step.failed comparte la rama de step.ended (misma forma de línea)")
+	}
+	if !strings.Contains(src, "tokens: d.tokens") {
+		t.Error("la línea de caché lleva tokens")
+	}
+	if !strings.Contains(src, "!d.tokens") {
+		t.Error("step.failed sin tokens no escribe línea")
+	}
+}
