@@ -88,6 +88,55 @@ func Segments(cmd string) []string { return segments(cmd, 0) }
 
 var heredocRe = regexp.MustCompile(`(?:^|[^<])<<-?\s*(?:'([^']+)'|"([^"]+)"|([A-Za-z_][A-Za-z0-9_]*))`)
 
+// heredocMatch devuelve el primer heredoc de la línea cuyo << está fuera de
+// comillas (mismo escaneo que splitCommand), o nil.
+func heredocMatch(line string) []string {
+	for _, ix := range heredocRe.FindAllStringSubmatchIndex(line, -1) {
+		at := strings.Index(line[ix[0]:], "<<") + ix[0]
+		if quotedAt(line, at) {
+			continue
+		}
+		m := make([]string, 4)
+		for k := range m {
+			if ix[2*k] >= 0 {
+				m[k] = line[ix[2*k]:ix[2*k+1]]
+			}
+		}
+		return m
+	}
+	return nil
+}
+
+// quotedAt dice si la posición pos de s queda dentro de comillas. Un $( dentro
+// de comillas dobles abre un contexto sin comillas hasta su ).
+func quotedAt(s string, pos int) bool {
+	var q byte
+	var stack []byte // comilla que rodea a cada $( abierto
+	for i := 0; i < pos && i < len(s); i++ {
+		c := s[i]
+		switch {
+		case q == '"' && c == '$' && i+1 < len(s) && s[i+1] == '(':
+			stack = append(stack, q)
+			q = 0
+			i++
+		case q != 0:
+			if c == q {
+				q = 0
+			} else if c == '\\' && q == '"' {
+				i++
+			}
+		case c == ')' && len(stack) > 0:
+			q = stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+		case c == '"' || c == '\'':
+			q = c
+		case c == '\\':
+			i++
+		}
+	}
+	return q != 0
+}
+
 var shellNames = map[string]bool{"bash": true, "sh": true, "zsh": true, "dash": true, "ksh": true}
 
 // feedsShell dice si algún segmento de la línea ejecuta un shell (bash <<EOF,
@@ -130,7 +179,7 @@ func stripHeredocs(cmd string) string {
 			continue
 		}
 		out = append(out, line)
-		if m := heredocRe.FindStringSubmatch(line); m != nil {
+		if m := heredocMatch(line); m != nil {
 			end = m[1] + m[2] + m[3]
 			run = feedsShell(line)
 		}
