@@ -79,8 +79,24 @@ func planRender(c *Ctx, cfg *config.Config) (*renderPlan, error) {
 		if t.ResolvesModels() {
 			var un []agents.Unresolved
 			toolSpecs, un = agents.ResolveModels(specs, cfg.Models[t.Name()])
-			if len(un) > 0 {
-				p.Unresolved[t.Name()] = un
+			var left []agents.Unresolved
+			for _, u := range un {
+				if v := cfg.PersonalModels[t.Name()][u.Alias]; v != "" {
+					if p.Overrides == nil {
+						p.Overrides = map[string]map[string]string{}
+					}
+					if p.Overrides[t.Name()] == nil {
+						p.Overrides[t.Name()] = map[string]string{}
+					}
+					for _, a := range u.Agents {
+						p.Overrides[t.Name()][a] = v
+					}
+					continue
+				}
+				left = append(left, u)
+			}
+			if len(left) > 0 {
+				p.Unresolved[t.Name()] = left
 			}
 		}
 		out, err := t.RenderAgents(toolSpecs)
@@ -151,9 +167,59 @@ func runRender(c *Ctx) output.Envelope {
 	if err := writeRender(cfg, p); err != nil {
 		return fail(err)
 	}
+	pm := syncPersonalModels(c, cfg, p)
+	data["personal_models"] = pm
 	env := output.OK("rendered", data, nil)
-	env.Text = renderText(p)
+	env.Text = renderText(p) + personalText(cfg, pm)
 	return env
+}
+
+// syncPersonalModels lleva el mapeo personal al opencode.json del usuario (R6).
+// Un fallo de E/S no rompe render: queda en "error". nil si ninguna herramienta lo usa.
+func syncPersonalModels(c *Ctx, cfg *config.Config, p *renderPlan) map[string]any {
+	home, _ := os.UserHomeDir()
+	for _, name := range cfg.Agent.Rendered() {
+		mo, ok := c.tool(name).(ModelOverrider)
+		if !ok {
+			continue
+		}
+		want := p.Overrides[name]
+		res, err := mo.SyncModels(home, want)
+		out := map[string]any{"path": res.Path, "changed": res.Changed, "agents": slices.Sorted(maps.Keys(want)), "paste": res.Paste, "error": nil}
+		if err != nil {
+			out["error"] = err.Error()
+		}
+		return out
+	}
+	return nil
+}
+
+// personalText son las líneas de texto de la sincronización y del aviso del perfil.
+func personalText(cfg *config.Config, pm map[string]any) string {
+	var b strings.Builder
+	if pm != nil {
+		path, _ := pm["path"].(string)
+		agentsN, _ := pm["agents"].([]string)
+		switch {
+		case pm["error"] != nil:
+			fmt.Fprintf(&b, "\naviso: no se pudieron escribir los modelos personales en %v: %v", path, pm["error"])
+		case pm["paste"] != "":
+			fmt.Fprintf(&b, "\naviso: %s no se puede editar; pega en %s: %s", path, path, pm["paste"])
+		case pm["changed"] == true:
+			fmt.Fprintf(&b, "\nmodelos personales: %s (actualizado)", path)
+		case len(agentsN) > 0:
+			fmt.Fprintf(&b, "\nmodelos personales: %s (sin cambios)", path)
+		}
+	}
+	b.WriteString(profileModelsText(cfg))
+	return b.String()
+}
+
+func profileModelsText(cfg *config.Config) string {
+	if !cfg.ProfileModelsIgnored {
+		return ""
+	}
+	return fmt.Sprintf("\naviso: los models del perfil %s no se aplican; ponlos en bflow.yaml o en %s", cfg.Profile, config.GlobalPath())
 }
 
 // applyRender planifica y escribe los agentes; con conflictos no escribe nada
@@ -213,8 +279,8 @@ func renderText(p *renderPlan) string {
 	}
 	for _, tool := range slices.Sorted(maps.Keys(p.Unresolved)) {
 		for _, u := range p.Unresolved[tool] {
-			fmt.Fprintf(&b, "\naviso: %s: el alias %q no tiene equivalente (%s) y esos agentes salen sin model; agrega models.%s.%s: proveedor/modelo en bflow.yaml o en la config global",
-				tool, u.Alias, strings.Join(u.Agents, ", "), tool, u.Alias)
+			fmt.Fprintf(&b, "\naviso: %s: el alias %q no tiene equivalente (%s) y esos agentes salen sin model; agrega models.%s.%s: proveedor/modelo en bflow.yaml (equipo) o en %s (solo tú)",
+				tool, u.Alias, strings.Join(u.Agents, ", "), tool, u.Alias, config.GlobalPath())
 		}
 	}
 	return b.String()

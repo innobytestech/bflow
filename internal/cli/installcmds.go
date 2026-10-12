@@ -103,6 +103,9 @@ func runInstall(c *Ctx) output.Envelope {
 	default:
 		data["render"] = true
 		text.WriteString("\nagentes: " + renderText(p))
+		pm := syncPersonalModels(c, cfg, p)
+		data["personal_models"] = pm
+		text.WriteString(personalText(cfg, pm))
 	}
 	return finish()
 }

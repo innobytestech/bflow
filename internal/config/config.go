@@ -297,13 +297,29 @@ func Load(dir string) (*Config, error) {
 	if ui, ok := globalMap["ui"].(map[string]any); ok { // preferencias personales: el repo o el perfil las pisan
 		merged["ui"] = ui
 	}
-	if models, ok := globalMap["models"].(map[string]any); ok { // tabla de alias global: perfil y repo la pisan por alias
-		merged["models"] = models
+	if models, ok := globalMap["models"]; ok { // mapeo personal: no entra al merge, va a opencode.json del usuario
+		rawM, err := yaml.Marshal(models)
+		if err == nil {
+			err = yaml.Unmarshal(rawM, &c.PersonalModels)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("models en %s: %w", GlobalPath(), err)
+		}
 	}
 	if profile != "" {
 		pm, ok := globalProfiles[profile]
 		if !ok {
 			return nil, fmt.Errorf("perfil %q no existe en %s (disponibles: %s)", profile, GlobalPath(), strings.Join(sortedKeys(globalProfiles), ", "))
+		}
+		if _, has := pm["models"]; has {
+			cp := make(map[string]any, len(pm))
+			for k, v := range pm {
+				if k != "models" {
+					cp[k] = v
+				}
+			}
+			pm = cp
+			c.ProfileModelsIgnored = true
 		}
 		merged = deepMerge(merged, pm)
 		c.Sources.Profile = profile
@@ -556,17 +572,8 @@ func (c *Config) Validate() error {
 		}
 		seenAgent[a] = true
 	}
-	for _, table := range sortedKeys(c.Models) {
-		if !slices.Contains(Known.ModelTables, table) {
-			add("models.%s no existe (disponible: %s)", table, strings.Join(Known.ModelTables, ", "))
-			continue
-		}
-		for _, alias := range sortedKeys(c.Models[table]) {
-			if strings.TrimSpace(c.Models[table][alias]) == "" {
-				add("models.%s.%s está vacío", table, alias)
-			}
-		}
-	}
+	validateModels(add, c.Models, "")
+	validateModels(add, c.PersonalModels, " (en "+GlobalPath()+")")
 	for i, s := range c.Check.Steps {
 		if s.Name == "" {
 			add("check.steps[%d].name es obligatorio", i)
@@ -676,4 +683,19 @@ func humanize(err error) error {
 	msg := unknownField.ReplaceAllString(err.Error(), "línea $1: campo desconocido «$2»")
 	msg = strings.Replace(msg, "yaml: unmarshal errors:\n", "", 1)
 	return errors.New(strings.TrimSpace(msg))
+}
+
+// validateModels revisa una tabla de alias; suffix nombra su origen si no es bflow.yaml.
+func validateModels(add func(string, ...any), m map[string]map[string]string, suffix string) {
+	for _, table := range sortedKeys(m) {
+		if !slices.Contains(Known.ModelTables, table) {
+			add("models.%s no existe (disponible: %s)%s", table, strings.Join(Known.ModelTables, ", "), suffix)
+			continue
+		}
+		for _, alias := range sortedKeys(m[table]) {
+			if strings.TrimSpace(m[table][alias]) == "" {
+				add("models.%s.%s está vacío%s", table, alias, suffix)
+			}
+		}
+	}
 }

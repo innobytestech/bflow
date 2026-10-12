@@ -364,7 +364,7 @@ func runInit(c *Ctx) output.Envelope {
 		next = append(next, "bflow render (genera los agentes en .claude/agents; commitéalos)")
 	}
 	if slices.Contains(a.Agent, "opencode") {
-		next = append(next, "bflow install opencode (comando /bflow y agentes en .opencode/agents; define models.opencode en bflow.yaml o en "+config.GlobalPath()+")")
+		next = append(next, "bflow install opencode (comando /bflow y agentes en .opencode/agents; define models.opencode en bflow.yaml (equipo) o en "+config.GlobalPath()+" (solo tú; va a tu opencode.json, no al repo))")
 	}
 	next = append(next, "bflow doctor")
 	env := output.OK("initialized", data, nil)
@@ -793,9 +793,21 @@ func doctorOpenCode(c *Ctx, cfg *config.Config, add func(string, string, string,
 			for _, u := range un {
 				parts = append(parts, fmt.Sprintf("%s (%s)", u.Alias, strings.Join(u.Agents, ", ")))
 			}
-			add("modelos", "warn", "opencode: alias sin equivalente, esos agentes salen sin model: %s; define models.opencode.<alias> en bflow.yaml o en %s", strings.Join(parts, "; "), config.GlobalPath())
+			add("modelos", "warn", "opencode: alias sin equivalente, esos agentes salen sin model: %s; define models.opencode.<alias> en bflow.yaml (equipo) o en %s (solo tú)", strings.Join(parts, "; "), config.GlobalPath())
 		} else {
 			add("modelos", "ok", "opencode: modelos de los agentes resueltos")
+		}
+		if cfg.ProfileModelsIgnored {
+			add("modelos", "warn", "opencode: los models del perfil %s no se aplican; ponlos en bflow.yaml o en %s", cfg.Profile, config.GlobalPath())
+		}
+		if mo, ok := t.(ModelOverrider); ok {
+			home, _ := os.UserHomeDir()
+			switch sy, state := mo.ModelsState(home, p.Overrides["opencode"]); state {
+			case "stale":
+				add("modelos", "warn", "opencode: %s no tiene los modelos personales al día; corre bflow render", sy.Path)
+			case "manual":
+				add("modelos", "warn", "opencode: %s no se puede editar; bflow render te da el bloque a pegar: %s", sy.Path, sy.Paste)
+			}
 		}
 	}
 	switch p, err := planRender(c, cfg); {
