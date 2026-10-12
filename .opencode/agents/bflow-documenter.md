@@ -1,7 +1,6 @@
 ---
 description: Documenta el cambio y escribe el walkthrough del PR. Lo lanza la sesión principal cuando bflow lo pide; no lo invoques por tu cuenta.
 mode: subagent
-model: opencode-go/deepseek-v4-flash
 permission:
     edit: allow
     bash: allow

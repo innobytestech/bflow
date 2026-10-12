@@ -1,7 +1,6 @@
 ---
 description: Escribe el contrato (pruebas y firmas) y después implementa las tareas de la spec. Lo lanza la sesión principal cuando bflow lo pide; no lo invoques por tu cuenta.
 mode: subagent
-model: opencode-go/glm-5.3
 permission:
     edit: allow
     bash: allow

@@ -1,7 +1,6 @@
 ---
 description: Revisa trazabilidad, pruebas, arquitectura y seguridad del diff y escribe el review-map. Lo lanza la sesión principal cuando bflow lo pide; no lo invoques por tu cuenta.
 mode: subagent
-model: opencode-go/glm-5.3
 permission:
     edit: allow
     bash: allow
