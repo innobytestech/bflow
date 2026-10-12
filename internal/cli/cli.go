@@ -268,9 +268,10 @@ func (c *Ctx) hooks(name string) HookAdapter {
 type AgentAdapter interface {
 	ToolAdapter
 	ParsePreToolUse(raw []byte) (a guard.Action, cwd string, ok bool)
-	// TokenSource dice qué transcript leer en un hook de fin de turno o de
-	// subagente y de quién es (agent vacío = sesión principal).
-	TokenSource(raw []byte) TokenSource
+	// TokenSources dice qué transcripts leer en un hook de fin de turno o de
+	// subagente y de quién son (agent vacío = sesión principal): el del
+	// subagente primero y el de la principal después.
+	TokenSources(raw []byte) []TokenSource
 	// ReadUsage devuelve las respuestas nuevas del transcript con su hora.
 	ReadUsage(path string, cur *metrics.Cursor) ([]metrics.Sample, error)
 	// Skills lista las skills instaladas (proyecto y usuario).

@@ -7,6 +7,7 @@ Cada llamada al modelo se carga a la tarea que su sesión conducía en ese momen
 1. **Marca de sesión:** Cuando corres `bflow <ID>` o inicias un subagente `bflow-*` para una tarea, bflow anota una marca (sesión → tarea, con timestamp) en `.bflow/cache/sessions.jsonl`.
 
 2. **Reparto:** Al terminar un turno, `bflow hook tokens` lee las marcas de la sesión y reparte cada llamada a la tarea de la última marca cuya hora sea anterior o igual a la llamada.
+   La sesión principal se carga en el Stop y también cada vez que termina un subagente (SubagentStop en Claude Code; el idle de una sesión hija en OpenCode lee además el archivo de su padre). El cursor evita contar dos veces una llamada; el aviso y la poda de marcas siguen solo en el Stop.
 
 3. **Sin tarea:** Si una sesión no condujo ninguna tarea (por ejemplo, solo contestaste preguntas en el chat sin un comando bflow), sus tokens van a una bolsa "sin tarea".
 

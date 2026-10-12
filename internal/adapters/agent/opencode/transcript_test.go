@@ -77,17 +77,17 @@ func TestTokenSourcesPrincipalTodos(t *testing.T) {
 	}
 }
 
-func TestTokenSourcesHijoSoloSuyo(t *testing.T) {
+func TestTokenSourcesHijoYPadre(t *testing.T) {
 	dir := cache(t)
 	srcs, main := Agent{}.TokenSources([]byte(`{"sessionID":"ses_kid","parentID":"ses_main","cwd":"x"}`), dir)
-	if main || !reflect.DeepEqual(sources(srcs), map[string]string{"ses_kid.jsonl": "bflow-implementer"}) {
-		t.Errorf("el idle de un hijo solo lee su archivo: main=%v %v", main, sources(srcs))
+	if main || !reflect.DeepEqual(sources(srcs), map[string]string{"ses_kid.jsonl": "bflow-implementer", "ses_main.jsonl": ""}) {
+		t.Errorf("el idle de un hijo lee su archivo y el de su padre: main=%v %v", main, sources(srcs))
 	}
 }
 
 func TestTokenSourcesSessionIDInvalido(t *testing.T) {
 	dir := cache(t)
-	if srcs, _ := (Agent{}).TokenSources([]byte(`{"sessionID":"ses_kid","parentID":"ses_main"}`), dir); len(srcs) != 1 {
+	if srcs, _ := (Agent{}).TokenSources([]byte(`{"sessionID":"ses_kid","parentID":"ses_main"}`), dir); len(srcs) != 2 {
 		t.Errorf("un sessionID válido sí encuentra su archivo: %v", srcs)
 	}
 	for _, id := range []string{"../ses_main", "ses/main", `ses\main`, "ses main", "", "ses_main.jsonl"} {

@@ -78,7 +78,7 @@ Los instala `bflow install`; no se corren a mano.
 | Comando | Qué hace |
 |---|---|
 | `hook session-start` | Entorno, compromisos y tarea activa en pocas líneas. |
-| `hook tokens` | Hook Stop y SubagentStop: suma los tokens nuevos a la fase y avisa si la tarea espera a la persona. |
+| `hook tokens` | Hook Stop y SubagentStop: suma los tokens nuevos a la fase. En SubagentStop suma también las llamadas nuevas de la sesión principal (sin avisar ni podar marcas); el Stop avisa si la tarea espera a la persona. |
 | `hook subagent-stop` | Si un agente de bflow terminó sin reportar, lo hace seguir (máximo 2 veces) y después bloquea la tarea. |
 
 ## Mantenimiento
