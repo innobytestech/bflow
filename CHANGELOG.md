@@ -10,6 +10,7 @@ Los cambios de bflow que ve quien lo usa. Las versiones siguen [semver](https://
 
 ### Cambiado
 
+- **Los modelos personales de OpenCode no entran a los agentes versionados.** `bflow render` y `render --check` generan `.opencode/agents/bflow-*.md` solo con `models` de `bflow.yaml`; un alias que solo está en tu config global sale sin `model:`. Tu mapeo personal (`models.opencode` de la config global) se escribe en `agent.bflow-<agente>.model` de tu `opencode.json`, que `render` (sin `--check`) y `bflow install opencode` actualizan. Un perfil que defina `models` se ignora con aviso. `doctor` revisa ese archivo. Si tu `opencode.json` es `.jsonc` o no se puede leer, `render` muestra el bloque para pegar. Hace falta correr `bflow render` en cada repo: este repo ya quedó migrado y sus 4 agentes salen sin `model:`.
 - **El líder no hace el trabajo del subagente que falla.** Si un subagente falla sin reportar, el líder muestra el error y la causa probable y lo relanza cuando el humano lo confirma. Hace falta correr `bflow render` (o reinstalar el adaptador) para regenerar la skill y el comando.
 
 ### Agregado
