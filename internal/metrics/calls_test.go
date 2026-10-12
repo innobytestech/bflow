@@ -121,8 +121,8 @@ func TestRunsAccumulatesPerRun(t *testing.T) {
 	if m.Total.Calls != 3 || m.Total.CacheRead != 500 || m.Total.New() != 119 || m.Total.MaxContext != 301 {
 		t.Errorf("total de la corrida: %+v", m.Total)
 	}
-	if m.FinalContext != 301 || !m.Last.Equal(at(6)) || m.Phase != flow.Spec || m.Agent != "main" {
-		t.Errorf("contexto final = el de la última fila, última hora, fase de la primera: %+v", m)
+	if m.FinalContext != 305 || !m.Last.Equal(at(6)) || m.Phase != flow.Spec || m.Agent != "main" {
+		t.Errorf("contexto final = el de la última fila más su salida, última hora, fase de la primera: %+v", m)
 	}
 	if len(Runs(nil)) != 0 {
 		t.Error("sin llamadas no hay corridas")
@@ -244,5 +244,47 @@ func TestPrefixByAgent(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("prefijo por agente:\n got %+v\nwant %+v", got, want)
+	}
+}
+
+func final(run string, min int, in, cw, cr, out int64) Call {
+	return Call{TS: at(min), Run: run, Tool: "claude", Agent: "main", Msg: "final:x", Input: in, CacheWrite: cw, CacheRead: cr, Output: out, Final: true}
+}
+
+func TestRunsFinalFromToolUseResult(t *testing.T) {
+	calls := []Call{
+		call("claude:agent-x", "scout", "a1", 1, flow.Discovery, 8, 1083, 50697, 1),
+		final("claude:agent-x", 2, 1, 1, 1, 1), // vieja: gana la de TS mayor
+		final("claude:agent-x", 3, 8, 1083, 50697, 535),
+	}
+	runs := Runs(calls)
+	if len(runs) != 1 || runs[0].FinalContext != 52323 {
+		t.Fatalf("final = suma de los cuatro campos de la última final: %+v", runs)
+	}
+	r := runs[0]
+	if len(r.Rows) != 1 || r.Total.Calls != 1 || r.Total.MaxContext != 51788 || r.Total.Output != 1 || r.Rows[0].AccRead != 50697 || r.Rows[0].AccNew != 1092 {
+		t.Errorf("la final no cambia filas ni totales: %+v", r)
+	}
+}
+
+func TestRunsFinalFallbackIncludesOutput(t *testing.T) {
+	calls := []Call{
+		call("claude:agent-x", "scout", "a1", 1, flow.Spec, 1, 0, 100, 5),
+		call("claude:agent-x", "scout", "a2", 2, flow.Spec, 2, 10, 200, 1),
+		call("claude:agent-x", "scout", "a2", 2, flow.Spec, 0, 0, 0, 928), // fragmento del mismo mensaje
+	}
+	if got := Runs(calls)[0].FinalContext; got != 2+10+200+929 {
+		t.Errorf("final = contexto de la última fila + su salida fusionada: %d", got)
+	}
+}
+
+func TestRunsFinalWithoutRowsIgnored(t *testing.T) {
+	calls := []Call{
+		call("claude:main", "main", "a1", 1, flow.Spec, 1, 0, 100, 5),
+		final("claude:agent-zzz", 2, 8, 1083, 50697, 535),
+	}
+	runs := Runs(calls)
+	if len(runs) != 1 || runs[0].Run != "claude:main" || runs[0].FinalContext != 106 {
+		t.Errorf("una final sin filas no crea corrida: %+v", runs)
 	}
 }

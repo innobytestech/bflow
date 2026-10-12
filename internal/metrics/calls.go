@@ -32,9 +32,11 @@ type Call struct {
 	CacheWrite int64      `json:"cache_write"`
 	CacheRead  int64      `json:"cache_read"`
 	Output     int64      `json:"output"`
+	Final      bool       `json:"final,omitempty"` // cifra final de la corrida, no una llamada
 }
 
 // Context es lo que la llamada leyó como contexto: Input + CacheRead + CacheWrite.
+// El contexto máximo de una corrida no incluye la salida; el final (FinalContext) sí.
 func (c Call) Context() int64 { return c.Input + c.CacheRead + c.CacheWrite }
 
 // New es igual que Usage.New: Input + CacheWrite + Output.
@@ -110,8 +112,15 @@ func Runs(calls []Call) []Run {
 	type mk struct{ run, msg string }
 	merged := map[mk]*Call{}
 	byRun := map[string][]*Call{}
+	finals := map[string]Call{}
 	var order []string
 	for _, c := range calls {
+		if c.Final {
+			if p, ok := finals[c.Run]; !ok || !c.TS.Before(p.TS) {
+				finals[c.Run] = c
+			}
+			continue
+		}
 		k := mk{c.Run, c.Msg}
 		if m := merged[k]; m != nil {
 			m.Input += c.Input
@@ -139,8 +148,11 @@ func Runs(calls []Call) []Run {
 			r.Rows = append(r.Rows, CallRow{N: i + 1, Call: *c, Context: c.Context(), AccRead: accRead, AccNew: accNew})
 			r.Total.Add(Usage{Input: c.Input, Output: c.Output, CacheRead: c.CacheRead, CacheWrite: c.CacheWrite,
 				Calls: 1, MaxContext: c.Context()})
-			r.FinalContext = c.Context()
+			r.FinalContext = c.Context() + c.Output
 			r.Last = c.TS
+		}
+		if f, ok := finals[key]; ok {
+			r.FinalContext = f.Context() + f.Output
 		}
 		runs = append(runs, r)
 	}

@@ -269,9 +269,9 @@ func TestStatsCallsText(t *testing.T) {
 		t.Errorf("la primera línea es el resumen de la tarea:\n%q\n%q", lines[0], strings.Split(plain, "\n")[0])
 	}
 	for _, want := range []string{
-		"implementer · implementing #1 · 2 llamadas · contexto final 2,001 · releído 3,000 · nuevo 348",
-		"implementer · implementing #2 · 1 llamadas · contexto final 101 · releído 100 · nuevo 6",
-		"sesión principal · implementing · 2 llamadas · contexto final 6,051 · releído 11,000 · nuevo 181",
+		"implementer · implementing #1 · 2 llamadas · contexto final 2,006 · releído 3,000 · nuevo 348",
+		"implementer · implementing #2 · 1 llamadas · contexto final 106 · releído 100 · nuevo 6",
+		"sesión principal · implementing · 2 llamadas · contexto final 6,071 · releído 11,000 · nuevo 181",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("falta el encabezado %q en:\n%s", want, out)
@@ -352,7 +352,7 @@ func TestStatsCallsJSON(t *testing.T) {
 		t.Fatalf("data.calls: una entrada por corrida: %s", raw)
 	}
 	r0 := runs[0].(map[string]any)
-	if r0["run"] != "claude:agent-a" || r0["name"] != "implementer" || r0["stage"] != "implementing" || r0["label"] != "implementer · implementing" || r0["phase"] != "implementing" || r0["final_context"] != float64(2001) {
+	if r0["run"] != "claude:agent-a" || r0["name"] != "implementer" || r0["stage"] != "implementing" || r0["label"] != "implementer · implementing" || r0["phase"] != "implementing" || r0["final_context"] != float64(2006) {
 		t.Errorf("corrida 0: %v", r0)
 	}
 	rows := r0["rows"].([]any)
@@ -522,7 +522,7 @@ func TestPanelTokensTable(t *testing.T) {
 		b.Key != "claude:sess-1" || b.Label != "sesión principal · implementing" {
 		t.Errorf("clave, etapa y etiqueta: %+v %+v", a, b)
 	}
-	if a.Summary != "2 llamadas · contexto final 2,001 · releído 3,000 · nuevo 348" {
+	if a.Summary != "2 llamadas · contexto final 2,006 · releído 3,000 · nuevo 348" {
 		t.Errorf("resumen: %q", a.Summary)
 	}
 	if a.Calls != 2 || a.Context != "2.0k" || a.Read != "3.0k" || a.New != "348" || b.Context != "6.1k" || b.Read != "11.0k" || b.New != "181" {
@@ -676,5 +676,41 @@ func TestStatsPrefixWithoutCallsFile(t *testing.T) {
 		if got := tail2(out, name); !reflect.DeepEqual(got, want) {
 			t.Errorf("fila %q: escrita del log y prefijo \"-\": %v, want %v\n%s", name, got, want, out)
 		}
+	}
+}
+
+func TestHookTokensFinalSampleNotCounted(t *testing.T) {
+	countNotify(t)
+	env, e, id, _ := tokensEnv(t, true)
+	main := filepath.Join(t.TempDir(), "sess-1.jsonl")
+	appendText(t, main, claudeLine("m1", time.Now(), 2, 10, 1000, 300))
+	claudeHook(t, env, map[string]string{"transcript_path": main})
+	before, _ := tokensByAgent(t, e, id)
+	logBefore, err := e.Store.Log(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fin, _ := json.Marshal(map[string]any{"type": "user", "timestamp": time.Now().UTC().Format(time.RFC3339Nano),
+		"toolUseResult": map[string]any{"agentId": "abc", "usage": map[string]any{"input_tokens": 8, "output_tokens": 535,
+			"cache_read_input_tokens": 50697, "cache_creation_input_tokens": 1083}}})
+	appendText(t, main, string(fin)+"\n")
+	claudeHook(t, env, map[string]string{"transcript_path": main})
+
+	after, _ := tokensByAgent(t, e, id)
+	if !reflect.DeepEqual(before, after) {
+		t.Errorf("los tokens por agente no cambian: %v -> %v", before, after)
+	}
+	if logAfter, err := e.Store.Log(id); err != nil || len(logAfter) != len(logBefore) {
+		t.Errorf("no se agregan entradas tokens: %d -> %d (%v)", len(logBefore), len(logAfter), err)
+	}
+	var finals []metrics.Call
+	for _, c := range rawCalls(t, e, id) {
+		if c.Final {
+			finals = append(finals, c)
+		}
+	}
+	if len(finals) != 1 || finals[0].Run != "claude:agent-abc" || finals[0].Output != 535 || finals[0].CacheRead != 50697 {
+		t.Errorf("una línea final en la corrida del agente: %+v", finals)
 	}
 }

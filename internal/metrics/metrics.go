@@ -44,6 +44,8 @@ type Sample struct {
 	TS    time.Time
 	Model string
 	Msg   string // id de mensaje: claude e.Message.ID; opencode "opencode:"+l.ID (la misma llave de cur.Seen)
+	Run   string // si no está vacío, la corrida a la que va la muestra (RunKey)
+	Final bool   // cifra final de la corrida: no es una llamada ni suma tokens
 	Usage
 }
 
