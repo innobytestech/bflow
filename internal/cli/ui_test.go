@@ -107,3 +107,48 @@ func TestRenderPanelClosedOutside(t *testing.T) {
 		}
 	}
 }
+
+// GH-52: el panel avisa cuando el binario instalado cambió tras arrancar.
+func TestStaleCheck(t *testing.T) {
+	cur := "a"
+	s := newStaleCheck(func() string { return cur })
+	if s.Stale() {
+		t.Error("recién arrancado no está viejo")
+	}
+	cur = "b"
+	if !s.Stale() {
+		t.Error("el binario cambió: debe avisar")
+	}
+	cur = ""
+	if s.Stale() {
+		t.Error("sin bflow en el PATH no se avisa")
+	}
+	var none *staleCheck
+	if none.Stale() {
+		t.Error("sin chequeo no se avisa")
+	}
+}
+
+func TestPanelStaleInState(t *testing.T) {
+	cur := "a"
+	s := &uiServer{stale: newStaleCheck(func() string { return cur })}
+	ps := buildPanel("dev", watchData{Repo: "api"}, time.Now())
+	ps.Stale = s.stale.Stale()
+	b, _ := json.Marshal(ps)
+	if strings.Contains(string(b), `"stale"`) {
+		t.Errorf("sin cambio no debe salir stale: %s", b)
+	}
+	cur = "b"
+	ps.Stale = s.stale.Stale()
+	b, _ = json.Marshal(ps)
+	if !strings.Contains(string(b), `"stale":true`) {
+		t.Errorf("con cambio debe salir stale: %s", b)
+	}
+}
+
+func TestRenderWatchStale(t *testing.T) {
+	out := renderWatch(bannerOff, "dev", watchData{Repo: "api", Stale: true}, time.Now(), 0)
+	if !strings.Contains(out, "reinicia el panel") {
+		t.Errorf("watch no avisa: %s", out)
+	}
+}

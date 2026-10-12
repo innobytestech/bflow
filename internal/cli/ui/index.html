@@ -430,6 +430,7 @@ svg.px.arrow { display: inline-block; width: 14px; height: 10px; margin: 0 6px; 
   <div class="tools">
     <span class="where" id="where"></span>
     <span class="ver" id="version">…</span>
+    <span class="ver" id="stale" role="status" hidden>Hay una versión nueva de bflow: reinicia el panel.</span>
     <span class="link" id="conn" aria-live="polite">Conectando…</span>
     <div class="seg" role="group" aria-label="Fondo">
       <button class="btn frame" data-theme-pick="light" aria-pressed="false">Blanco</button>
@@ -1038,6 +1039,7 @@ function renderRepos() {
 function render() {
   setText($("version"), state.version);
   $("version").title = state.version;
+  $("stale").hidden = !state.stale;
   const where = $("where");
   where.replaceChildren();
   if (state.profile) where.append(document.createTextNode(state.profile + " / "));

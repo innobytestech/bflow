@@ -48,6 +48,7 @@ type watchData struct {
 	// Calls son las corridas de calls.jsonl de la tarea activa; CallsFile dice si el archivo existe.
 	Calls     []metrics.Run
 	CallsFile bool
+	Stale     bool // el binario instalado cambió desde que arrancó este panel
 }
 
 func runWatch(c *Ctx) output.Envelope {
@@ -79,6 +80,7 @@ func runWatch(c *Ctx) output.Envelope {
 		_ = config.RememberRepo(e.Cfg.Root)
 		defer os.Remove(alivePath(storeDir)) // al cerrar la ventana no corre: el latido envejece solo
 	}
+	stale := newStaleCheck(binStamp)
 	var web *webPanel
 	if str(c.Flags, "web") == "true" {
 		web = startWeb(c)
@@ -93,6 +95,7 @@ func runWatch(c *Ctx) output.Envelope {
 				web.tick()
 				d.WebURL = web.url
 			}
+			d.Stale = stale.Stale()
 			frame = renderWatch(m, c.Version, d, time.Now(), termRows(f)-1)
 		}
 		if storeDir != "" {
@@ -321,6 +324,9 @@ func renderWatch(m bannerMode, version string, d watchData, now time.Time, rows 
 	brand := "bflow"
 	if m == bannerColor {
 		brand = fmt.Sprintf("\x1b[1;38;2;%d;%d;%dmbflow\x1b[0m", gradTo[0], gradTo[1], gradTo[2])
+	}
+	if d.Stale {
+		where += " · " + staleNotice
 	}
 	compact := "  " + brand + paint(m, cDim, " by innobytes.tech · "+version+" · "+where) + "\n\n"
 	if head == "" {
