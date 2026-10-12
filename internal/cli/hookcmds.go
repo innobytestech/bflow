@@ -76,9 +76,7 @@ func runSubagentStop(c *Ctx) output.Envelope {
 func runGuard(c *Ctx) output.Envelope {
 	raw, _ := io.ReadAll(c.Stdin)
 	allowed := output.Envelope{OK: true, Code: "allowed", Quiet: true}
-	if str(c.Flags, "post") == "true" {
-		return allowed // T4: restaurar pruebas congeladas (GH-86)
-	}
+	post := str(c.Flags, "post") == "true"
 	var acts []guard.Action
 	cwd := ""
 	if tool := str(c.Flags, "tool"); tool != "" {
@@ -97,6 +95,9 @@ func runGuard(c *Ctx) output.Envelope {
 			a, cwd, ok = c.Agent.ParsePreToolUse(raw)
 		}
 		if !ok && json.Unmarshal(raw, &a) != nil {
+			if post {
+				return allowed
+			}
 			return output.Fail("bad_input", fmt.Errorf("entrada de guard no reconocida"))
 		}
 		acts = []guard.Action{a}
@@ -109,6 +110,9 @@ func runGuard(c *Ctx) output.Envelope {
 	if err != nil {
 		// Con la config rota no se bloquea al agente: lo reporta cualquier otro comando.
 		return allowed
+	}
+	if post {
+		return runGuardPost(c, cfg, acts)
 	}
 	if allReads(acts) {
 		recordReads(c, cfg, acts, cwd, str(c.Flags, "reads") == "true") // un Read no se evalúa (R9)
@@ -307,6 +311,43 @@ func logGuard(c *Ctx, root, rule string, a guard.Action) {
 		_ = e.Store.Append(store.Entry{TS: time.Now(), ID: id, Event: "guard", By: e.User, Agent: a.Agent,
 			Data: map[string]any{"rule": rule, "command": truncateCmd(a.Command)}})
 	}
+}
+
+// runGuardPost revisa tras un Bash si cambiaron pruebas congeladas: las restaura
+// y avisa al agente (GH-86 R13-R17). Es abierto: ante cualquier duda, allowed.
+func runGuardPost(c *Ctx, cfg *config.Config, acts []guard.Action) output.Envelope {
+	allowed := output.Envelope{OK: true, Code: "allowed", Quiet: true}
+	var bash *guard.Action
+	for i := range acts {
+		if acts[i].Tool == guard.Bash {
+			bash = &acts[i]
+			break
+		}
+	}
+	if bash == nil || c.Build == nil {
+		return allowed
+	}
+	e, err := c.Build(cfg.Root)
+	if err != nil {
+		return allowed
+	}
+	id, err := e.Active(context.Background())
+	if err != nil {
+		return allowed
+	}
+	if v, err := e.Status(context.Background(), id); err != nil || !guard.FrozenPhase(v.Phase) {
+		return allowed
+	}
+	r := e.RestoreFrozen(id)
+	if r.Empty() {
+		return allowed
+	}
+	reason := engine.FrozenRestoreReason(r)
+	fmt.Fprintln(c.Stderr, "bflow guard: "+reason)
+	logGuard(c, cfg.Root, "frozen_test", *bash)
+	env := output.Rejected("frozen_test", reason)
+	env.Quiet = !c.JSON
+	return env
 }
 
 // needsTask dice si la regla necesita la fase y las pruebas congeladas (cuesta
