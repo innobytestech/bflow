@@ -197,6 +197,7 @@ type panelState struct {
 	Key     string              `json:"key,omitempty"`
 	Profile string              `json:"profile,omitempty"`
 	Version string              `json:"version"`
+	Stale   bool                `json:"stale,omitempty"` // el binario instalado cambió: reiniciar el panel
 	Now     time.Time           `json:"now"`
 	Task    *panelTask          `json:"task,omitempty"`
 	Others  []map[string]string `json:"others,omitempty"`
@@ -315,6 +316,7 @@ type uiServer struct {
 	net   map[string]panelRepo // por raíz
 	prof  map[string]string    // perfil de cada raíz
 	netAt time.Time
+	stale *staleCheck
 }
 
 const uiNetworkTTL = 5 * time.Second // los demás repos se releen cada tanto, no en cada pregunta
@@ -364,6 +366,7 @@ func (s *uiServer) state(key string) (panelState, error) {
 	d, profile := rr.d, rr.profile
 	ps := buildPanel(s.c.Version, d, now)
 	ps.Key, ps.Profile = repoKey(sel), profile
+	ps.Stale = s.stale.Stale()
 	if ps.Task == nil {
 		ps.Lanes = rr.lanes
 	}
@@ -458,7 +461,7 @@ func serveUI(c *Ctx, port int, fallback bool) (string, func(), error) {
 	_ = config.RememberRepo(e.Cfg.Root)
 	addr := ln.Addr().(*net.TCPAddr)
 	allowed := []string{fmt.Sprintf("127.0.0.1:%d", addr.Port), fmt.Sprintf("localhost:%d", addr.Port)}
-	s := &uiServer{c: c, root: e.Cfg.Root}
+	s := &uiServer{c: c, root: e.Cfg.Root, stale: newStaleCheck(binStamp)}
 	srv := &http.Server{Handler: uiHandler(allowed, s.state), ReadHeaderTimeout: 5 * time.Second}
 	go srv.Serve(ln)
 	stop := func() {

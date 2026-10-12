@@ -100,6 +100,7 @@ func runUpdate(c *Ctx) output.Envelope {
 			text += fmt.Sprintf("\n"+done, name)
 		}
 	}
+	text += "\nreinicia los paneles abiertos (bflow watch, bflow ui): siguen con el binario anterior"
 	data["integrations"] = integrations
 	data["skill"] = "skipped"
 	if v, ok := integrations["claude"]; ok {
