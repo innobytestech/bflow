@@ -143,7 +143,9 @@ Los archivos fuente están en [`adapters/claude/`](../adapters/claude/).
 
 Con `opencode` en `agent:`, `bflow render` escribe `.opencode/agents/bflow-<agente>.md` (subagentes con permisos `edit` y `bash` según lo que hace cada agente) y `bflow render --check` cubre los dos conjuntos. También escribe `.opencode/plugins/bflow.js` (OpenCode 1.x) y `.opencode/plugins/bflow2/` (OpenCode 2.x, que además inyecta el estado de la tarea al primer prompt); se commitean y no se editan: el guard antes de bash, edit, write y patch, y los tokens por fase y agente. OpenCode no tiene nudge de subagente; el plugin inyecta `bflow hook session-start` al crear una sesión raíz (sin pedir respuesta), así que un `/clear` no pierde el hilo.
 
-OpenCode pide el modelo como `proveedor/modelo`, así que los alias de los agentes (`sonnet`, `haiku`) se traducen con `models.opencode`, en `bflow.yaml`, en un perfil o en la config global (gana el repo, por alias):
+OpenCode pide el modelo como `proveedor/modelo`, así que los alias de los agentes (`sonnet`, `haiku`) se traducen con `models.opencode`. Hay dos lugares, con efectos distintos:
+
+- `bflow.yaml` (equipo): el modelo se escribe en el `model:` de los agentes versionados.
 
 ```yaml
 models:
@@ -152,7 +154,10 @@ models:
     haiku: anthropic/claude-haiku-4
 ```
 
-Un valor con `/` se usa tal cual. Un alias sin equivalente deja al agente sin `model:` (usa el de tu OpenCode) y `render` y `bflow doctor` lo avisan. Los archivos fuente están en [`adapters/opencode/`](../adapters/opencode/).
+- `models:` en el nivel superior de la config global (solo tú): nunca entra a los archivos versionados. `bflow render` e `install opencode` lo llevan a `agent.bflow-<agente>.model` de tu `opencode.json` (`$XDG_CONFIG_HOME/opencode` o `~/.config/opencode`), conservando el resto de tu archivo. Si el repo define el alias, gana el repo y no se escribe override. Si solo existe `opencode.jsonc`, o el `opencode.json` no se puede leer, bflow no lo edita: `render` te da el bloque `{"agent": ...}` para pegar. `render --check` no lee ni escribe tu `opencode.json`.
+- Los `models` de un perfil se ignoran (`render` y `doctor` lo avisan): ponlos en `bflow.yaml` o en el nivel superior de la global.
+
+Un valor con `/` se usa tal cual. Un alias sin equivalente en ninguno de los dos deja al agente sin `model:` (usa el de tu OpenCode) y `render` y `bflow doctor` lo avisan; `doctor` también avisa si tu `opencode.json` no está al día (`bflow render`). Los archivos fuente están en [`adapters/opencode/`](../adapters/opencode/).
 
 ## Paneles y notificaciones
 

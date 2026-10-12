@@ -109,10 +109,10 @@ func (Agent) GeneratedAgents(root string) []string {
 	return out
 }
 
-// commandPath es <config de OpenCode>/commands/bflow.md: $XDG_CONFIG_HOME/opencode
+// configDir es la config de OpenCode del usuario: $XDG_CONFIG_HOME/opencode
 // o ~/.config/opencode. Una XDG_CONFIG_HOME relativa se rechaza para no escribir
 // según el directorio actual.
-func commandPath(home string) (string, error) {
+func configDir(home string) (string, error) {
 	var dir string
 	if x := os.Getenv("XDG_CONFIG_HOME"); x != "" {
 		if !filepath.IsAbs(x) {
@@ -125,7 +125,16 @@ func commandPath(home string) (string, error) {
 		}
 		dir = filepath.Join(home, ".config")
 	}
-	return filepath.Join(dir, "opencode", "commands", "bflow.md"), nil
+	return filepath.Join(dir, "opencode"), nil
+}
+
+// commandPath es <config de OpenCode>/commands/bflow.md.
+func commandPath(home string) (string, error) {
+	d, err := configDir(home)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(d, "commands", "bflow.md"), nil
 }
 
 // InstallSkill escribe el comando /bflow en <config de OpenCode>/commands/bflow.md.

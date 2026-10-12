@@ -452,25 +452,48 @@ func TestAgentListValidate(t *testing.T) {
 	}
 }
 
-func TestModelsMerge(t *testing.T) {
-	const global = "models:\n  opencode: { sonnet: g/sonnet, haiku: g/haiku, opus: g/opus }\nprofiles:\n  p:\n    models:\n      opencode: { sonnet: p/sonnet, haiku: p/haiku }\n"
-	got := func(t *testing.T, global, repo string) map[string]string {
-		t.Helper()
-		c, err := Load(fixture(t, global, repo))
-		if err != nil {
-			t.Fatal(err)
-		}
-		return c.Models["opencode"]
+// R1: lo versionado (Models) sale solo de bflow.yaml; lo personal va aparte.
+func TestModelsRepoOnly(t *testing.T) {
+	const global = "models:\n  opencode: { sonnet: g/sonnet, haiku: g/haiku, opus: g/opus }\n"
+	c, err := Load(fixture(t, global, "models:\n  opencode: { haiku: r/haiku }\n"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if m := got(t, global, ""); m["sonnet"] != "g/sonnet" || m["haiku"] != "g/haiku" {
-		t.Errorf("la tabla global se usa sin perfil ni repo: %v", m)
+	if m := c.Models["opencode"]; len(m) != 1 || m["haiku"] != "r/haiku" {
+		t.Errorf("Models solo trae lo de bflow.yaml, sin fusionar la global: %v", c.Models)
 	}
-	m := got(t, global, "profile: p\nmodels:\n  opencode: { haiku: r/haiku }\n")
-	if m["haiku"] != "r/haiku" || m["sonnet"] != "p/sonnet" || m["opus"] != "g/opus" {
-		t.Errorf("gana por alias: repo > perfil > global: %v", m)
+	if m := c.PersonalModels["opencode"]; len(m) != 3 || m["sonnet"] != "g/sonnet" || m["haiku"] != "g/haiku" || m["opus"] != "g/opus" {
+		t.Errorf("PersonalModels trae la tabla global completa: %v", c.PersonalModels)
 	}
-	if m := got(t, "", "models:\n  opencode: { sonnet: r/sonnet }\n"); m["sonnet"] != "r/sonnet" || len(m) != 1 {
-		t.Errorf("solo repo: %v", m)
+	c, err = Load(fixture(t, global, ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.Models["opencode"]) != 0 || c.PersonalModels["opencode"]["sonnet"] != "g/sonnet" {
+		t.Errorf("sin models en el repo, Models queda vacío: %v / %v", c.Models, c.PersonalModels)
+	}
+	c, err = Load(fixture(t, "", "models:\n  opencode: { sonnet: r/sonnet }\n"))
+	if err != nil || c.Models["opencode"]["sonnet"] != "r/sonnet" || len(c.PersonalModels) != 0 || c.ProfileModelsIgnored {
+		t.Errorf("solo repo: %v %v %v", c.Models, c.PersonalModels, err)
+	}
+}
+
+// R2: los models de un perfil se ignoran y se marca para avisar.
+func TestModelsProfileIgnored(t *testing.T) {
+	const global = "models:\n  opencode: { sonnet: g/sonnet }\nprofiles:\n  p:\n    models:\n      opencode: { sonnet: p/sonnet, haiku: p/haiku }\n"
+	c, err := Load(fixture(t, global, "profile: p\n"))
+	if err != nil {
+		t.Fatalf("un perfil con models no falla la validación: %v", err)
+	}
+	if len(c.Models) != 0 || c.PersonalModels["opencode"]["sonnet"] != "g/sonnet" || len(c.PersonalModels["opencode"]) != 1 {
+		t.Errorf("el perfil no aporta a Models ni a PersonalModels: %v / %v", c.Models, c.PersonalModels)
+	}
+	if !c.ProfileModelsIgnored {
+		t.Error("ProfileModelsIgnored debe ser true")
+	}
+	c, err = Load(fixture(t, "profiles:\n  p:\n    agent: opencode\n", "profile: p\n"))
+	if err != nil || c.ProfileModelsIgnored {
+		t.Errorf("un perfil sin models no avisa: %v %v", c.ProfileModelsIgnored, err)
 	}
 }
 
@@ -484,7 +507,8 @@ func TestModelsValidate(t *testing.T) {
 		{"valor que no es texto", "", "models:\n  opencode: { sonnet: [a, b] }\n", []string{"bflow.yaml"}},
 		{"valor que no es texto en la global", "models:\n  opencode: { sonnet: [a] }\n", "", []string{"config.yaml"}},
 		{"tabla desconocida en la global", "models:\n  codex: { sonnet: x/y }\n", "", []string{"models.codex"}},
-		{"alias vacío en un perfil", "profiles:\n  p:\n    models:\n      opencode: { haiku: \"\" }\n", "profile: p\n", []string{"models.opencode.haiku está vacío"}},
+		{"alias vacío en la global", "models:\n  opencode: { sonnet: \"\" }\n", "", []string{"models.opencode.sonnet está vacío", "config.yaml"}},
+		{"tabla desconocida en la global nombra su origen", "models:\n  claude: { sonnet: x/y }\n", "", []string{"models.claude", "config.yaml"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

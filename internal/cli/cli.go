@@ -228,6 +228,15 @@ type LogDoctor interface {
 	DoctorLog(root string, now time.Time) []LogFinding
 }
 
+// ModelOverrider lo implementan los adaptadores cuyo mapeo personal de modelos
+// vive en la config del usuario y no en los archivos versionados (OpenCode).
+type ModelOverrider interface {
+	// SyncModels lleva want (subagente → proveedor/modelo) a la config del usuario.
+	SyncModels(home string, want map[string]string) (agents.ModelSync, error)
+	// ModelsState dice si la config del usuario coincide con want: ok|stale|manual.
+	ModelsState(home string, want map[string]string) (agents.ModelSync, string)
+}
+
 // TokenSource vive en metrics para que los adaptadores no importen cli.
 type TokenSource = metrics.TokenSource
 

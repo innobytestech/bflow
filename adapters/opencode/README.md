@@ -10,7 +10,7 @@
 
 ## Modelos
 
-OpenCode exige `proveedor/modelo`. Los agentes de bflow traen alias (`sonnet`, `haiku`) que se traducen con `models.opencode` en `bflow.yaml`, en un perfil o en la config global (por alias gana el repo, luego el perfil, luego la global):
+OpenCode exige `proveedor/modelo`. Los agentes de bflow traen alias (`sonnet`, `haiku`) que se traducen con `models.opencode`. En `bflow.yaml` (equipo) el modelo va al `model:` de los agentes versionados. En el nivel superior de la config global (solo tú) va a `agent.bflow-<agente>.model` de tu `opencode.json`, nunca al repo; los `models` de un perfil se ignoran:
 
 ```yaml
 models:
@@ -19,7 +19,9 @@ models:
     haiku: anthropic/claude-haiku-4
 ```
 
-Un valor con `/` se usa tal cual. Un alias sin equivalente deja al agente sin `model:` y `bflow render` y `bflow doctor` lo avisan.
+Un valor con `/` se usa tal cual. Un alias sin equivalente deja al agente sin `model:` y `bflow render` y `bflow doctor` lo avisan. Si el repo define el alias, no se escribe override. `bflow render` e `install opencode` conservan el resto de tu `opencode.json`; con solo `opencode.jsonc` o un JSON ilegible no lo editan y te dan el bloque a pegar.
+
+Pendiente de comprobar a mano (no se pudo en la implementación): que OpenCode aplique el `agent.bflow-*.model` de `opencode.json` sobre el agente de `.opencode/agents`, y si aparecen agentes fantasma `bflow-*` en un repo sin bflow.
 
 ## Plugin: guard y tokens
 

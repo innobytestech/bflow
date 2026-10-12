@@ -41,6 +41,14 @@ type Spec struct {
 // escribió una persona. Lo llevan los agentes de todas las herramientas.
 const GeneratedMark = "<!-- generado por bflow render: no lo edites; cambia bflow.yaml (agents) o el archivo extra y vuelve a correrlo -->"
 
+// ModelSync es el resultado de llevar los overrides de modelo a la config del usuario.
+type ModelSync struct {
+	Path    string            // opencode.json (o .jsonc si es el que existe)
+	Changed bool              // se escribió el archivo
+	Paste   string            // bloque {"agent":{...}} si no se pudo editar; "" si se editó
+	Want    map[string]string // subagente → proveedor/modelo
+}
+
 // Unresolved es un alias de modelo sin equivalente en la tabla de una
 // herramienta, con los agentes (Spec.Subagent, ordenados) que lo usan.
 type Unresolved struct {

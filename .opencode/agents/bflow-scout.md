@@ -1,7 +1,6 @@
 ---
 description: Lee el repo y resume lo que toca la tarea antes del discovery o la spec. Lo lanza la sesión principal cuando bflow lo pide; no lo invoques por tu cuenta.
 mode: subagent
-model: opencode-go/deepseek-v4-flash
 permission:
     edit: deny
     bash: allow

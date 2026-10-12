@@ -5,12 +5,14 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"innobytes.tech/bflow/internal/testutil"
 )
 
 func TestRenderAgents(t *testing.T) {
 	r := newRepo(t)
 	cfg := filepath.Join(r.dir, "bflow.yaml")
-	os.WriteFile(cfg, []byte("stack: go\nflow: { security_audit: true }\nagents:\n  implementer:\n    read: [docs/architecture/]\n"), 0o644)
+	_ = os.WriteFile(cfg, []byte("stack: go\nflow: { security_audit: true }\nagents:\n  implementer:\n    read: [docs/architecture/]\n"), 0o644)
 	agentsDir := filepath.Join(r.dir, ".claude", "agents")
 
 	if n := len(r.ok("render").Data["changed"].([]any)); n != 6 {
@@ -29,12 +31,12 @@ func TestRenderAgents(t *testing.T) {
 
 	// Un agente del usuario con el mismo prefijo no es de bflow: no se toca.
 	mine := filepath.Join(agentsDir, "bflow-mio.md")
-	os.WriteFile(mine, []byte("---\nname: bflow-mio\n---\nmío\n"), 0o644)
+	_ = os.WriteFile(mine, []byte("---\nname: bflow-mio\n---\nmío\n"), 0o644)
 	r.ok("render", "--check")
 
 	// Cambia el flujo (vuelve al default: el reviewer revisa también
 	// seguridad): el check lo detecta y render quita el agente que sobra.
-	os.WriteFile(cfg, []byte("stack: go\nagents:\n  implementer:\n    read: [docs/architecture/]\n"), 0o644)
+	_ = os.WriteFile(cfg, []byte("stack: go\nagents:\n  implementer:\n    read: [docs/architecture/]\n"), 0o644)
 	if env := r.run("render", "--check"); env.exit != 1 || env.Code != "render_outdated" {
 		t.Errorf("render --check con agentes desactualizados: exit %d code %s", env.exit, env.Code)
 	}
@@ -51,7 +53,7 @@ func TestRenderAgents(t *testing.T) {
 	r.ok("render", "--check")
 
 	// Un agente propio sin oficio es un error de configuración.
-	os.WriteFile(cfg, []byte("stack: go\nflow: { agents: { quality: [reviewer, perf-auditor] } }\n"), 0o644)
+	_ = os.WriteFile(cfg, []byte("stack: go\nflow: { agents: { quality: [reviewer, perf-auditor] } }\n"), 0o644)
 	if env := r.run("render"); env.exit != 1 || !strings.Contains(env.Data["error"].(string), "agents.perf-auditor.extra") {
 		t.Errorf("agente propio sin extra: exit %d %v", env.exit, env.Data)
 	}
@@ -65,4 +67,40 @@ func TestShowTaskIsExternalContent(t *testing.T) {
 		strings.Count(got, "</pasted_content>") != 1 || !strings.Contains(got, "# Alta de clientes") {
 		t.Errorf("show task:\n%s", got)
 	}
+}
+
+// GH-96: el mapeo de modelos de la config global no entra a los agentes
+// versionados: va al opencode.json del usuario y render --check lo ignora.
+func TestRenderAgentsGlobalModelsNotVersioned(t *testing.T) {
+	r := newRepo(t)
+	xdg := testutil.TempDir(t)
+	t.Setenv("XDG_CONFIG_HOME", xdg)
+	global := filepath.Join(os.Getenv("BFLOW_CONFIG_HOME"), "config.yaml")
+	_ = os.WriteFile(global, []byte("models:\n  opencode: { sonnet: g/sonnet, haiku: g/haiku }\n"), 0o644)
+	r.writeConfig("agent: [claude, opencode]\nmodels:\n  opencode: { sonnet: r/sonnet }\n")
+
+	r.ok("render")
+	agent := func(name string) string {
+		b, err := os.ReadFile(filepath.Join(r.dir, ".opencode", "agents", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	if imp := agent("bflow-implementer.md"); !strings.Contains(imp, "model: r/sonnet") || strings.Contains(imp, "g/") {
+		t.Errorf("el implementer usa solo bflow.yaml:\n%s", imp)
+	}
+	if doc := agent("bflow-documenter.md"); strings.Contains(doc, "model:") {
+		t.Errorf("el documenter no lleva el modelo personal:\n%s", doc)
+	}
+	oc, err := os.ReadFile(filepath.Join(xdg, "opencode", "opencode.json"))
+	if err != nil || !strings.Contains(string(oc), `"bflow-documenter"`) || !strings.Contains(string(oc), "g/haiku") || strings.Contains(string(oc), "g/sonnet") {
+		t.Errorf("el mapeo personal va al opencode.json del usuario: %v\n%s", err, oc)
+	}
+
+	r.ok("render", "--check")
+	_ = os.WriteFile(global, []byte("models:\n  opencode: { sonnet: x/otro, haiku: x/otro }\n"), 0o644)
+	r.ok("render", "--check")
+	_ = os.Remove(global)
+	r.ok("render", "--check")
 }

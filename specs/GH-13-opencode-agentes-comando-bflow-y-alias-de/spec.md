@@ -42,7 +42,7 @@ Todo está atado a Claude: main.go inyecta `claude.Agent{}` y `Config.Agent` es 
 Configuración
 - R1 [D] CUANDO bflow.yaml, un perfil o la config global traen `agent:` como texto (`agent: claude`) o como lista (`agent: [claude, opencode]`), el sistema DEBE cargarlo como lista de herramientas; `agent: claude`, `agent: ""` y la ausencia de `agent:` DEBEN producir el mismo comportamiento que hoy en render, install, init y doctor.
 - R2 [D] CUANDO `agent:` trae un valor que no es claude u opencode, o repite uno, `config.Load` DEBE fallar con un mensaje que nombra el valor y lista las disponibles (`claude, opencode`).
-- R3 [D] CUANDO la config global trae `models.opencode` en el nivel superior, el sistema DEBE usarla; un perfil y después bflow.yaml DEBEN poder fijar alias sueltos, ganando por alias (el repo gana).
+- R3 [D] CUANDO la config global trae `models.opencode` en el nivel superior, el sistema DEBE usarla; un perfil y después bflow.yaml DEBEN poder fijar alias sueltos, ganando por alias (el repo gana). *Nota: GH-96 lo reemplaza; la tabla global ya no entra a los agentes versionados, va al `opencode.json` del usuario y el perfil no puede fijar `models`.*
 - R4 [N] CUANDO `models` trae una clave distinta de `opencode`, un alias con valor vacío o un valor que no es texto, `config.Load` DEBE fallar con la ruta del archivo que lo trae (o "configuración combinada" si sale de la fusión).
 
 Render
