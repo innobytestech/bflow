@@ -32,6 +32,9 @@ type renderPlan struct {
 	Conflicts []string          // existe con ese nombre pero no lo generó bflow
 	// Unresolved son los alias de modelo sin equivalente, por herramienta.
 	Unresolved map[string][]agents.Unresolved
+	// Overrides son los modelos personales que cubren alias sin valor en el
+	// repo: herramienta → subagente → proveedor/modelo.
+	Overrides map[string]map[string]string
 }
 
 // agentsMD es el archivo que leen otras herramientas (Codex, OpenCode). Si el

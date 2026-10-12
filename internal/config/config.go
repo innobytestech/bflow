@@ -42,6 +42,11 @@ type Config struct {
 	// Models traduce los alias de modelo de los agentes (sonnet, haiku) al
 	// proveedor/modelo de cada herramienta: models.<herramienta>.<alias>.
 	Models map[string]map[string]string `yaml:"models,omitempty"`
+	// PersonalModels son los models del nivel superior de la config global: no
+	// entran a los archivos versionados, solo al opencode.json del usuario.
+	PersonalModels map[string]map[string]string `yaml:"-"`
+	// ProfileModelsIgnored avisa que el perfil activo definía models y se ignoraron.
+	ProfileModelsIgnored bool `yaml:"-"`
 
 	Root    string  `yaml:"-"` // raíz del repo
 	Sources Sources `yaml:"-"`

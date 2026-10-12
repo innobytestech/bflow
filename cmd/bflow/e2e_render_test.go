@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"innobytes.tech/bflow/internal/testutil"
 )
 
 func TestRenderAgents(t *testing.T) {
@@ -65,4 +67,40 @@ func TestShowTaskIsExternalContent(t *testing.T) {
 		strings.Count(got, "</pasted_content>") != 1 || !strings.Contains(got, "# Alta de clientes") {
 		t.Errorf("show task:\n%s", got)
 	}
+}
+
+// GH-96: el mapeo de modelos de la config global no entra a los agentes
+// versionados: va al opencode.json del usuario y render --check lo ignora.
+func TestRenderAgentsGlobalModelsNotVersioned(t *testing.T) {
+	r := newRepo(t)
+	xdg := testutil.TempDir(t)
+	t.Setenv("XDG_CONFIG_HOME", xdg)
+	global := filepath.Join(os.Getenv("BFLOW_CONFIG_HOME"), "config.yaml")
+	os.WriteFile(global, []byte("models:\n  opencode: { sonnet: g/sonnet, haiku: g/haiku }\n"), 0o644)
+	r.writeConfig("agent: [claude, opencode]\nmodels:\n  opencode: { sonnet: r/sonnet }\n")
+
+	r.ok("render")
+	agent := func(name string) string {
+		b, err := os.ReadFile(filepath.Join(r.dir, ".opencode", "agents", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	if imp := agent("bflow-implementer.md"); !strings.Contains(imp, "model: r/sonnet") || strings.Contains(imp, "g/") {
+		t.Errorf("el implementer usa solo bflow.yaml:\n%s", imp)
+	}
+	if doc := agent("bflow-documenter.md"); strings.Contains(doc, "model:") {
+		t.Errorf("el documenter no lleva el modelo personal:\n%s", doc)
+	}
+	oc, err := os.ReadFile(filepath.Join(xdg, "opencode", "opencode.json"))
+	if err != nil || !strings.Contains(string(oc), `"bflow-documenter"`) || !strings.Contains(string(oc), "g/haiku") || strings.Contains(string(oc), "g/sonnet") {
+		t.Errorf("el mapeo personal va al opencode.json del usuario: %v\n%s", err, oc)
+	}
+
+	r.ok("render", "--check")
+	os.WriteFile(global, []byte("models:\n  opencode: { sonnet: x/otro, haiku: x/otro }\n"), 0o644)
+	r.ok("render", "--check")
+	os.Remove(global)
+	r.ok("render", "--check")
 }
