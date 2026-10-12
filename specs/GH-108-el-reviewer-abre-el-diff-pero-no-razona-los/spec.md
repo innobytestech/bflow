@@ -54,6 +54,6 @@ Carril light: los nombres exactos van en cada tarea.
 - [x] **T3 · Docs** (R7)
   - `docs/guia.md`, párrafo del walkthrough (l.34): agregar que bflow rechaza un 🔴 sin `caminos:` y que `## Pruebas sin ejecutar` justifica pruebas por texto.
   - `CHANGELOG.md`: una viñeta en la versión en curso, junto a las de `review_incomplete`.
-- [ ] **T4 · Verificación manual de los criterios de la tarea** (R1, R2)
+- [x] **T4 · Verificación manual de los criterios de la tarea** (R1, R2)
   - En una rama desechable, mover `steps.delete` después del `continue` de `step.failed` en `adapters/opencode/plugin2/index.js` y correr el reviewer: debe reportar REJECTED citando `index.js:<línea>`. Anotar el resultado en `reports/impl.md`; la rama no se mergea.
   - Revisar un diff donde la única prueba de un R sea una regex sobre el fuente, sin `## Pruebas sin ejecutar`: no debe salir APPROVED.
