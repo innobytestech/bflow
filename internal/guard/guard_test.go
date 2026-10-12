@@ -231,6 +231,8 @@ func TestHumanOnlySubagent(t *testing.T) {
 		{"go test ./... ; ./bin/bflow.exe --json reject GH-1", active, false},
 		{"bflow approve --help", active, false},
 		{"bflow approve GH-1", ctx(), false}, // sin tarea activa ni fase
+		{"echo \"<<EOF\"\nbflow approve GH-1\nEOF", active, false},
+		{"cat <<'EOF'\nbflow approve GH-1\nEOF", active, true},
 		{`env -i X=1 "C:\tools\BFLOW.EXE" unblock GH-1`, active, false},
 	}
 	for _, tc := range cases {

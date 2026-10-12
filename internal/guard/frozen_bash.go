@@ -205,7 +205,7 @@ func heredocWrites(cmd string, c Context) (string, bool) {
 	}
 	lines := strings.Split(cmd, "\n")
 	for i := 0; i < len(lines); i++ {
-		m := heredocRe.FindStringSubmatch(lines[i])
+		m := heredocMatch(lines[i])
 		if m == nil {
 			continue
 		}
