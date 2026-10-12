@@ -26,10 +26,13 @@ type staleCheck struct {
 	start string
 }
 
+// newStaleCheck toma la huella del binario al arrancar el panel.
 func newStaleCheck(stamp func() string) *staleCheck {
 	return &staleCheck{stamp: stamp, start: stamp()}
 }
 
+// Stale dice si la huella actual difiere de la de arranque. Nil, huella
+// inicial vacía o huella actual vacía nunca avisan.
 func (s *staleCheck) Stale() bool {
 	if s == nil || s.start == "" {
 		return false
