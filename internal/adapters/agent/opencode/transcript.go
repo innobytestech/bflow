@@ -39,9 +39,9 @@ var sessionRe = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
 // TokenSources dice qué archivos leer en un session.idle. En el de una sesión
 // principal (sin parentID) son todos los *.jsonl de cacheDir, porque los hijos
-// no siempre tienen un idle propio; en el de un hijo, el suyo y el de su padre. El agente de
-// cada archivo sale de su primera línea completa: "" la principal, el agente del
-// hijo o "?" si no se supo.
+// no siempre tienen un idle propio; en el de un hijo, el suyo y el de su padre.
+// El agente de cada archivo sale de su primera línea completa: "" la principal,
+// el agente del hijo o "?" si no se supo.
 func (Agent) TokenSources(raw []byte, cacheDir string) ([]metrics.TokenSource, bool) {
 	var in struct {
 		SessionID string `json:"sessionID"`

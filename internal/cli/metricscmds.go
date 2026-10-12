@@ -286,8 +286,9 @@ func nextLabel(v engine.View) string {
 // runHookTokens suma los tokens nuevos de un transcript a la tarea activa. En
 // Stop lee solo la sesión principal y reparte cada respuesta en la fase en que
 // ocurrió; en SubagentStop lee el transcript de ese agente (a la fase donde
-// trabajó) y también el de la sesión principal, sin avisar ni podar. Al terminar el turno de la sesión principal, además
-// avisa a la persona si la tarea la espera. Nunca falla ni imprime: es un hook.
+// trabajó) y también el de la sesión principal, sin avisar ni podar. Al
+// terminar el turno de la sesión principal, además avisa a la persona si la
+// tarea la espera. Nunca falla ni imprime: es un hook.
 func runHookTokens(c *Ctx) output.Envelope {
 	quiet := output.Envelope{OK: true, Code: "tokens", Quiet: true}
 	raw, _ := io.ReadAll(c.Stdin)
