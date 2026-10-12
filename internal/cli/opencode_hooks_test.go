@@ -373,8 +373,8 @@ func TestHookTokensClaudeSubagentStopNoNotify(t *testing.T) {
 	tr := filepath.Join(env.Dir, "s1.jsonl")
 	sub := filepath.Join(env.Dir, "s1", "agent-a.jsonl")
 	_ = os.MkdirAll(filepath.Dir(sub), 0o755)
-	os.WriteFile(tr, nil, 0o644)
-	os.WriteFile(sub, nil, 0o644)
+	_ = os.WriteFile(tr, nil, 0o644)
+	_ = os.WriteFile(sub, nil, 0o644)
 	in, _ := json.Marshal(map[string]string{"hook_event_name": "SubagentStop", "session_id": "s1", "agent_id": "a", "agent_type": "x", "transcript_path": tr, "agent_transcript_path": sub})
 	hookRun(t, env, string(in), "hook", "tokens")
 	if *notified != 0 {

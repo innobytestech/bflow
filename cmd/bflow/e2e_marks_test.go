@@ -357,7 +357,7 @@ func TestHookTokensMainMidTurn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.WriteString(transcriptLineAt(base.Add(3*time.Minute), "m2", 1, 5, 0, 0))
+	_, _ = f.WriteString(transcriptLineAt(base.Add(3*time.Minute), "m2", 1, 5, 0, 0))
 	f.Close()
 	r.hook(stopJSON("s1", tr), "hook", "tokens")
 	if got := r.taskOutput(id); got != 115 {
