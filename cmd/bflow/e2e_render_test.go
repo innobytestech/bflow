@@ -76,7 +76,7 @@ func TestRenderAgentsGlobalModelsNotVersioned(t *testing.T) {
 	xdg := testutil.TempDir(t)
 	t.Setenv("XDG_CONFIG_HOME", xdg)
 	global := filepath.Join(os.Getenv("BFLOW_CONFIG_HOME"), "config.yaml")
-	os.WriteFile(global, []byte("models:\n  opencode: { sonnet: g/sonnet, haiku: g/haiku }\n"), 0o644)
+	_ = os.WriteFile(global, []byte("models:\n  opencode: { sonnet: g/sonnet, haiku: g/haiku }\n"), 0o644)
 	r.writeConfig("agent: [claude, opencode]\nmodels:\n  opencode: { sonnet: r/sonnet }\n")
 
 	r.ok("render")
@@ -99,7 +99,7 @@ func TestRenderAgentsGlobalModelsNotVersioned(t *testing.T) {
 	}
 
 	r.ok("render", "--check")
-	os.WriteFile(global, []byte("models:\n  opencode: { sonnet: x/otro, haiku: x/otro }\n"), 0o644)
+	_ = os.WriteFile(global, []byte("models:\n  opencode: { sonnet: x/otro, haiku: x/otro }\n"), 0o644)
 	r.ok("render", "--check")
 	os.Remove(global)
 	r.ok("render", "--check")
