@@ -230,7 +230,6 @@ func snapshotBytes(t *testing.T, v *env, hash string) []byte {
 
 // R12: al congelar se guardan los bytes de cada prueba que existe.
 func TestFrozenSnapshotSaved(t *testing.T) {
-	t.Skip("T3")
 	a := []byte("package a\r\nfunc TestA() {}\r\n")
 	v := frozenEnv(t, map[string][]byte{fa: a, fb: []byte("package b\n"), "internal/nueva_test.go": nil})
 	ha, hb := v.e.testHash(fa), v.e.testHash(fb)
@@ -246,7 +245,6 @@ func TestFrozenSnapshotSaved(t *testing.T) {
 
 // R12: re-congelar actualiza las copias y poda las que ya nadie referencia.
 func TestFrozenSnapshotRefreeze(t *testing.T) {
-	t.Skip("T3")
 	v := frozenEnv(t, map[string][]byte{fa: []byte("uno\n"), fb: []byte("b\n")})
 	h1, hb := v.e.testHash(fa), v.e.testHash(fb)
 
@@ -283,7 +281,6 @@ func TestFrozenSnapshotRefreeze(t *testing.T) {
 
 // R13, R15, R17: restaura con los bytes guardados y deja el evento.
 func TestRestoreFrozen(t *testing.T) {
-	t.Skip("T4")
 	orig := []byte("package a\r\nfunc TestA() {}\r\n")
 	v := frozenEnv(t, map[string][]byte{fa: orig, fb: []byte("b\n")})
 	if r := v.e.RestoreFrozen("T-1"); !r.Empty() {
@@ -323,7 +320,6 @@ func TestRestoreFrozen(t *testing.T) {
 
 // R13: una prueba que no existía al congelar y apareció se borra.
 func TestRestoreFrozenAbsent(t *testing.T) {
-	t.Skip("T4")
 	v := frozenEnv(t, map[string][]byte{fa: []byte("a\n"), "internal/nueva_test.go": nil})
 	put(t, v, "internal/nueva_test.go", []byte("package x\n"))
 	r := v.e.RestoreFrozen("T-1")
@@ -337,7 +333,6 @@ func TestRestoreFrozenAbsent(t *testing.T) {
 
 // R13: una prueba con allow o sin hash (formato anterior) no se toca.
 func TestRestoreFrozenAllowSkipped(t *testing.T) {
-	t.Skip("T4")
 	v := frozenEnv(t, map[string][]byte{fa: []byte("a\n"), fb: []byte("b\n")})
 	if err := v.e.AllowFrozen("T-1", fa); err != nil {
 		t.Fatal(err)
@@ -360,7 +355,6 @@ func TestRestoreFrozenAllowSkipped(t *testing.T) {
 
 // R14: una tarea congelada antes de este cambio no tiene copias: avisa, no escribe.
 func TestRestoreFrozenNoSnapshot(t *testing.T) {
-	t.Skip("T4")
 	v := frozenEnv(t, map[string][]byte{fa: []byte("a\n")})
 	p, _ := v.e.Store.Path("T-1", FrozenSnapshots)
 	if err := os.RemoveAll(p); err != nil {
@@ -378,7 +372,6 @@ func TestRestoreFrozenNoSnapshot(t *testing.T) {
 
 // R14: una copia cuyo hash no es el guardado no se usa.
 func TestRestoreFrozenBadSnapshot(t *testing.T) {
-	t.Skip("T4")
 	v := frozenEnv(t, map[string][]byte{fa: []byte("a\n")})
 	h := v.e.testHash(fa)
 	if err := v.e.Store.WriteFile("T-1", FrozenSnapshots+"/"+h, []byte("contenido alterado\n")); err != nil {
@@ -396,7 +389,6 @@ func TestRestoreFrozenBadSnapshot(t *testing.T) {
 
 // Seguridad: un hash guardado que no es de 64 caracteres hex no arma rutas (../).
 func TestRestoreFrozenBadHashName(t *testing.T) {
-	t.Skip("T4")
 	v := frozenEnv(t, map[string][]byte{fa: []byte("a\n")})
 	taskDir, _ := v.e.Store.Path("T-1", ".")
 	outside := filepath.Join(taskDir, "..", "secreto")

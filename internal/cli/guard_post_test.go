@@ -85,7 +85,6 @@ func eventsOf(t *testing.T, e *engine.Engine, id, event string) []store.Entry {
 
 // R13, R15, R17, R18: el Bash cambió una prueba congelada → se restaura y sale 2.
 func TestGuardPostRestores(t *testing.T) {
-	t.Skip("T4")
 	env, e, id := frozenTask(t, flow.Implementing)
 	in := claudePost(env, "Bash", map[string]any{"command": "python - <<'EOF'\nopen('internal/a_test.go','w').write('x')\nEOF"})
 
@@ -122,7 +121,6 @@ func TestGuardPostRestores(t *testing.T) {
 
 // R19, R20: OpenCode manda el mismo cuerpo que el guard previo.
 func TestGuardPostOpenCode(t *testing.T) {
-	t.Skip("T4")
 	env, _, _ := frozenTask(t, flow.Implementing)
 	body := func(tool string) string {
 		return guardIn(env, tool, map[string]any{"command": "sed -i s/a/b/ internal/a_test.go"}, true, "bflow-implementer")
@@ -143,7 +141,6 @@ func TestGuardPostOpenCode(t *testing.T) {
 
 // R16: sin tarea activa no hace nada.
 func TestGuardPostNoTask(t *testing.T) {
-	t.Skip("T4")
 	env, _, _, _ := tokensEnv(t, false)
 	writeFrozenFile(t, env, []byte("cambiada\n"))
 	code, out, errOut := hookRun(t, env, claudePost(env, "Bash", map[string]any{"command": "ls"}), "guard", "--post")
@@ -157,7 +154,6 @@ func TestGuardPostNoTask(t *testing.T) {
 
 // R16: fuera de las fases congeladas no restaura.
 func TestGuardPostOutsidePhase(t *testing.T) {
-	t.Skip("T4")
 	for _, p := range []flow.Phase{flow.Contract, flow.Spec, flow.InReview} {
 		env, _, _ := frozenTask(t, p)
 		writeFrozenFile(t, env, []byte("cambiada\n"))
@@ -173,7 +169,6 @@ func TestGuardPostOutsidePhase(t *testing.T) {
 
 // R16: solo Bash se revisa después de ejecutar.
 func TestGuardPostNotBash(t *testing.T) {
-	t.Skip("T4")
 	env, _, _ := frozenTask(t, flow.Implementing)
 	writeFrozenFile(t, env, []byte("cambiada\n"))
 	for _, tool := range []string{"Edit", "Write", "Read"} {
@@ -192,7 +187,6 @@ func TestGuardPostNotBash(t *testing.T) {
 
 // R16: entrada ilegible, herramienta desconocida o config rota → 0 sin salida ni cambios.
 func TestGuardPostBadInput(t *testing.T) {
-	t.Skip("T4")
 	env, _, _ := frozenTask(t, flow.Implementing)
 	writeFrozenFile(t, env, []byte("cambiada\n"))
 	for name, args := range map[string][]string{"claude": {"guard", "--post"}, "opencode": {"guard", "--tool", "opencode", "--post"},
@@ -218,7 +212,6 @@ func TestGuardPostBadInput(t *testing.T) {
 
 // R11: el guard previo carga la fase y las congeladas para comandos que pueden escribir.
 func TestNeedsTaskMayWrite(t *testing.T) {
-	t.Skip("T2")
 	env, _, _ := frozenTask(t, flow.Implementing)
 	cfg, err := config.Load(env.Dir)
 	if err != nil {

@@ -154,7 +154,6 @@ func TestSettingsGuardSeesRead(t *testing.T) {
 
 // GH-86 R18: después de cada Bash, bflow revisa que no se haya escrito una prueba congelada.
 func TestSettingsPostToolUse(t *testing.T) {
-	t.Skip("T5")
 	b, err := os.ReadFile("settings.json")
 	if err != nil {
 		t.Fatal(err)

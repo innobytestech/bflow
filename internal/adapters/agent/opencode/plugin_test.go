@@ -364,7 +364,6 @@ func sub(m map[string]any, keys ...string) any {
 
 // GH-86 R19: tool.execute.after de 1.x revisa el bash que ya corrió y le agrega el motivo a la salida.
 func TestPluginExecuteAfter(t *testing.T) {
-	t.Skip("T5")
 	// La forma real (OpenCode 1.1.53): after trae callID pero no los argumentos; before guarda los suyos por callID.
 	after := fixtureLines(t, "tool_after.jsonl")
 	if len(after) == 0 {
@@ -408,7 +407,6 @@ func TestPluginExecuteAfter(t *testing.T) {
 
 // GH-86 R20: execute.after de 2.x entrega el motivo en result.content (lo que ve el modelo).
 func TestPlugin2ExecuteAfter(t *testing.T) {
-	t.Skip("T5")
 	// La forma real (OpenCode 2.0.22): x trae input y result.content[].text; cambiar result.output.output no llega al modelo.
 	x := fixtureLines(t, "tool_after_v2.jsonl")
 	if len(x) == 0 || sub(x[0], "tool") != "shell" {

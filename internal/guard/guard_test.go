@@ -421,7 +421,6 @@ func bashCmd(cmd string) Action {
 
 // R1-R7: escribir una prueba congelada desde Bash se niega con frozen_test.
 func TestBashFrozenWrites(t *testing.T) {
-	t.Skip("T2")
 	root := filepath.ToSlash(testutil.TempDir(t))
 	diff := "diff --git a/internal/a_test.go b/internal/a_test.go\n--- a/internal/a_test.go\n+++ b/internal/a_test.go\n@@ -1 +1 @@\n-x\n+y\n"
 	if err := os.WriteFile(filepath.Join(root, "x.diff"), []byte(diff), 0o644); err != nil {
@@ -499,7 +498,6 @@ func TestBashFrozenReads(t *testing.T) {
 
 // R9: fuera de las fases congeladas, o con la prueba en allow (c.Frozen sin ella), no aplica.
 func TestBashFrozenOutsidePhase(t *testing.T) {
-	t.Skip("T2")
 	cmds := []string{`sed -i 's/a/b/' internal/a_test.go`, `echo x > internal/a_test.go`, `python -c "open('internal/a_test.go','w')"`}
 	for _, p := range []flow.Phase{flow.Contract, flow.Spec, flow.InReview, flow.Done} {
 		c := frozenCtx()
@@ -532,7 +530,6 @@ func TestBashFrozenOutsidePhase(t *testing.T) {
 
 // R10: el motivo nombra la ruta y dice lo mismo que el de Edit/Write.
 func TestBashFrozenReason(t *testing.T) {
-	t.Skip("T2")
 	c := frozenCtx()
 	edit := Evaluate(Action{Tool: Edit, Path: "internal/a_test.go"}, c)
 	d := Evaluate(bashCmd(`sed -i 's/a/b/' internal/a_test.go`), c)
@@ -556,7 +553,6 @@ func TestBashFrozenReason(t *testing.T) {
 
 // R11: qué comandos necesitan cargar la fase y las pruebas congeladas.
 func TestMayWrite(t *testing.T) {
-	t.Skip("T2")
 	for cmd, want := range map[string]bool{
 		"echo x > a.txt": true, "sed -i s/a/b/ f": true, "perl -pi -e x f": true, "tee f": true, "cp a b": true,
 		"install a b": true, "git apply x.diff": true, "patch -p1": true, "python3 x.py": true, "node -e x": true,
@@ -570,7 +566,6 @@ func TestMayWrite(t *testing.T) {
 }
 
 func TestFrozenPhase(t *testing.T) {
-	t.Skip("T2")
 	for p, want := range map[flow.Phase]bool{
 		flow.Implementing: true, flow.Paused: true, flow.Quality: true, flow.Documenting: true, flow.Walkthrough: true,
 		flow.Contract: false, flow.Spec: false, flow.InReview: false, flow.Done: false, "": false,
