@@ -154,16 +154,18 @@ func (e *Engine) Import(ctx context.Context, harnessRoot string, dryRun bool) (I
 
 func oldDescription(f oldFeature) string {
 	d := strings.TrimSpace(f.Description)
-	if len(f.Acceptance) > 0 {
+	acc := f.Acceptances
+	if len(acc) == 0 {
+		acc = f.Acceptance
+	}
+	if len(acc) > 0 {
 		d += "\n\n**Aceptación**\n"
-		for _, a := range f.Acceptance {
+		for _, a := range acc {
 			d += "- " + a + "\n"
 		}
 	}
 	if f.ID.s != "" && !f.ID.numeric {
-		d += "
-
-Origen: " + f.ID.s
+		d += "\n\nOrigen: " + f.ID.s
 	}
 	return strings.TrimSpace(d)
 }
