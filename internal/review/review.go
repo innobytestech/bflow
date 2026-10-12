@@ -235,8 +235,11 @@ func IsDoc(p string) bool {
 type Map struct {
 	Red       []string // rutas de las viñetas 🔴, normalizadas (sin :línea ni #L), sin duplicados
 	RedNoPath []string // viñetas 🔴 sin ruta inicial, recortadas a 80 runas
-	Docs      []string // rutas de ## Docs
-	HasDocs   bool
+	// RedNoExits son las viñetas 🔴 de primer nivel sin `caminos:` en su bloque,
+	// recortadas a 80 runas.
+	RedNoExits []string
+	Docs       []string // rutas de ## Docs
+	HasDocs    bool
 	// QuestionTells son las opciones de ## Preguntas de producto que delatan
 	// cuál hace el código, recortadas a 80 runas.
 	QuestionTells []string
@@ -252,6 +255,7 @@ var (
 	// tellRe encuentra las marcas que delatan la opción que hace el código.
 	tellRe        = regexp.MustCompile(`(?i)(?:(?:^|[^\pL\pN_])(?:el código|lo que hace|implementad[oa]s?|implementación|actual(?:mente)?|hoy|correct[oa]s?|recomendad[oa]s?|esperad[oa]s?)(?:$|[^\pL\pN_])|[✓✔✅←])`)
 	codeAnswersRe = regexp.MustCompile(`(?i)^el código responde\s*:`)
+	exitsRe       = regexp.MustCompile(`(?i)(?:^|[^\pL])caminos\s*:`)
 )
 
 // OptionScanner reconoce, línea a línea, las opciones de respuesta de las
@@ -293,9 +297,22 @@ func ParseMap(md string) Map {
 	var m Map
 	redLvl, docsLvl, qLvl := 0, 0, 0
 	var scan OptionScanner
+	var cur string // texto de la viñeta 🔴 abierta; "" si no hay
+	curOK := false
+	flush := func() {
+		if cur != "" && !curOK {
+			r := []rune(cur)
+			if len(r) > 80 {
+				r = r[:80]
+			}
+			m.RedNoExits = append(m.RedNoExits, string(r))
+		}
+		cur, curOK = "", false
+	}
 	for _, line := range strings.Split(strings.ReplaceAll(md, "\r\n", "\n"), "\n") {
 		line = strings.TrimRight(line, " \t\r")
 		if h := headingRe.FindStringSubmatch(line); h != nil {
+			flush()
 			lvl := len(h[1])
 			if redLvl > 0 && lvl <= redLvl {
 				redLvl = 0
@@ -327,6 +344,14 @@ func ParseMap(md string) Map {
 			}
 		}
 		b := bulletRe.FindStringSubmatch(line)
+		if b != nil {
+			flush()
+			if redLvl > 0 {
+				cur, curOK = strings.TrimSpace(b[1]), exitsRe.MatchString(b[1])
+			}
+		} else if cur != "" && exitsRe.MatchString(line) {
+			curOK = true
+		}
 		if b == nil || (redLvl == 0 && docsLvl == 0) {
 			continue
 		}
@@ -353,6 +378,7 @@ func ParseMap(md string) Map {
 			}
 		}
 	}
+	flush()
 	return m
 }
 

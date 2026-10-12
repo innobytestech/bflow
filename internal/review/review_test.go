@@ -193,6 +193,7 @@ func TestIsDoc(t *testing.T) {
 const reviewMap = "# Review-map\n\n" +
 	"## 🔴 Mirar primero\n" +
 	"- `internal/a.go:12`, `internal/b.go#L3-L9`: razón uno\n" +
+	"  - caminos: sin ramas nuevas\n" +
 	"- `internal/a.go` otra vez, sin duplicar\n" +
 	"* `internal/c.go` texto\n" +
 	"1. `d/e.go`: numerada\n" +
@@ -440,5 +441,30 @@ func TestFromActionGitDeleted(t *testing.T) {
 	r := FromAction(guard.Action{Tool: guard.Bash, Command: "git diff internal/borrado.go"}, root, root, true, now)
 	if len(r.Paths) != 0 {
 		t.Errorf("sin --, una ruta inexistente no cuenta: %v", r.Paths)
+	}
+}
+
+func TestParseMapRedNoExits(t *testing.T) {
+	md := "## 🔴 Primero\n" +
+		"- `a.go`: con sub-viñeta\n  - caminos: a.go:3 return limpia\n" +
+		"- `b.go`: misma línea, Caminos: ok\n" +
+		"- `c.go`: sin nada\n" +
+		"- `d.go`: continuación\n  más texto\n  CAMINOS : d.go:9\n" +
+		"- `e.go`: sin caminos aquí\n  - nota\n" +
+		"## 🟡 Luego\n- `f.go`\n"
+	m := ParseMap(md)
+	want := []string{"`c.go`: sin nada", "`e.go`: sin caminos aquí"}
+	if !slices.Equal(m.RedNoExits, want) {
+		t.Errorf("RedNoExits = %q, quiero %q", m.RedNoExits, want)
+	}
+	if got := ParseMap("## 🟡 Luego\n- `f.go`\n"); len(got.RedNoExits) != 0 {
+		t.Errorf("sin 🔴: %q", got.RedNoExits)
+	}
+	if got := ParseMap(reviewMap); len(got.RedNoExits) == 0 {
+		t.Errorf("las demás viñetas de reviewMap no traen caminos")
+	}
+	long := ParseMap("## 🔴 X\n- " + strings.Repeat("ñ", 100) + "\n")
+	if len(long.RedNoExits) != 1 || len([]rune(long.RedNoExits[0])) != 80 {
+		t.Errorf("recorte: %q", long.RedNoExits)
 	}
 }

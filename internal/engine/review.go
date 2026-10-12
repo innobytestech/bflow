@@ -127,6 +127,9 @@ func reviewIncomplete(cov review.Coverage, m review.Map, hasMap bool, base strin
 	if len(m.RedNoPath) > 0 {
 		blocks = append(blocks, "Estas viñetas 🔴 no empiezan con la ruta del archivo en backticks (`ruta`: razón):\n- "+strings.Join(m.RedNoPath, "\n- "))
 	}
+	if len(m.RedNoExits) > 0 {
+		blocks = append(blocks, "Estas viñetas 🔴 no dicen qué caminos de salida revisaste; agrega debajo `- caminos: <archivo:línea y estado que deja>` o `- caminos: sin ramas nuevas`:\n- "+strings.Join(m.RedNoExits, "\n- "))
+	}
 	if len(m.QuestionTells) > 0 {
 		blocks = append(blocks, "Estas opciones de `## Preguntas de producto` delatan cuál hace el código; reescríbelas neutras, sin marcas ni menciones al código:\n- "+strings.Join(m.QuestionTells, "\n- "))
 	}

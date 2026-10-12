@@ -40,18 +40,18 @@ Carril light: los nombres exactos van en cada tarea.
 
 ## Tasks
 
-- [ ] **T1 · Oficio del reviewer** (`internal/agents/craft/reviewer.md`)
+- [x] **T1 · Oficio del reviewer** (`internal/agents/craft/reviewer.md`)
   - R1: en las viñetas de revisión, después de **Pruebas**, va un punto **Corrección**: por cada rama nueva o modificada, sigue cada salida (`return`, `continue`, `break`, error, excepción) y comprueba que el estado queda consistente (entradas de mapas, recursos, cursores, archivos), el orden de los efectos (limpiar antes de salir) y el caso sin datos opcionales. Una salida que deja estado inconsistente es bloqueante: REJECTED con archivo:línea en `--note`.
   - R2: **Pruebas** agrega que una prueba que solo inspecciona el texto del fuente (regex o `strings.Contains` sobre el código) en vez de ejecutarlo es bloqueante si es la única prueba de un criterio R, salvo que `## Pruebas sin ejecutar` lo justifique.
   - R3: en el formato del review-map, cada viñeta 🔴 lleva debajo una sub-viñeta `- caminos: …` con las salidas revisadas (archivo:línea y estado que deja cada una), o `- caminos: sin ramas nuevas`. Se documenta la sección `## Pruebas sin ejecutar` con viñetas `` `ruta_test:línea`: R<n>, <por qué no se puede ejecutar> ``.
   - El oficio sigue sin duplicar reglas existentes y no pasa de 40 líneas.
   - Prueba: `TestReviewerCraftCorreccion` en `internal/agents/agents_test.go` verifica que el cuerpo del reviewer contiene `Corrección`, `caminos:` y `## Pruebas sin ejecutar`.
-- [ ] **T2 · bflow exige `caminos:` en cada 🔴** (`internal/review/review.go`, `internal/engine/review.go`)
+- [x] **T2 · bflow exige `caminos:` en cada 🔴** (`internal/review/review.go`, `internal/engine/review.go`)
   - R4: `review.Map` gana `RedNoExits []string`: viñetas 🔴 de primer nivel (las que hoy entran en `Red` o `RedNoPath`) cuyo bloque (la viñeta y sus líneas con sangría hasta la siguiente viñeta de primer nivel o encabezado) no contiene `caminos:` (sin distinguir mayúsculas, regex `(?i)(?:^|[^\pL])caminos\s*:`). Cada entrada es el texto de la viñeta recortado a 80 runas. Vale también `caminos:` en la misma línea de la viñeta.
   - R5: CUANDO el reviewer reporta APPROVED y `RedNoExits` no está vacío, `reviewIncomplete` DEBE añadir el bloque "Estas viñetas 🔴 no dicen qué caminos de salida revisaste; agrega debajo `- caminos: <archivo:línea y estado que deja>` o `- caminos: sin ramas nuevas`:" con la lista, dentro del mismo rechazo `review_incomplete`. REJECTED nunca se bloquea por esto.
   - R6: un review-map sin sección 🔴 no produce `RedNoExits`.
   - Pruebas: `TestParseMapRedNoExits` en `internal/review/review_test.go` (sub-viñeta, misma línea, mayúsculas, viñeta sin `caminos:`, sangría de continuación, encabezado que cierra la sección) y ampliar el `reviewMap` de `TestParseMap` para que sus 🔴 traigan `caminos:`; una prueba en `internal/engine` (junto a las de `reviewIncomplete`) que reporte APPROVED con un 🔴 sin `caminos:` y espere `review_incomplete` con el texto de la viñeta.
-- [ ] **T3 · Docs** (R7)
+- [x] **T3 · Docs** (R7)
   - `docs/guia.md`, párrafo del walkthrough (l.34): agregar que bflow rechaza un 🔴 sin `caminos:` y que `## Pruebas sin ejecutar` justifica pruebas por texto.
   - `CHANGELOG.md`: una viñeta en la versión en curso, junto a las de `review_incomplete`.
 - [ ] **T4 · Verificación manual de los criterios de la tarea** (R1, R2)
