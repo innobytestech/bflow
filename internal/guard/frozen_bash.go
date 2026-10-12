@@ -124,7 +124,7 @@ var redirPrefixes = []string{"&>>", "&>", ">>", ">|", "1>", "2>", ">"}
 // frozenWrite evalúa un segmento: devuelve la prueba congelada que escribe.
 // read=true si el motivo debe sugerir cat o grep (intérpretes, R6).
 func frozenWrite(s string, c Context) (string, bool) {
-	raw := strings.Fields(s)
+	raw := quotedFields(s)
 	for i, w := range raw {
 		for _, pre := range redirPrefixes {
 			if !strings.HasPrefix(w, pre) {
@@ -218,7 +218,7 @@ func heredocWrites(cmd string, c Context) (string, bool) {
 		}
 		i = j
 		for _, seg := range segSplit.Split(head, -1) {
-			t := skipPrefix(strings.Fields(seg))
+			t := skipPrefix(quotedFields(seg))
 			if len(t) == 0 {
 				continue
 			}

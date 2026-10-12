@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"unicode"
 
 	"innobytes.tech/bflow/internal/flow"
 )
@@ -93,7 +94,7 @@ var shellNames = map[string]bool{"bash": true, "sh": true, "zsh": true, "dash": 
 // cat <<EOF | bash): entonces el cuerpo del heredoc son comandos.
 func feedsShell(line string) bool {
 	for _, seg := range segSplit.Split(line, -1) {
-		for _, f := range strings.Fields(seg) {
+		for _, f := range quotedFields(seg) {
 			if strings.Contains(f, "=") && !strings.HasPrefix(f, "-") {
 				continue
 			}
@@ -201,7 +202,7 @@ var groupedFlags = regexp.MustCompile(`^-[A-Za-z]+$`)
 
 // unwrapShell devuelve <cmd> de `bash|sh|zsh [-flags] -c "<cmd>"`.
 func unwrapShell(seg string) (string, bool) {
-	fields := strings.Fields(seg)
+	fields := quotedFields(seg)
 	t := skipPrefix(slices.Clone(fields))
 	if len(t) == 0 {
 		return "", false
@@ -231,7 +232,7 @@ func unwrapShell(seg string) (string, bool) {
 	rest := seg
 	for k := 0; k <= i+len(fields)-len(t); k++ {
 		rest = strings.TrimSpace(rest)
-		f := strings.Fields(rest)
+		f := quotedFields(rest)
 		if len(f) == 0 {
 			return "", false
 		}
@@ -328,7 +329,7 @@ func BflowArgs(seg string) []string {
 // bflowTokens devuelve los tokens de un segmento bflow desde el subcomando
 // (sin los flags previos a él); ok=false si el segmento no invoca a bflow.
 func bflowTokens(seg string) ([]string, bool) {
-	t := skipPrefix(strings.Fields(seg))
+	t := skipPrefix(quotedFields(seg))
 	if len(t) == 0 {
 		return nil, false
 	}
@@ -520,4 +521,39 @@ func MatchesTest(patterns []string, p string) bool {
 		}
 	}
 	return false
+}
+
+// quotedFields parte s por espacios fuera de comillas. Un tramo "…" o '…' queda
+// dentro de un token (con sus comillas); una comilla sin cerrar llega al final.
+// `\` no es especial (en Windows separa rutas). Cada token es un substring de s.
+func quotedFields(s string) []string {
+	var out []string
+	start := -1
+	var q rune
+	for i, r := range s {
+		switch {
+		case q != 0:
+			if r == q {
+				q = 0
+			}
+		case r == '"' || r == '\'':
+			if start < 0 {
+				start = i
+			}
+			q = r
+		case unicode.IsSpace(r):
+			if start >= 0 {
+				out = append(out, s[start:i])
+				start = -1
+			}
+		default:
+			if start < 0 {
+				start = i
+			}
+		}
+	}
+	if start >= 0 {
+		out = append(out, s[start:])
+	}
+	return out
 }
