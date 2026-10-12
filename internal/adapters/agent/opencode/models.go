@@ -8,18 +8,15 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"innobytes.tech/bflow/internal/agents"
 )
 
 // userConfig es el archivo de OpenCode del usuario donde van los overrides de modelo.
 const userConfig = "opencode.json"
 
 // ModelSync es el resultado de llevar los overrides a opencode.json.
-type ModelSync struct {
-	Path    string            // opencode.json (o .jsonc si es el que existe)
-	Changed bool              // se escribió el archivo
-	Paste   string            // bloque {"agent":{...}} si no se pudo editar; "" si se editó
-	Want    map[string]string // subagente → proveedor/modelo
-}
+type ModelSync = agents.ModelSync
 
 // loadUser lee opencode.json. editable=false si solo existe el .jsonc o el
 // JSON no es un objeto; exists dice si opencode.json existe.
