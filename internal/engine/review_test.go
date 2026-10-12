@@ -16,7 +16,7 @@ import (
 	"innobytes.tech/bflow/internal/store"
 )
 
-const mapRed = "# Review-map\n\n## 🔴 Mirar primero\n- `internal/a.go`: lógica nueva\n- `internal/b.go`: seguridad\n- `gone/x.go`: ya no está\n" +
+const mapRed = "# Review-map\n\n## 🔴 Mirar primero\n- `internal/a.go`: lógica nueva\n  - caminos: sin ramas nuevas\n- `internal/b.go`: seguridad\n  - caminos: sin ramas nuevas\n- `gone/x.go`: ya no está\n  - caminos: sin ramas nuevas\n" +
 	"## 🟡 Revisar\n- `internal/c.go`\n## Docs\n- `README.md`: tabla de comandos\n"
 
 var diff4 = []string{"internal/a.go", "internal/b.go", "internal/c.go", "README.md"}
@@ -140,7 +140,7 @@ func TestReviewerApprovedWholeSmallDiff(t *testing.T) {
 
 // R9: REJECTED no se bloquea ni por cobertura ni por formato, y registra la cobertura.
 func TestReviewerRejectedNotBlocked(t *testing.T) {
-	bad := "## 🔴 Primero\n- una viñeta sin ruta\n- `internal/b.go`: falta leerla\n"
+	bad := "## 🔴 Primero\n- una viñeta sin ruta\n- `internal/b.go`: falta leerla\n  - caminos: sin ramas nuevas\n"
 	v, id, _ := inQuality(t, bad, diff4, 3000)
 	addReads(t, v, id, readOf("internal/a.go"))
 	o, err := v.e.Report(context.Background(), id, ReportOpts{Agent: "reviewer", Verdict: flow.RejectedV, Note: "falta cubrir el caso vacío"})
@@ -194,13 +194,13 @@ func TestReviewerUnmeasuredNotBlocked(t *testing.T) {
 
 // R8: el formato del review-map se exige aunque la cobertura no esté medida.
 func TestReviewerNeedsRedPathsAndDocs(t *testing.T) {
-	noPath := "## 🔴 Primero\n- Revisar la parte de seguridad del cambio\n- `internal/a.go`: ok\n## Docs\n- `README.md`\n"
+	noPath := "## 🔴 Primero\n- Revisar la parte de seguridad del cambio\n- `internal/a.go`: ok\n  - caminos: sin ramas nuevas\n## Docs\n- `README.md`\n"
 	v, id, _ := inQuality(t, noPath, diff4, 3000)
 	rj := rejection(t, func() error { _, err := approve(v, id); return err }(), "review_incomplete")
 	if !strings.Contains(rj.Reason, "Revisar la parte de seguridad") || !strings.Contains(rj.Reason, "ruta") {
 		t.Errorf("dice qué viñeta no empieza con ruta en backticks:\n%s", rj.Reason)
 	}
-	fixed := "## 🔴 Primero\n- `internal/a.go`: seguridad\n## Docs\n- `README.md`\n"
+	fixed := "## 🔴 Primero\n- `internal/a.go`: seguridad\n  - caminos: sin ramas nuevas\n## Docs\n- `README.md`\n"
 	if err := v.e.Store.WriteFile(id, "reports/review-map.md", []byte(fixed)); err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +208,7 @@ func TestReviewerNeedsRedPathsAndDocs(t *testing.T) {
 		t.Fatalf("corregido pasa: %+v %v", o, err)
 	}
 
-	noDocs := "## 🔴 Primero\n- `internal/a.go`: seguridad\n## 🟡 Luego\n- `internal/c.go`\n"
+	noDocs := "## 🔴 Primero\n- `internal/a.go`: seguridad\n  - caminos: sin ramas nuevas\n## 🟡 Luego\n- `internal/c.go`\n"
 	v, id, _ = inQuality(t, noDocs, diff4, 3000)
 	rj = rejection(t, func() error { _, err := approve(v, id); return err }(), "review_incomplete")
 	if !strings.Contains(rj.Reason, "## Docs") || !strings.Contains(rj.Reason, "reporta APPROVED otra vez") {
@@ -290,7 +290,7 @@ func TestWalkthroughShowsCoverage(t *testing.T) {
 
 // R15: el documenter no cierra con una ruta de ## Docs sin tocar ni justificar.
 func TestDocumenterDocsPending(t *testing.T) {
-	docsMap := "## 🔴 Primero\n- `internal/a.go`: lógica\n## Docs\n- `README.md`: tabla\n- `docs/guia.md`: gates\n"
+	docsMap := "## 🔴 Primero\n- `internal/a.go`: lógica\n  - caminos: sin ramas nuevas\n## Docs\n- `README.md`: tabla\n- `docs/guia.md`: gates\n"
 	ctx := context.Background()
 	toDocumenting := func(t *testing.T, m string) (*env, string) {
 		v, id, _ := inQuality(t, m, []string{"internal/a.go", "README.md"}, 100)
@@ -335,7 +335,7 @@ func withTests(v *env) { v.e.Cfg.Guard.TestPatterns = []string{"*_test.go"} }
 
 // R1, R3, R5: caso GH-46: las 🔴 leídas pero una prueba sin abrir se rechaza; lo 🔴 pendiente no se repite.
 func TestReviewerApprovedNeedsAllCode(t *testing.T) {
-	m := "## 🔴 Primero\n- `internal/b.go`: lógica\n## Docs\n- `README.md`\n"
+	m := "## 🔴 Primero\n- `internal/b.go`: lógica\n  - caminos: sin ramas nuevas\n## Docs\n- `README.md`\n"
 	v, id, _ := inQuality(t, m, []string{"internal/a.go", "internal/b.go", "internal/b_test.go", "README.md"}, 300)
 	withTests(v)
 	addReads(t, v, id, readOf("internal/a.go"))
@@ -370,7 +370,7 @@ func TestReviewerPendingListCapped(t *testing.T) {
 		diff = append(diff, fmt.Sprintf("pkg/f%02d.go", i))
 	}
 	diff = append(diff, "README.md")
-	m := "## 🔴 Primero\n- `README.md`: ok\n## Docs\n- `README.md`\n"
+	m := "## 🔴 Primero\n- `README.md`: ok\n  - caminos: sin ramas nuevas\n## Docs\n- `README.md`\n"
 	reject := func(v *env, id string) string {
 		t.Helper()
 		addReads(t, v, id, readOf("README.md"))
@@ -406,7 +406,7 @@ func TestReviewerPendingListCapped(t *testing.T) {
 
 // R4, R11: docs, specs/, lockfiles y binarios sin abrir no se exigen.
 func TestReviewerExemptNotRequired(t *testing.T) {
-	m := "## 🔴 Primero\n- `internal/a.go`: ok\n## Docs\n- `README.md`\n"
+	m := "## 🔴 Primero\n- `internal/a.go`: ok\n  - caminos: sin ramas nuevas\n## Docs\n- `README.md`\n"
 	diff := []string{"internal/a.go", "README.md", "docs/guia.md", "specs/GH-1-x/spec.md", "go.sum", "assets/logo.png", "assets/blob"}
 	v, id, g := inQuality(t, m, diff, 3000)
 	g.binary = []string{"assets/logo.png", "assets/blob"}
@@ -426,7 +426,7 @@ func TestReviewerExemptNotRequired(t *testing.T) {
 
 // R6: con un diff de 2 archivos y un git diff entero no se pide nada más.
 func TestReviewerSmallDiffWholeCovers(t *testing.T) {
-	m := "## 🔴 Primero\n- `internal/a.go`: ok\n## Docs\n- `README.md`\n"
+	m := "## 🔴 Primero\n- `internal/a.go`: ok\n  - caminos: sin ramas nuevas\n## Docs\n- `README.md`\n"
 	v, id, _ := inQuality(t, m, []string{"internal/a.go", "internal/a_test.go"}, 80)
 	withTests(v)
 	addReads(t, v, id, review.Read{Tool: guard.Bash, Whole: true, ReadHook: true})
@@ -434,7 +434,7 @@ func TestReviewerSmallDiffWholeCovers(t *testing.T) {
 		t.Fatalf("diff chico leído entero: %+v %v", o, err)
 	}
 	// Con 1500 líneas el diff entero no cubre; la 🔴 está fuera del diff, así que solo cuentan los pendientes.
-	m = "## 🔴 Primero\n- `gone.go`: ya no está\n## Docs\n- `README.md`\n"
+	m = "## 🔴 Primero\n- `gone.go`: ya no está\n  - caminos: sin ramas nuevas\n## Docs\n- `README.md`\n"
 	v, id, _ = inQuality(t, m, []string{"internal/a.go", "internal/a_test.go"}, review.WholeDiffMax)
 	withTests(v)
 	addReads(t, v, id, review.Read{Tool: guard.Bash, Whole: true, ReadHook: true})

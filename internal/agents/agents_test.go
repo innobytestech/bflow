@@ -243,3 +243,21 @@ func TestAgentSpecsSameAcrossRoots(t *testing.T) {
 		t.Errorf("los Spec no dependen de la raíz del repo")
 	}
 }
+
+func TestReviewerCraftCorreccion(t *testing.T) {
+	specs, err := Build(flow.DefaultConfig(), nil, testutil.TempDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rv string
+	for _, s := range specs {
+		if s.Name == "reviewer" {
+			rv = s.Body
+		}
+	}
+	for _, want := range []string{"Corrección", "caminos:", "## Pruebas sin ejecutar"} {
+		if !strings.Contains(rv, want) {
+			t.Errorf("el reviewer no dice %q", want)
+		}
+	}
+}
