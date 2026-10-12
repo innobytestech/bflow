@@ -31,6 +31,7 @@ func init() {
 		Setup: func(fs *flag.FlagSet) {
 			fs.String("tool", "", "herramienta cuya entrada se lee (opencode); vacío: Claude Code")
 			fs.Bool("reads", false, "el hook también ve Read: registra las lecturas del reviewer en quality")
+			fs.Bool("post", false, "hook posterior a Bash: restaura pruebas congeladas que cambiaron y avisa al agente")
 		},
 		Run: runGuard})
 	Register(&Command{Name: "hook session-start", Summary: "hook de inicio de sesión: entorno, compromisos y tarea activa en pocas líneas",
@@ -75,6 +76,9 @@ func runSubagentStop(c *Ctx) output.Envelope {
 func runGuard(c *Ctx) output.Envelope {
 	raw, _ := io.ReadAll(c.Stdin)
 	allowed := output.Envelope{OK: true, Code: "allowed", Quiet: true}
+	if str(c.Flags, "post") == "true" {
+		return allowed // T4: restaurar pruebas congeladas (GH-86)
+	}
 	var acts []guard.Action
 	cwd := ""
 	if tool := str(c.Flags, "tool"); tool != "" {

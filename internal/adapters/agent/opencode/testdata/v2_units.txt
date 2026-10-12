@@ -4,3 +4,5 @@ Capturado en OpenCode 2.0.22 (opencode-cli run --standalone, proveedor mock open
 - El patch de 2.x usa "patchText" igual que 1.x; subagent usa "agent" y "prompt"; read/edit/write usan "path".
 - sessionID, assistantMessageID, tokens, model.{id,providerID} y parentID viajan dentro de ev.data.
 - usage_v2.jsonl: sesion raiz de events_v2.jsonl con la regla de R10 (agent "build", el del step.started).
+- execute.after (GH-86): ctx.tool.hook("execute.after") existe en 2.0.22 y recibe x con tool, sessionID, id, input, status y result {output, content:[{type:"text",text}], metadata}. El modelo ve result.content[0].text (se comprobo agregando texto ahi); cambiar result.output.output no llega al modelo. tool_after_v2.jsonl es el x de un shell.
+- tool.execute.after 1.1.53 (tool_after.jsonl): input {tool, sessionID, callID} y output {title, metadata, output}; no trae los argumentos.

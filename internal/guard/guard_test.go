@@ -1,11 +1,14 @@
 package guard
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
 	"innobytes.tech/bflow/internal/flow"
+	"innobytes.tech/bflow/internal/testutil"
 )
 
 func ctx() Context {
@@ -399,6 +402,181 @@ func TestHeredocExecutedByShell(t *testing.T) {
 		d := Evaluate(Action{Tool: Bash, Command: c.cmd, Subagent: true, Agent: "implementer"}, active)
 		if c.rule == "" && !d.Allow || c.rule != "" && (d.Allow || d.Rule != c.rule) {
 			t.Errorf("%q → %+v, quería regla %q", c.cmd, d, c.rule)
+		}
+	}
+}
+
+// frozenCtx es una tarea en implementing con dos pruebas congeladas (GH-86).
+func frozenCtx() Context {
+	c := ctx()
+	c.Root = "/repo"
+	c.Phase = flow.Implementing
+	c.Frozen = []string{"internal/a_test.go", "internal/b_test.go"}
+	return c
+}
+
+func bashCmd(cmd string) Action {
+	return Action{Tool: Bash, Command: cmd, Subagent: true, Agent: "bflow-implementer"}
+}
+
+// R1-R7: escribir una prueba congelada desde Bash se niega con frozen_test.
+func TestBashFrozenWrites(t *testing.T) {
+	t.Skip("T2")
+	root := filepath.ToSlash(testutil.TempDir(t))
+	diff := "diff --git a/internal/a_test.go b/internal/a_test.go\n--- a/internal/a_test.go\n+++ b/internal/a_test.go\n@@ -1 +1 @@\n-x\n+y\n"
+	if err := os.WriteFile(filepath.Join(root, "x.diff"), []byte(diff), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct{ name, cmd string }{
+		{"sed -i", `sed -i 's/a/b/' internal/a_test.go`},
+		{"sed -i.bak", `sed -i.bak 's/a/b/' internal/a_test.go`},
+		{"sed -Ei agrupado", `sed -Ei 's/a/b/' internal/a_test.go`},
+		{"sed --in-place", `sed --in-place -e 's/a/b/' internal/a_test.go`},
+		{"perl -pi", `perl -pi -e 's/a/b/' internal/a_test.go`},
+		{"redirección >", `echo x > internal/a_test.go`},
+		{"redirección sin espacio", `echo x >internal/a_test.go`},
+		{"redirección >>", `echo x >> internal/a_test.go`},
+		{"redirección 2>", `go test ./... 2> internal/a_test.go`},
+		{"redirección &>", `go test ./... &> internal/a_test.go`},
+		{"redirección >|", `echo x >| internal/a_test.go`},
+		{"tee", `echo x | tee internal/a_test.go`},
+		{"tee -a", `echo x | tee -a internal/a_test.go`},
+		{"cp destino", `cp /tmp/x internal/a_test.go`},
+		{"install destino", `install -m 644 /tmp/x internal/a_test.go`},
+		{"comodín en sed -i", `sed -i 's/a/b/' internal/*_test.go`},
+		{"comodín ? en tee", `echo x | tee internal/?_test.go`},
+		{"python con heredoc", "python - <<'EOF'\nopen('internal/a_test.go','w').write('')\nEOF"},
+		{"cat heredoc a python", "cat <<EOF | python3\nopen('internal/a_test.go','w').write('')\nEOF"},
+		{"python -c", `python -c "open('internal/a_test.go','w').write('')"`},
+		{"node -e", `node -e "require('fs').writeFileSync('internal/a_test.go','')"`},
+		{"git apply con el parche en un archivo", "git apply x.diff"},
+		{"patch con <", "patch -p1 < x.diff"},
+		{"git apply con heredoc", "git apply <<EOF\n--- a/internal/a_test.go\n+++ b/internal/a_test.go\nEOF"},
+		{"dentro de bash -c", `bash -c "sed -i 's/a/b/' internal/a_test.go"`},
+		{"cadena con &&", `go vet ./... && echo x > internal/a_test.go`},
+		{"ruta absoluta bajo Root", `sed -i 's/a/b/' ` + root + `/internal/a_test.go`},
+	}
+	for _, tc := range cases {
+		c := frozenCtx()
+		c.Root = root
+		d := Evaluate(bashCmd(tc.cmd), c)
+		if d.Allow || d.Rule != "frozen_test" {
+			t.Errorf("%s: %q → allow=%v rule=%q", tc.name, tc.cmd, d.Allow, d.Rule)
+		}
+	}
+}
+
+// R8: leer la prueba congelada no se niega.
+func TestBashFrozenReads(t *testing.T) {
+	for _, cmd := range []string{
+		"cat internal/a_test.go",
+		"grep -n Test internal/a_test.go",
+		"rg Test internal/a_test.go",
+		"head -20 internal/a_test.go",
+		"tail -5 internal/a_test.go",
+		"less internal/a_test.go",
+		"sed -n '1,5p' internal/a_test.go",
+		"sed -n 1p internal/a_test.go > /tmp/y",
+		"go test ./...",
+		"go test ./internal/... 2>&1",
+		"go test ./... > /tmp/out.txt",
+		"git diff internal/a_test.go",
+		"git log -p -- internal/a_test.go",
+		"git show HEAD:internal/a_test.go",
+		"cp internal/a_test.go /tmp/x",
+		"wc -l < internal/a_test.go",
+		"python x.py",
+		"cat internal/a_test.go | grep Test",
+		"echo hola > /tmp/x",
+		"tee /tmp/log.txt",
+		"cp /tmp/a.go internal/a.go",
+	} {
+		if d := Evaluate(bashCmd(cmd), frozenCtx()); !d.Allow {
+			t.Errorf("%q es lectura: %+v", cmd, d)
+		}
+	}
+}
+
+// R9: fuera de las fases congeladas, o con la prueba en allow (c.Frozen sin ella), no aplica.
+func TestBashFrozenOutsidePhase(t *testing.T) {
+	t.Skip("T2")
+	cmds := []string{`sed -i 's/a/b/' internal/a_test.go`, `echo x > internal/a_test.go`, `python -c "open('internal/a_test.go','w')"`}
+	for _, p := range []flow.Phase{flow.Contract, flow.Spec, flow.InReview, flow.Done} {
+		c := frozenCtx()
+		c.Phase = p
+		for _, cmd := range cmds {
+			if d := Evaluate(bashCmd(cmd), c); !d.Allow {
+				t.Errorf("fase %s, %q: %+v", p, cmd, d)
+			}
+		}
+	}
+	c := frozenCtx()
+	c.Frozen = nil // todas en allow
+	for _, cmd := range cmds {
+		if d := Evaluate(bashCmd(cmd), c); !d.Allow {
+			t.Errorf("sin congeladas, %q: %+v", cmd, d)
+		}
+	}
+	c.Frozen = []string{"internal/b_test.go"} // a_test.go está en allow
+	if d := Evaluate(bashCmd(cmds[0]), c); !d.Allow {
+		t.Errorf("la prueba en allow se puede cambiar: %+v", d)
+	}
+	for _, p := range []flow.Phase{flow.Implementing, flow.Paused, flow.Quality, flow.Documenting, flow.Walkthrough} {
+		c := frozenCtx()
+		c.Phase = p
+		if d := Evaluate(bashCmd(cmds[0]), c); d.Allow || d.Rule != "frozen_test" {
+			t.Errorf("fase %s debe negar: %+v", p, d)
+		}
+	}
+}
+
+// R10: el motivo nombra la ruta y dice lo mismo que el de Edit/Write.
+func TestBashFrozenReason(t *testing.T) {
+	t.Skip("T2")
+	c := frozenCtx()
+	edit := Evaluate(Action{Tool: Edit, Path: "internal/a_test.go"}, c)
+	d := Evaluate(bashCmd(`sed -i 's/a/b/' internal/a_test.go`), c)
+	if d.Allow || d.Reason != edit.Reason {
+		t.Errorf("mismo motivo que Edit:\n%q\n%q", d.Reason, edit.Reason)
+	}
+	for _, w := range []string{"internal/a_test.go", "NEEDS_DECISION", "bflow freeze --allow internal/a_test.go"} {
+		if !strings.Contains(d.Reason, w) {
+			t.Errorf("el motivo no dice %q: %s", w, d.Reason)
+		}
+	}
+	r6 := Evaluate(bashCmd(`python -c "open('internal/b_test.go','w')"`), c)
+	if r6.Allow || !strings.HasPrefix(r6.Reason, strings.ReplaceAll(edit.Reason, "internal/a_test.go", "internal/b_test.go")) ||
+		!strings.Contains(r6.Reason, "cat o grep") {
+		t.Errorf("R6 suma cómo leerla: %+v", r6)
+	}
+	if strings.Contains(d.Reason, "cat o grep") {
+		t.Errorf("solo R6 habla de leer: %s", d.Reason)
+	}
+}
+
+// R11: qué comandos necesitan cargar la fase y las pruebas congeladas.
+func TestMayWrite(t *testing.T) {
+	t.Skip("T2")
+	for cmd, want := range map[string]bool{
+		"echo x > a.txt": true, "sed -i s/a/b/ f": true, "perl -pi -e x f": true, "tee f": true, "cp a b": true,
+		"install a b": true, "git apply x.diff": true, "patch -p1": true, "python3 x.py": true, "node -e x": true,
+		"pwsh -c x": true, "PYTHON -c x": true, "ruby -e x": true,
+		"go test ./...": false, "cat internal/a_test.go": false, "git status": false, "ls -la": false,
+	} {
+		if got := MayWrite(cmd); got != want {
+			t.Errorf("MayWrite(%q) = %v", cmd, got)
+		}
+	}
+}
+
+func TestFrozenPhase(t *testing.T) {
+	t.Skip("T2")
+	for p, want := range map[flow.Phase]bool{
+		flow.Implementing: true, flow.Paused: true, flow.Quality: true, flow.Documenting: true, flow.Walkthrough: true,
+		flow.Contract: false, flow.Spec: false, flow.InReview: false, flow.Done: false, "": false,
+	} {
+		if got := FrozenPhase(p); got != want {
+			t.Errorf("FrozenPhase(%q) = %v", p, got)
 		}
 	}
 }

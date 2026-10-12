@@ -65,8 +65,8 @@ func TestPluginSinDependencias(t *testing.T) {
 			t.Errorf("importa %q: solo se permiten módulos node:", m[1])
 		}
 	}
-	if n := strings.Count(strings.TrimRight(src, "\n"), "\n") + 1; n > 100 {
-		t.Errorf("el plugin tiene %d líneas, máximo 100", n)
+	if n := strings.Count(strings.TrimRight(src, "\n"), "\n") + 1; n > 120 {
+		t.Errorf("el plugin tiene %d líneas, máximo 120", n)
 	}
 }
 
@@ -89,8 +89,8 @@ func TestPluginSessionStart(t *testing.T) {
 	if !regexp.MustCompile(`!\s*p\.info\.parentID`).MatchString(src) {
 		t.Error("solo se inyecta en sesiones sin parentID")
 	}
-	if n := strings.Count(strings.TrimRight(src, "\n"), "\n") + 1; n > 100 {
-		t.Errorf("el plugin tiene %d líneas, máximo 100", n)
+	if n := strings.Count(strings.TrimRight(src, "\n"), "\n") + 1; n > 120 {
+		t.Errorf("el plugin tiene %d líneas, máximo 120", n)
 	}
 }
 
@@ -136,8 +136,8 @@ func TestPluginReadsFireAndForget(t *testing.T) {
 	if !strings.Contains(src, `stderr: "ignore"`) {
 		t.Error(`sin esperar, el proceso se lanza con stderr: "ignore"`)
 	}
-	if n := strings.Count(strings.TrimRight(src, "\n"), "\n") + 1; n > 100 {
-		t.Errorf("el plugin tiene %d líneas, máximo 100", n)
+	if n := strings.Count(strings.TrimRight(src, "\n"), "\n") + 1; n > 120 {
+		t.Errorf("el plugin tiene %d líneas, máximo 120", n)
 	}
 }
 
@@ -214,8 +214,8 @@ func TestPlugin2SinDependencias(t *testing.T) {
 	if n := lines(src); n > 160 {
 		t.Errorf("el plugin 2.x tiene %d líneas, máximo 160", n)
 	}
-	if n := lines(string(files.Plugin)); n > 100 || !strings.Contains(string(files.Plugin), "export const BflowPlugin") {
-		t.Errorf("bflow.js conserva su formato y sus 100 líneas: %d", n)
+	if n := lines(string(files.Plugin)); n > 120 || !strings.Contains(string(files.Plugin), "export const BflowPlugin") {
+		t.Errorf("bflow.js conserva su formato y sus 120 líneas: %d", n)
 	}
 }
 
@@ -329,5 +329,113 @@ func TestPlugin2StepFailedSinTokensLimpiaMapa(t *testing.T) {
 	skip := strings.Index(src, `ev.type === "session.step.failed" && !d.tokens`)
 	if del < 0 || skip < 0 || skip < del {
 		t.Error("steps.delete debe ir antes del continue de step.failed sin tokens")
+	}
+}
+
+// fixtureLines lee un archivo JSONL de testdata como objetos.
+func fixtureLines(t *testing.T, name string) []map[string]any {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join("testdata", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []map[string]any
+	for _, l := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+		var m map[string]any
+		if err := json.Unmarshal([]byte(l), &m); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		out = append(out, m)
+	}
+	return out
+}
+
+func sub(m map[string]any, keys ...string) any {
+	var cur any = m
+	for _, k := range keys {
+		mm, ok := cur.(map[string]any)
+		if !ok {
+			return nil
+		}
+		cur = mm[k]
+	}
+	return cur
+}
+
+// GH-86 R19: tool.execute.after de 1.x revisa el bash que ya corrió y le agrega el motivo a la salida.
+func TestPluginExecuteAfter(t *testing.T) {
+	t.Skip("T5")
+	// La forma real (OpenCode 1.1.53): after trae callID pero no los argumentos; before guarda los suyos por callID.
+	after := fixtureLines(t, "tool_after.jsonl")
+	if len(after) == 0 {
+		t.Fatal("tool_after.jsonl vacío")
+	}
+	for _, l := range after {
+		if _, ok := sub(l, "input", "callID").(string); !ok {
+			t.Errorf("after trae input.callID: %v", l)
+		}
+		if _, ok := sub(l, "output", "output").(string); !ok {
+			t.Errorf("after trae output.output (texto que ve el modelo): %v", l)
+		}
+		if sub(l, "input", "args") != nil || sub(l, "output", "args") != nil {
+			t.Errorf("after no trae los argumentos: %v", l)
+		}
+	}
+	for _, l := range fixtureLines(t, "tool_before.jsonl") {
+		if _, ok := sub(l, "input", "callID").(string); !ok {
+			t.Errorf("before trae input.callID, la llave del Map: %v", l)
+		}
+	}
+
+	src := string(files.Plugin)
+	i := strings.Index(src, `"tool.execute.after": async (input, output)`)
+	if i < 0 {
+		t.Fatal(`falta "tool.execute.after": async (input, output)`)
+	}
+	blk := src[i:]
+	for _, w := range []string{`input.tool === "bash"`, `"--post"`, "10000", "output.output =", "code === 2", "input.callID", ".delete(", "sessionID: input.sessionID", "warn("} {
+		if !strings.Contains(blk, w) {
+			t.Errorf("tool.execute.after no trae %q", w)
+		}
+	}
+	if strings.Contains(blk, "throw") {
+		t.Error("after nunca lanza: el comando ya corrió")
+	}
+	if !regexp.MustCompile(`\.set\(input\.callID`).MatchString(src[:i]) {
+		t.Error("before guarda los argumentos del bash por input.callID")
+	}
+}
+
+// GH-86 R20: execute.after de 2.x entrega el motivo en result.content (lo que ve el modelo).
+func TestPlugin2ExecuteAfter(t *testing.T) {
+	t.Skip("T5")
+	// La forma real (OpenCode 2.0.22): x trae input y result.content[].text; cambiar result.output.output no llega al modelo.
+	x := fixtureLines(t, "tool_after_v2.jsonl")
+	if len(x) == 0 || sub(x[0], "tool") != "shell" {
+		t.Fatalf("tool_after_v2.jsonl: un shell: %v", x)
+	}
+	if c, ok := sub(x[0], "result", "content").([]any); !ok || len(c) == 0 || sub(c[0].(map[string]any), "text") == nil {
+		t.Errorf("result.content[0].text: %v", x[0])
+	}
+	if sub(x[0], "input", "command") == nil {
+		t.Errorf("x.input trae el comando: %v", x[0])
+	}
+
+	src := string(files.Plugin2)
+	i := strings.Index(src, `ctx.tool.hook("execute.after"`)
+	if i < 0 {
+		t.Fatal(`falta ctx.tool.hook("execute.after"`)
+	}
+	blk := src[i:]
+	if j := strings.Index(blk, "session.hook("); j > 0 {
+		blk = blk[:j]
+	}
+	for _, w := range []string{`"shell"`, `"--post"`, "10000", "x.result.content", "code === 2", "x.input", "sessionID: x.sessionID"} {
+		if !strings.Contains(blk, w) {
+			t.Errorf("execute.after no trae %q", w)
+		}
+	}
+	if strings.Contains(blk, "throw") {
+		t.Error("after nunca lanza: el comando ya corrió")
 	}
 }

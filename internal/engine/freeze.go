@@ -196,3 +196,21 @@ func (e *Engine) testHash(rel string) string {
 	sum := sha256.Sum256(bytes.ReplaceAll(b, []byte("\r\n"), []byte("\n")))
 	return hex.EncodeToString(sum[:])
 }
+
+// FrozenSnapshots es la carpeta, dentro de la tarea, con una copia de cada
+// prueba congelada nombrada por su hash (GH-86 R12).
+const FrozenSnapshots = "frozen-tests"
+
+// FrozenRestore es lo que RestoreFrozen hizo con las pruebas congeladas que
+// cambiaron: las que restauró, las que borró (no existían al congelar) y las
+// que no pudo restaurar por falta de copia válida.
+type FrozenRestore struct{ Restored, Deleted, Missing []string }
+
+// Empty dice si no hubo nada que restaurar.
+func (r FrozenRestore) Empty() bool {
+	return len(r.Restored)+len(r.Deleted)+len(r.Missing) == 0
+}
+
+// RestoreFrozen devuelve las pruebas congeladas de la tarea a la versión que
+// bflow copió al congelar (GH-86 R13, R14, R17).
+func (e *Engine) RestoreFrozen(id string) FrozenRestore { return FrozenRestore{} } // T4

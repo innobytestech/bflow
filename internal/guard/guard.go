@@ -510,3 +510,10 @@ func MatchesTest(patterns []string, p string) bool {
 	}
 	return false
 }
+
+// FrozenPhase dice si en la fase p las pruebas del contrato no se tocan (GH-86).
+func FrozenPhase(p flow.Phase) bool { return false } // T2
+
+// MayWrite dice si un comando Bash podría escribir un archivo: entonces el guard
+// necesita la fase y las pruebas congeladas de la tarea activa (GH-86 R11).
+func MayWrite(cmd string) bool { return false } // T2
