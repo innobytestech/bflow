@@ -89,17 +89,18 @@ export default {
             sessions.set(d.sessionID, { parentID: d.parentID ?? "", known: true })
           } else if (ev.type === "session.step.started") {
             steps.set(d.assistantMessageID, { providerID: d.model?.providerID, modelID: d.model?.id, agent: d.agent, started: d.started })
-          } else if (ev.type === "session.step.ended") {
+          } else if (ev.type === "session.step.ended" || ev.type === "session.step.failed") {
             if (!existsSync(join(dir, ".bflow")) || !safe(d.sessionID)) continue
             const st = steps.get(d.assistantMessageID) ?? {}
             steps.delete(d.assistantMessageID)
+            if (ev.type === "session.step.failed" && !d.tokens) continue
             const s = await resolve(d.sessionID)
             const cache = join(dir, ".bflow", "cache", "opencode")
             mkdirSync(cache, { recursive: true })
             const line = { id: ev.id, sessionID: d.sessionID, parentID: s.parentID ?? "", agent: st.agent ?? "", providerID: st.providerID,
               modelID: st.modelID, created: st.started ?? ev.created, completed: ev.created, tokens: d.tokens }
             appendFileSync(join(cache, safe(d.sessionID) + ".jsonl"), JSON.stringify(line) + "\n")
-          } else if (ev.type === "session.execution.succeeded") {
+          } else if (ev.type === "session.execution.succeeded" || ev.type === "session.execution.failed" || ev.type === "session.execution.interrupted") {
             const s = await resolve(d.sessionID)
             run(["hook", "tokens", "--tool", "opencode"], { sessionID: d.sessionID, parentID: s.parentID ?? "", cwd: dir }, false)
           }
