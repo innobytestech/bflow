@@ -47,13 +47,36 @@ var oldStatus = map[string]struct {
 }
 
 type oldFeature struct {
-	ID          json.Number `json:"id"`
-	Name        string      `json:"name"`
-	Title       string      `json:"title"`
-	Description string      `json:"description"`
-	Acceptance  []string    `json:"acceptance"`
-	Status      string      `json:"status"`
+	ID          oldID    `json:"id"`
+	Name        string   `json:"name"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Acceptance  []string `json:"acceptance"`
+	Acceptances []string `json:"acceptances"`
+	Status      string   `json:"status"`
 }
+
+// oldID acepta un id numérico o de texto ("FE-16") y lo guarda como texto.
+type oldID struct {
+	s       string
+	numeric bool
+}
+
+func (o *oldID) UnmarshalJSON(b []byte) error {
+	var str string
+	if err := json.Unmarshal(b, &str); err == nil {
+		o.s, o.numeric = str, false
+		return nil
+	}
+	var n json.Number
+	if err := json.Unmarshal(b, &n); err != nil {
+		return fmt.Errorf("id debe ser texto o número: %s", b)
+	}
+	o.s, o.numeric = n.String(), true
+	return nil
+}
+
+func (o oldID) String() string { return o.s }
 
 const importIndex = "imported.json"
 
@@ -68,7 +91,9 @@ func (e *Engine) importIndex() (map[string]string, string) {
 
 // Import lee harness/feature-list.json y crea en el tracker (que debe permitir
 // crear tareas) las features no cerradas, con su registro de flujo. Es
-// idempotente: recuerda lo importado en .bflow/imported.json.
+// idempotente: recuerda lo importado en .bflow/imported.json. Acepta ids
+// numéricos o de texto ("FE-16") y criterios en "acceptances" o "acceptance";
+// con id de texto, la descripción de la tarea lleva "Origen: <id>".
 func (e *Engine) Import(ctx context.Context, harnessRoot string, dryRun bool) (ImportPlan, error) {
 	var plan ImportPlan
 	creator, ok := e.Tracker.(tracker.Creator)
@@ -131,11 +156,18 @@ func (e *Engine) Import(ctx context.Context, harnessRoot string, dryRun bool) (I
 
 func oldDescription(f oldFeature) string {
 	d := strings.TrimSpace(f.Description)
-	if len(f.Acceptance) > 0 {
+	acc := f.Acceptances
+	if len(acc) == 0 {
+		acc = f.Acceptance
+	}
+	if len(acc) > 0 {
 		d += "\n\n**Aceptación**\n"
-		for _, a := range f.Acceptance {
+		for _, a := range acc {
 			d += "- " + a + "\n"
 		}
+	}
+	if f.ID.s != "" && !f.ID.numeric {
+		d += "\n\nOrigen: " + f.ID.s
 	}
 	return strings.TrimSpace(d)
 }

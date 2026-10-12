@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"innobytes.tech/bflow/internal/flow"
@@ -120,5 +121,43 @@ func TestImportStateTimesForExistingTracker(t *testing.T) {
 	}
 	if len(v.tr.Calls) != 0 {
 		t.Errorf("importar estado no debe escribir en el tracker: %v", v.tr.Calls)
+	}
+}
+
+func TestImportFeatureListTextIDsAndAcceptances(t *testing.T) {
+	v := newEnv(t, "")
+	ctx := context.Background()
+	root := v.e.Cfg.Root
+	if err := os.MkdirAll(filepath.Join(root, "harness"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "harness", "feature-list.json"), []byte(`{"features":[
+	 {"id": "FE-16", "name": "login", "title": "Login", "description": "D", "acceptances": ["X1", "X2"], "status": "pending"},
+	 {"id": 7, "name": "num", "title": "Num", "acceptance": ["Y1"], "status": "pending"}
+	]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	plan, err := v.e.Import(ctx, root, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byOld := map[string]ImportedTask{}
+	for _, it := range plan.Tasks {
+		byOld[it.From] = it
+	}
+	fe, ok := byOld["FE-16"]
+	if !ok || len(plan.Tasks) != 2 {
+		t.Fatalf("plan: %+v", plan)
+	}
+	task, _ := v.tr.Get(ctx, fe.ID)
+	for _, want := range []string{"- X1", "- X2", "Origen: FE-16"} {
+		if !strings.Contains(task.Description, want) {
+			t.Errorf("descripción sin %q: %q", want, task.Description)
+		}
+	}
+	num, _ := v.tr.Get(ctx, byOld["7"].ID)
+	if !strings.Contains(num.Description, "- Y1") || strings.Contains(num.Description, "Origen") {
+		t.Errorf("id numérico: %q", num.Description)
 	}
 }
