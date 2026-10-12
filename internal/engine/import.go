@@ -91,7 +91,9 @@ func (e *Engine) importIndex() (map[string]string, string) {
 
 // Import lee harness/feature-list.json y crea en el tracker (que debe permitir
 // crear tareas) las features no cerradas, con su registro de flujo. Es
-// idempotente: recuerda lo importado en .bflow/imported.json.
+// idempotente: recuerda lo importado en .bflow/imported.json. Acepta ids
+// numéricos o de texto ("FE-16") y criterios en "acceptances" o "acceptance";
+// con id de texto, la descripción de la tarea lleva "Origen: <id>".
 func (e *Engine) Import(ctx context.Context, harnessRoot string, dryRun bool) (ImportPlan, error) {
 	var plan ImportPlan
 	creator, ok := e.Tracker.(tracker.Creator)
