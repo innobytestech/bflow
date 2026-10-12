@@ -47,13 +47,36 @@ var oldStatus = map[string]struct {
 }
 
 type oldFeature struct {
-	ID          json.Number `json:"id"`
-	Name        string      `json:"name"`
-	Title       string      `json:"title"`
-	Description string      `json:"description"`
-	Acceptance  []string    `json:"acceptance"`
-	Status      string      `json:"status"`
+	ID          oldID    `json:"id"`
+	Name        string   `json:"name"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Acceptance  []string `json:"acceptance"`
+	Acceptances []string `json:"acceptances"`
+	Status      string   `json:"status"`
 }
+
+// oldID acepta un id numérico o de texto ("FE-16") y lo guarda como texto.
+type oldID struct {
+	s       string
+	numeric bool
+}
+
+func (o *oldID) UnmarshalJSON(b []byte) error {
+	var str string
+	if err := json.Unmarshal(b, &str); err == nil {
+		o.s, o.numeric = str, false
+		return nil
+	}
+	var n json.Number
+	if err := json.Unmarshal(b, &n); err != nil {
+		return fmt.Errorf("id debe ser texto o número: %s", b)
+	}
+	o.s, o.numeric = n.String(), true
+	return nil
+}
+
+func (o oldID) String() string { return o.s }
 
 const importIndex = "imported.json"
 
@@ -136,6 +159,11 @@ func oldDescription(f oldFeature) string {
 		for _, a := range f.Acceptance {
 			d += "- " + a + "\n"
 		}
+	}
+	if f.ID.s != "" && !f.ID.numeric {
+		d += "
+
+Origen: " + f.ID.s
 	}
 	return strings.TrimSpace(d)
 }
