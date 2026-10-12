@@ -12,7 +12,7 @@ import (
 func TestRenderAgents(t *testing.T) {
 	r := newRepo(t)
 	cfg := filepath.Join(r.dir, "bflow.yaml")
-	os.WriteFile(cfg, []byte("stack: go\nflow: { security_audit: true }\nagents:\n  implementer:\n    read: [docs/architecture/]\n"), 0o644)
+	_ = os.WriteFile(cfg, []byte("stack: go\nflow: { security_audit: true }\nagents:\n  implementer:\n    read: [docs/architecture/]\n"), 0o644)
 	agentsDir := filepath.Join(r.dir, ".claude", "agents")
 
 	if n := len(r.ok("render").Data["changed"].([]any)); n != 6 {
@@ -31,12 +31,12 @@ func TestRenderAgents(t *testing.T) {
 
 	// Un agente del usuario con el mismo prefijo no es de bflow: no se toca.
 	mine := filepath.Join(agentsDir, "bflow-mio.md")
-	os.WriteFile(mine, []byte("---\nname: bflow-mio\n---\nmío\n"), 0o644)
+	_ = os.WriteFile(mine, []byte("---\nname: bflow-mio\n---\nmío\n"), 0o644)
 	r.ok("render", "--check")
 
 	// Cambia el flujo (vuelve al default: el reviewer revisa también
 	// seguridad): el check lo detecta y render quita el agente que sobra.
-	os.WriteFile(cfg, []byte("stack: go\nagents:\n  implementer:\n    read: [docs/architecture/]\n"), 0o644)
+	_ = os.WriteFile(cfg, []byte("stack: go\nagents:\n  implementer:\n    read: [docs/architecture/]\n"), 0o644)
 	if env := r.run("render", "--check"); env.exit != 1 || env.Code != "render_outdated" {
 		t.Errorf("render --check con agentes desactualizados: exit %d code %s", env.exit, env.Code)
 	}
@@ -53,7 +53,7 @@ func TestRenderAgents(t *testing.T) {
 	r.ok("render", "--check")
 
 	// Un agente propio sin oficio es un error de configuración.
-	os.WriteFile(cfg, []byte("stack: go\nflow: { agents: { quality: [reviewer, perf-auditor] } }\n"), 0o644)
+	_ = os.WriteFile(cfg, []byte("stack: go\nflow: { agents: { quality: [reviewer, perf-auditor] } }\n"), 0o644)
 	if env := r.run("render"); env.exit != 1 || !strings.Contains(env.Data["error"].(string), "agents.perf-auditor.extra") {
 		t.Errorf("agente propio sin extra: exit %d %v", env.exit, env.Data)
 	}
@@ -76,7 +76,7 @@ func TestRenderAgentsGlobalModelsNotVersioned(t *testing.T) {
 	xdg := testutil.TempDir(t)
 	t.Setenv("XDG_CONFIG_HOME", xdg)
 	global := filepath.Join(os.Getenv("BFLOW_CONFIG_HOME"), "config.yaml")
-	os.WriteFile(global, []byte("models:\n  opencode: { sonnet: g/sonnet, haiku: g/haiku }\n"), 0o644)
+	_ = os.WriteFile(global, []byte("models:\n  opencode: { sonnet: g/sonnet, haiku: g/haiku }\n"), 0o644)
 	r.writeConfig("agent: [claude, opencode]\nmodels:\n  opencode: { sonnet: r/sonnet }\n")
 
 	r.ok("render")
@@ -99,8 +99,8 @@ func TestRenderAgentsGlobalModelsNotVersioned(t *testing.T) {
 	}
 
 	r.ok("render", "--check")
-	os.WriteFile(global, []byte("models:\n  opencode: { sonnet: x/otro, haiku: x/otro }\n"), 0o644)
+	_ = os.WriteFile(global, []byte("models:\n  opencode: { sonnet: x/otro, haiku: x/otro }\n"), 0o644)
 	r.ok("render", "--check")
-	os.Remove(global)
+	_ = os.Remove(global)
 	r.ok("render", "--check")
 }

@@ -89,7 +89,7 @@ func TestRenderIgnoresGlobalModels(t *testing.T) {
 	// render --check no depende de la global.
 	for _, g := range []string{globalHaiku, "", "models:\n  opencode: { haiku: otro/h, sonnet: otro/s }\n"} {
 		if g == "" {
-			os.Remove(config.GlobalPath())
+			_ = os.Remove(config.GlobalPath())
 		} else {
 			setGlobal(t, g)
 		}
@@ -135,7 +135,7 @@ func TestRenderSyncsPersonalModels(t *testing.T) {
 
 	// Un alias sin valor ni en el repo ni en la global sigue sin resolver.
 	setGlobal(t, "models:\n  opencode: { haiku: g/haiku }\n")
-	os.WriteFile(filepath.Join(env.Dir, "bflow.yaml"), []byte("agent: [claude, opencode]\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(env.Dir, "bflow.yaml"), []byte("agent: [claude, opencode]\n"), 0o644)
 	_, out, raw = runJSON(t, env, "render")
 	b, _ := json.Marshal(dataOf(out)["unresolved"])
 	if !strings.Contains(string(b), "sonnet") || strings.Contains(string(b), "haiku") {
@@ -148,7 +148,7 @@ func TestRenderSyncsPersonalModels(t *testing.T) {
 	if got := userModels(t, oc); got["bflow-documenter"] != "g/nuevo" {
 		t.Errorf("se actualiza: %v", got)
 	}
-	os.Remove(config.GlobalPath())
+	_ = os.Remove(config.GlobalPath())
 	runJSON(t, env, "render")
 	if got := userModels(t, oc); len(got) != 0 {
 		t.Errorf("sin mapeo personal se quitan los overrides de bflow: %v", got)
@@ -156,8 +156,8 @@ func TestRenderSyncsPersonalModels(t *testing.T) {
 
 	// Texto: avisa dónde quedó.
 	setGlobal(t, globalHaiku)
-	os.WriteFile(filepath.Join(env.Dir, "bflow.yaml"), []byte(repoOC), 0o644)
-	os.Remove(oc)
+	_ = os.WriteFile(filepath.Join(env.Dir, "bflow.yaml"), []byte(repoOC), 0o644)
+	_ = os.Remove(oc)
 	sb := &strings.Builder{}
 	env.Stdout = sb
 	Run([]string{"render"}, env)
@@ -170,8 +170,8 @@ func TestRenderSyncsPersonalModels(t *testing.T) {
 func TestRenderPersonalModelsJSONC(t *testing.T) {
 	env, oc := personalEnv(t, repoOC, globalHaiku)
 	jsonc := filepath.Join(filepath.Dir(oc), "opencode.jsonc")
-	os.MkdirAll(filepath.Dir(oc), 0o755)
-	os.WriteFile(jsonc, []byte("{ // mío\n}\n"), 0o644)
+	_ = os.MkdirAll(filepath.Dir(oc), 0o755)
+	_ = os.WriteFile(jsonc, []byte("{ // mío\n}\n"), 0o644)
 	code, out, raw := runJSON(t, env, "render")
 	if code != 0 {
 		t.Fatalf("render: %s", raw)
@@ -233,8 +233,8 @@ func TestRenderCheckNoUserConfig(t *testing.T) {
 		t.Errorf("con --check data.personal_models es null: %v", v)
 	}
 	// Un opencode.json ilegible ni se lee ni importa.
-	os.MkdirAll(filepath.Dir(oc), 0o755)
-	os.WriteFile(oc, []byte("{ roto"), 0o644)
+	_ = os.MkdirAll(filepath.Dir(oc), 0o755)
+	_ = os.WriteFile(oc, []byte("{ roto"), 0o644)
 	if code, _, raw := runJSON(t, env, "render", "--check"); code != 0 {
 		t.Errorf("el check no depende del opencode.json: %s", raw)
 	}
@@ -247,8 +247,8 @@ func TestRenderCheckNoUserConfig(t *testing.T) {
 func TestRenderConflictNoSync(t *testing.T) {
 	env, oc := personalEnv(t, repoOC, globalHaiku)
 	handmade := filepath.Join(env.Dir, ".opencode", "agents", "bflow-implementer.md")
-	os.MkdirAll(filepath.Dir(handmade), 0o755)
-	os.WriteFile(handmade, []byte("mío\n"), 0o644)
+	_ = os.MkdirAll(filepath.Dir(handmade), 0o755)
+	_ = os.WriteFile(handmade, []byte("mío\n"), 0o644)
 	code, out, raw := runJSON(t, env, "render")
 	if code != 1 || out["code"] != "render_conflict" {
 		t.Fatalf("conflicto: %s", raw)
@@ -256,7 +256,7 @@ func TestRenderConflictNoSync(t *testing.T) {
 	if !notExist(oc) {
 		t.Error("con conflictos no se escribe opencode.json")
 	}
-	os.Remove(handmade)
+	_ = os.Remove(handmade)
 	if code, _, raw := runJSON(t, env, "render"); code != 0 || notExist(oc) {
 		t.Errorf("resuelto el conflicto, render sí sincroniza: %s", raw)
 	}
@@ -268,7 +268,7 @@ func TestRenderConflictNoSync(t *testing.T) {
 	if !notExist(oc2) {
 		t.Error("sin opencode en agent: no se toca opencode.json")
 	}
-	os.WriteFile(filepath.Join(env2.Dir, "bflow.yaml"), []byte("agent: [claude, opencode]\nmodels:\n  opencode: { sonnet: r/s }\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(env2.Dir, "bflow.yaml"), []byte("agent: [claude, opencode]\nmodels:\n  opencode: { sonnet: r/s }\n"), 0o644)
 	if code, _, raw := runJSON(t, env2, "render"); code != 0 || notExist(oc2) {
 		t.Errorf("con opencode en agent: sí sincroniza: %s", raw)
 	}
@@ -342,22 +342,22 @@ func TestDoctorOpenCodeModels(t *testing.T) {
 	}
 
 	// R11: lo que no se puede editar.
-	os.WriteFile(oc, []byte("{ roto"), 0o644)
+	_ = os.WriteFile(oc, []byte("{ roto"), 0o644)
 	if !anyDetail(modelosItems(t, env), "warn", "opencode.json", "bflow render") {
 		t.Errorf("opencode.json ilegible: %v", modelosItems(t, env))
 	}
-	os.Remove(oc)
+	_ = os.Remove(oc)
 	jsonc := filepath.Join(filepath.Dir(oc), "opencode.jsonc")
-	os.WriteFile(jsonc, []byte("{}"), 0o644)
+	_ = os.WriteFile(jsonc, []byte("{}"), 0o644)
 	if !anyDetail(modelosItems(t, env), "warn", "opencode.jsonc") {
 		t.Errorf("solo .jsonc: %v", modelosItems(t, env))
 	}
-	os.Remove(jsonc)
+	_ = os.Remove(jsonc)
 
 	// R2: los models de un perfil se ignoran y doctor lo dice, sin fallar.
 	prof := "profiles:\n  p:\n    models:\n      opencode: { sonnet: p/sonnet }\n"
 	setGlobal(t, prof)
-	os.WriteFile(filepath.Join(env.Dir, "bflow.yaml"), []byte("agent: [claude, opencode]\nprofile: p\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(env.Dir, "bflow.yaml"), []byte("agent: [claude, opencode]\nprofile: p\n"), 0o644)
 	items = modelosItems(t, env)
 	if !anyDetail(items, "warn", "perfil", "p") {
 		t.Errorf("avisa que los models del perfil no se aplican: %v", items)
