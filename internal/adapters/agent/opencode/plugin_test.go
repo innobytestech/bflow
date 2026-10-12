@@ -322,3 +322,12 @@ func TestPlugin2StepFailedEscribeCache(t *testing.T) {
 		t.Error("step.failed sin tokens no escribe línea")
 	}
 }
+
+func TestPlugin2StepFailedSinTokensLimpiaMapa(t *testing.T) {
+	src := string(files.Plugin2)
+	del := strings.Index(src, "steps.delete(d.assistantMessageID)")
+	skip := strings.Index(src, `ev.type === "session.step.failed" && !d.tokens`)
+	if del < 0 || skip < 0 || skip < del {
+		t.Error("steps.delete debe ir antes del continue de step.failed sin tokens")
+	}
+}
