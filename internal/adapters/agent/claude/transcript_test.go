@@ -161,3 +161,57 @@ func TestTokenSourceSession(t *testing.T) {
 		t.Errorf("subagente: %+v", sub)
 	}
 }
+
+func toolResultLine(t *testing.T, result any) string {
+	t.Helper()
+	b, err := json.Marshal(map[string]any{"type": "user", "timestamp": "2026-09-28T22:36:00Z", "toolUseResult": result})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b) + "\n"
+}
+
+func TestReadUsageFinalFromToolUseResult(t *testing.T) {
+	main := filepath.Join(t.TempDir(), "s.jsonl")
+	appendTo(t, main, line("m1", opus, 1, 5, 10, 0))
+	appendTo(t, main, toolResultLine(t, map[string]any{"agentId": "aea14", "totalTokens": 52323,
+		"usage": map[string]any{"input_tokens": 8, "output_tokens": 535, "cache_read_input_tokens": 50697, "cache_creation_input_tokens": 1083}}))
+	cur := &metrics.Cursor{}
+	ss, err := (Agent{}).ReadUsage(main, cur)
+	if err != nil || len(ss) != 2 {
+		t.Fatalf("%v %+v", err, ss)
+	}
+	var fin []metrics.Sample
+	for _, s := range ss {
+		if s.Final {
+			fin = append(fin, s)
+		}
+	}
+	if len(fin) != 1 {
+		t.Fatalf("una sola muestra final: %+v", ss)
+	}
+	f := fin[0]
+	want := metrics.Usage{Input: 8, Output: 535, CacheRead: 50697, CacheWrite: 1083}
+	if f.Usage != want || f.Run != "claude:agent-aea14" || f.Msg != "final:aea14" || f.TS.IsZero() {
+		t.Errorf("muestra final: %+v", f)
+	}
+	if _, ok := cur.Seen["final:aea14"]; ok || len(cur.Seen) != 1 {
+		t.Errorf("la final no toca Seen: %v", cur.Seen)
+	}
+}
+
+func TestReadUsageToolUseResultWithoutUsage(t *testing.T) {
+	main := filepath.Join(t.TempDir(), "s.jsonl")
+	u := map[string]any{"input_tokens": 1, "output_tokens": 1, "cache_read_input_tokens": 1, "cache_creation_input_tokens": 1}
+	appendTo(t, main, toolResultLine(t, map[string]any{"agentId": "a", "totalTokens": 3}))                           // sin usage
+	appendTo(t, main, toolResultLine(t, map[string]any{"usage": u}))                                                 // sin agentId
+	appendTo(t, main, toolResultLine(t, "texto"))                                                                    // no es objeto
+	appendTo(t, main, toolResultLine(t, []any{1, 2}))                                                                // lista
+	appendTo(t, main, toolResultLine(t, map[string]any{"agentId": "a", "usage": "x"}))                               // usage mal formado
+	appendTo(t, main, toolResultLine(t, map[string]any{"agentId": "a", "usage": map[string]any{"input_tokens": 0}})) // todo en 0
+	appendTo(t, main, `{"type":"user","usage":1}`+"\n")                                                              // sin toolUseResult
+	ss, err := (Agent{}).ReadUsage(main, &metrics.Cursor{})
+	if err != nil || len(ss) != 0 {
+		t.Errorf("no emite nada ni falla: %v %+v", err, ss)
+	}
+}

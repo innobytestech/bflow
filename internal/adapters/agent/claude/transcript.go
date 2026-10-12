@@ -93,6 +93,33 @@ type entry struct {
 			CacheWrite int64 `json:"cache_creation_input_tokens"`
 		} `json:"usage"`
 	} `json:"message"`
+	ToolUseResult json.RawMessage `json:"toolUseResult"`
+}
+
+// finalSample saca la cifra final de un subagente de la línea user con el
+// toolUseResult del Task: Claude Code suma ahí la salida de la última llamada.
+func finalSample(e entry) (metrics.Sample, bool) {
+	var r struct {
+		AgentID string `json:"agentId"`
+		Usage   *struct {
+			Input      int64 `json:"input_tokens"`
+			Output     int64 `json:"output_tokens"`
+			CacheRead  int64 `json:"cache_read_input_tokens"`
+			CacheWrite int64 `json:"cache_creation_input_tokens"`
+		} `json:"usage"`
+	}
+	if len(e.ToolUseResult) == 0 || json.Unmarshal(e.ToolUseResult, &r) != nil || r.AgentID == "" || r.Usage == nil {
+		return metrics.Sample{}, false
+	}
+	u := metrics.Usage{Input: r.Usage.Input, Output: r.Usage.Output, CacheRead: r.Usage.CacheRead, CacheWrite: r.Usage.CacheWrite}
+	if u.Input+u.Output+u.CacheRead+u.CacheWrite <= 0 {
+		return metrics.Sample{}, false
+	}
+	ts := e.Timestamp
+	if ts.IsZero() {
+		ts = time.Now()
+	}
+	return metrics.Sample{TS: ts, Msg: "final:" + r.AgentID, Run: metrics.RunKey("claude", "agent-"+r.AgentID), Final: true, Usage: u}, true
 }
 
 func readFile(path string, cur *metrics.Cursor) ([]metrics.Sample, error) {
@@ -120,7 +147,16 @@ func readFile(path string, cur *metrics.Cursor) ([]metrics.Sample, error) {
 			continue
 		}
 		var e entry
-		if json.Unmarshal(line, &e) != nil || e.Type != "assistant" || e.Message.ID == "" {
+		if json.Unmarshal(line, &e) != nil {
+			continue
+		}
+		if e.Type == "user" {
+			if s, ok := finalSample(e); ok {
+				out = append(out, s)
+			}
+			continue
+		}
+		if e.Type != "assistant" || e.Message.ID == "" {
 			continue
 		}
 		u := metrics.Usage{Input: e.Message.Usage.Input, Output: e.Message.Usage.Output,

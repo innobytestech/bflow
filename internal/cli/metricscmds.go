@@ -433,8 +433,12 @@ func addUnassigned(e *engine.Engine, tool, run, agent string, samples []metrics.
 	}
 	var buf []byte
 	for _, s := range samples {
-		b, err := json.Marshal(metrics.Call{TS: s.TS, Run: run, Tool: tool, Agent: name, Model: s.Model, Msg: s.Msg,
-			Input: s.Input, CacheWrite: s.CacheWrite, CacheRead: s.CacheRead, Output: s.Output})
+		r := run
+		if s.Run != "" {
+			r = s.Run
+		}
+		b, err := json.Marshal(metrics.Call{TS: s.TS, Run: r, Tool: tool, Agent: name, Model: s.Model, Msg: s.Msg,
+			Input: s.Input, CacheWrite: s.CacheWrite, CacheRead: s.CacheRead, Output: s.Output, Final: s.Final})
 		if err != nil {
 			return err
 		}
@@ -468,6 +472,16 @@ func addTokens(e *engine.Engine, id, tool, run string, samples []metrics.Sample,
 	if agent != "" {
 		name = strings.TrimPrefix(agent, flow.SubagentPrefix)
 	}
+	var finals []metrics.Sample // cifras finales: solo van a calls.jsonl, no suman
+	var counted []metrics.Sample
+	for _, s := range samples {
+		if s.Final {
+			finals = append(finals, s)
+		} else {
+			counted = append(counted, s)
+		}
+	}
+	samples = counted
 	shares := metrics.Allot(log, id, strings.TrimPrefix(agent, flow.SubagentPrefix), samples)
 	now := time.Now()
 	var entries []store.Entry
@@ -495,6 +509,12 @@ func addTokens(e *engine.Engine, id, tool, run string, samples []metrics.Sample,
 		b, err := json.Marshal(metrics.Call{TS: s.TS, Run: run, Tool: tool, Agent: name, Phase: phases[i], Model: s.Model, Msg: s.Msg,
 			Input: s.Input, CacheWrite: s.CacheWrite, CacheRead: s.CacheRead, Output: s.Output})
 		if err == nil {
+			lines = append(lines, b)
+		}
+	}
+	for _, s := range finals {
+		if b, err := json.Marshal(metrics.Call{TS: s.TS, Run: s.Run, Tool: tool, Agent: name, Msg: s.Msg,
+			Input: s.Input, CacheWrite: s.CacheWrite, CacheRead: s.CacheRead, Output: s.Output, Final: true}); err == nil {
 			lines = append(lines, b)
 		}
 	}

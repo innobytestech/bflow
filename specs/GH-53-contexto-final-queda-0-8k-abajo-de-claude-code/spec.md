@@ -46,21 +46,21 @@ Ver Tasks.
 
 ## Tasks
 
-- [ ] **T1 · Muestra final en el lector de Claude Code** (`internal/adapters/agent/claude/transcript.go`, `internal/metrics/metrics.go`)
+- [x] **T1 · Muestra final en el lector de Claude Code** (`internal/adapters/agent/claude/transcript.go`, `internal/metrics/metrics.go`)
   - `metrics.Sample` suma `Run string` (si no está vacío, es la corrida a la que va la muestra) y `Final bool`.
   - En `readFile`, una línea `type: "user"` con `toolUseResult.agentId` no vacío y `toolUseResult.usage` con algún valor > 0 emite `Sample{TS, Msg: "final:"+agentId, Run: metrics.RunKey("claude", "agent-"+agentId), Final: true, Usage{Input, Output, CacheRead, CacheWrite}}`, con `Calls` en 0. No toca `cur.Seen`. El filtro `bytes.Contains("usage")` ya deja pasar esas líneas.
   - C1: CUANDO el transcript principal trae un `toolUseResult` con `agentId` y `usage`, el lector DEBE emitir una sola muestra final con esos cuatro campos y la corrida del agente.
   - C2: CUANDO `toolUseResult` no existe, no es objeto, o le faltan `agentId` o `usage`, el lector NO DEBE emitir nada para esa línea ni fallar.
   - Pruebas en `transcript_test.go`: `TestReadUsageFinalFromToolUseResult`, `TestReadUsageToolUseResultWithoutUsage`.
 
-- [ ] **T2 · Guardar la muestra final sin sumar tokens** (`internal/cli/metricscmds.go`, `internal/metrics/calls.go`)
+- [x] **T2 · Guardar la muestra final sin sumar tokens** (`internal/cli/metricscmds.go`, `internal/metrics/calls.go`)
   - `metrics.Call` suma `Final bool json:"final,omitempty"`.
   - En `addTokens`, las muestras con `Final` no van a `Allot`, `Phases`, las entradas `tokens` ni `e.AddTokens`. Solo escriben una línea `Call{TS, Run: s.Run, Tool, Agent: name, Msg, Input, CacheWrite, CacheRead, Output, Final: true}` en `calls.jsonl`. `addUnassigned` hace lo mismo en `.bflow/metrics/calls.jsonl`. Las demás muestras siguen igual.
   - C3: CUANDO llega una muestra final, los totales de fase y de la tarea NO DEBEN cambiar.
   - C4: CUANDO llega una muestra final, `calls.jsonl` DEBE tener una línea con `final: true` y `run` = la corrida del agente.
   - Pruebas en `internal/cli/calls_test.go`: `TestHookTokensFinalSampleNotCounted`.
 
-- [ ] **T3 · `FinalContext` en `Runs`** (`internal/metrics/calls.go`)
+- [x] **T3 · `FinalContext` en `Runs`** (`internal/metrics/calls.go`)
   - En `Runs`, las `Call` con `Final` no se fusionan ni son filas. Se guardan por `Run`, y si hay varias para la misma corrida gana la de `TS` mayor. Después de armar cada corrida con filas: si tiene final, `FinalContext` = `Input + CacheRead + CacheWrite + Output` de esa final. Si no, `FinalContext` = `Context()` + `Output` de la última fila ya fusionada.
   - Una final cuya corrida no tiene filas se ignora: no crea corrida.
   - Se actualiza el comentario de `Call.Context()`: el contexto máximo sigue sin la salida y el final la incluye.
