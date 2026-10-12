@@ -304,8 +304,8 @@ func TestHookTokensOpenCodeHijo(t *testing.T) {
 		t.Fatalf("silencioso: %d %q", code, out)
 	}
 	by, _ := tokensByAgent(t, e, id)
-	if len(by) != 1 || by["implementer"] != 200 {
-		t.Errorf("el idle de un hijo procesa solo su archivo: %v", by)
+	if len(by) != 2 || by["implementer"] != 200 || by["main"] != 100 {
+		t.Errorf("el idle de un hijo procesa su archivo y el de su padre: %v", by)
 	}
 	if *notified != 0 {
 		t.Errorf("el idle de un hijo no avisa: %d", *notified)
@@ -314,10 +314,76 @@ func TestHookTokensOpenCodeHijo(t *testing.T) {
 	hookRun(t, env, `{"sessionID":"ses_main","parentID":"","cwd":"x"}`, "hook", "tokens", "--tool", "opencode")
 	by, _ = tokensByAgent(t, e, id)
 	if by["main"] != 100 || by["implementer"] != 200 {
-		t.Errorf("después el idle de la principal suma lo suyo y no repite al hijo: %v", by)
+		t.Errorf("después el idle de la principal no repite ni al hijo ni al padre: %v", by)
 	}
 	if *notified != 1 {
 		t.Errorf("y esa sí avisa: %d", *notified)
+	}
+}
+
+func TestOpenCodeTokensChildReadsParent(t *testing.T) {
+	notified := countNotify(t)
+	env, e, id, cache := tokensEnv(t, true)
+	putFile(t, cache, "ses_main.jsonl", usageEntry("m1", "ses_main", "", "build", 100, 10), 0)
+	putFile(t, cache, "ses_kid.jsonl", usageEntry("k1", "ses_kid", "ses_main", "bflow-implementer", 200, 20), 0)
+	kid := `{"sessionID":"ses_kid","parentID":"ses_main","cwd":"x"}`
+	hookRun(t, env, kid, "hook", "tokens", "--tool", "opencode")
+	// El padre sigue escribiendo: el siguiente idle del hijo suma solo lo nuevo.
+	appendFile(t, filepath.Join(cache, "ses_main.jsonl"), usageEntry("m2", "ses_main", "", "build", 7, 1))
+	hookRun(t, env, kid, "hook", "tokens", "--tool", "opencode")
+	hookRun(t, env, `{"sessionID":"ses_main","parentID":"","cwd":"x"}`, "hook", "tokens", "--tool", "opencode")
+	by, _ := tokensByAgent(t, e, id)
+	if by["main"] != 107 || by["implementer"] != 200 {
+		t.Errorf("el padre se suma a mitad de turno y su idle no lo repite: %v", by)
+	}
+	if *notified != 1 {
+		t.Errorf("solo el idle del padre avisa: %d", *notified)
+	}
+}
+
+func TestOpenCodeTokensBadParentID(t *testing.T) {
+	env, e, id, cache := tokensEnv(t, true)
+	putFile(t, cache, "ses_main.jsonl", usageEntry("m1", "ses_main", "", "build", 100, 10), 0)
+	putFile(t, cache, "ses_kid.jsonl", usageEntry("k1", "ses_kid", "ses_main", "bflow-implementer", 200, 20), 0)
+	for _, parent := range []string{"../ses_main", "ses/main", "ses_ausente"} {
+		raw, _ := json.Marshal(map[string]string{"sessionID": "ses_kid", "parentID": parent, "cwd": "x"})
+		hookRun(t, env, string(raw), "hook", "tokens", "--tool", "opencode")
+	}
+	by, _ := tokensByAgent(t, e, id)
+	if len(by) != 1 || by["implementer"] != 200 {
+		t.Errorf("parentID inválido o sin archivo: solo suma a la hija: %v", by)
+	}
+}
+
+func appendFile(t *testing.T, path, s string) {
+	t.Helper()
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if _, err := f.WriteString(s); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestHookTokensClaudeSubagentStopNoNotify(t *testing.T) {
+	notified := countNotify(t)
+	env, _, _, _ := tokensEnv(t, true)
+	tr := filepath.Join(env.Dir, "s1.jsonl")
+	sub := filepath.Join(env.Dir, "s1", "agent-a.jsonl")
+	_ = os.MkdirAll(filepath.Dir(sub), 0o755)
+	os.WriteFile(tr, nil, 0o644)
+	os.WriteFile(sub, nil, 0o644)
+	in, _ := json.Marshal(map[string]string{"hook_event_name": "SubagentStop", "session_id": "s1", "agent_id": "a", "agent_type": "x", "transcript_path": tr, "agent_transcript_path": sub})
+	hookRun(t, env, string(in), "hook", "tokens")
+	if *notified != 0 {
+		t.Errorf("SubagentStop no avisa: %d", *notified)
+	}
+	in, _ = json.Marshal(map[string]string{"hook_event_name": "Stop", "session_id": "s1", "transcript_path": tr})
+	hookRun(t, env, string(in), "hook", "tokens")
+	if *notified != 1 {
+		t.Errorf("Stop sí avisa: %d", *notified)
 	}
 }
 

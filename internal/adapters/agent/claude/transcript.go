@@ -24,10 +24,11 @@ func (Agent) Name() string { return "claude" }
 // ParsePreToolUse ver hook.go.
 func (Agent) ParsePreToolUse(raw []byte) (guard.Action, string, bool) { return ParsePreToolUse(raw) }
 
-// TokenSource dice qué transcript leer al terminar un turno o un subagente. En
-// Stop es el de la sesión principal (agent vacío); en SubagentStop, solo el
-// del subagente, para no mezclar sus tokens con los de la sesión.
-func (Agent) TokenSource(raw []byte) metrics.TokenSource {
+// TokenSources dice qué transcripts leer al terminar un turno o un subagente.
+// En Stop es el de la sesión principal (agent vacío); en SubagentStop, el del
+// subagente y después el de la sesión principal, para que sus tokens se vean a
+// mitad de turno. Se omiten las fuentes sin ruta.
+func (Agent) TokenSources(raw []byte) []metrics.TokenSource {
 	var in struct {
 		TranscriptPath      string `json:"transcript_path"`
 		AgentTranscriptPath string `json:"agent_transcript_path"`
@@ -36,8 +37,13 @@ func (Agent) TokenSource(raw []byte) metrics.TokenSource {
 		SessionID           string `json:"session_id"`
 	}
 	_ = json.Unmarshal(raw, &in)
+	mainSrc := metrics.TokenSource{Path: in.TranscriptPath, Session: in.SessionID}
+	var out []metrics.TokenSource
 	if in.AgentType == "" && in.AgentID == "" {
-		return metrics.TokenSource{Path: in.TranscriptPath, Session: in.SessionID}
+		if mainSrc.Path != "" {
+			out = append(out, mainSrc)
+		}
+		return out
 	}
 	path := in.AgentTranscriptPath
 	if path == "" && in.AgentID != "" && in.TranscriptPath != "" { // versiones que no mandan la ruta
@@ -47,7 +53,13 @@ func (Agent) TokenSource(raw []byte) metrics.TokenSource {
 	if agent == "" {
 		agent = "?"
 	}
-	return metrics.TokenSource{Path: path, Agent: agent, Session: in.SessionID + ":" + in.AgentID, Parent: in.SessionID}
+	if path != "" {
+		out = append(out, metrics.TokenSource{Path: path, Agent: agent, Session: in.SessionID + ":" + in.AgentID, Parent: in.SessionID})
+	}
+	if mainSrc.Path != "" {
+		out = append(out, mainSrc)
+	}
+	return out
 }
 
 // ReadUsage devuelve las respuestas nuevas del transcript, con su hora y

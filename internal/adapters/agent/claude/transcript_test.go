@@ -99,18 +99,31 @@ func TestReadUsageIncrementalWithDuplicates(t *testing.T) {
 	}
 }
 
-func TestTokenSource(t *testing.T) {
+func TestTokenSources(t *testing.T) {
 	var a Agent
-	for _, c := range []struct{ in, path, agent string }{
-		{`{"session_id":"x","transcript_path":"C:/t/s.jsonl","hook_event_name":"Stop"}`, "C:/t/s.jsonl", ""},
+	type src struct{ path, agent string }
+	for _, c := range []struct {
+		in   string
+		want []src
+	}{
+		{`{"session_id":"x","transcript_path":"C:/t/s.jsonl","hook_event_name":"Stop"}`, []src{{"C:/t/s.jsonl", ""}}},
+		// SubagentStop: el subagente primero y la sesión principal después.
 		{`{"transcript_path":"C:/t/s.jsonl","hook_event_name":"SubagentStop","agent_id":"a1","agent_type":"bflow-implementer","agent_transcript_path":"C:/t/s/subagents/agent-a1.jsonl"}`,
-			"C:/t/s/subagents/agent-a1.jsonl", "bflow-implementer"},
+			[]src{{"C:/t/s/subagents/agent-a1.jsonl", "bflow-implementer"}, {"C:/t/s.jsonl", ""}}},
 		// Sin agent_transcript_path se arma con la convención de Claude Code.
-		{`{"transcript_path":"C:/t/s.jsonl","agent_id":"a2","agent_type":"Explore"}`, filepath.Join("C:/t/s", "subagents", "agent-a2.jsonl"), "Explore"},
-		{`nada`, "", ""},
+		{`{"transcript_path":"C:/t/s.jsonl","agent_id":"a2","agent_type":"Explore"}`,
+			[]src{{filepath.Join("C:/t/s", "subagents", "agent-a2.jsonl"), "Explore"}, {"C:/t/s.jsonl", ""}}},
+		// Sin transcript_path (R5): solo el subagente.
+		{`{"agent_id":"a3","agent_type":"Explore","agent_transcript_path":"C:/t/s/subagents/agent-a3.jsonl"}`,
+			[]src{{"C:/t/s/subagents/agent-a3.jsonl", "Explore"}}},
+		{`nada`, nil},
 	} {
-		if s := a.TokenSource([]byte(c.in)); s.Path != c.path || s.Agent != c.agent {
-			t.Errorf("%s → %q %q, want %q %q", c.in, s.Path, s.Agent, c.path, c.agent)
+		var got []src
+		for _, s := range a.TokenSources([]byte(c.in)) {
+			got = append(got, src{s.Path, s.Agent})
+		}
+		if !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%s → %v, want %v", c.in, got, c.want)
 		}
 	}
 }
@@ -135,11 +148,15 @@ func TestReadUsageSetsMsg(t *testing.T) {
 
 func TestTokenSourceSession(t *testing.T) {
 	var a Agent
-	main := a.TokenSource([]byte(`{"session_id":"s1","transcript_path":"C:/t/s1.jsonl","hook_event_name":"Stop"}`))
+	main := a.TokenSources([]byte(`{"session_id":"s1","transcript_path":"C:/t/s1.jsonl","hook_event_name":"Stop"}`))[0]
 	if main.Session != "s1" || main.Parent != "" || main.Agent != "" {
 		t.Errorf("principal: %+v", main)
 	}
-	sub := a.TokenSource([]byte(`{"session_id":"s1","transcript_path":"C:/t/s1.jsonl","agent_id":"a7","agent_type":"bflow-implementer","agent_transcript_path":"C:/t/s1/subagents/agent-a7.jsonl"}`))
+	subs := a.TokenSources([]byte(`{"session_id":"s1","transcript_path":"C:/t/s1.jsonl","agent_id":"a7","agent_type":"bflow-implementer","agent_transcript_path":"C:/t/s1/subagents/agent-a7.jsonl"}`))
+	if len(subs) != 2 || subs[1].Session != "s1" || subs[1].Agent != "" {
+		t.Errorf("principal tras el subagente: %+v", subs)
+	}
+	sub := subs[0]
 	if sub.Session != "s1:a7" || sub.Parent != "s1" || sub.Agent != "bflow-implementer" {
 		t.Errorf("subagente: %+v", sub)
 	}

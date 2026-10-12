@@ -40,7 +40,7 @@ En el carril light las decisiones van en el Brief.
 
 ## Tasks
 
-- [ ] T1 Claude: `TokenSources` y lectura del principal en SubagentStop.
+- [x] T1 Claude: `TokenSources` y lectura del principal en SubagentStop.
   - `internal/cli/cli.go`: en `AgentAdapter`, `TokenSource(raw []byte) TokenSource` se reemplaza por `TokenSources(raw []byte) []TokenSource`.
   - `internal/adapters/agent/claude/transcript.go`: en Stop devuelve `[{Path: transcript_path, Session}]`; en SubagentStop devuelve `[sub, {Path: transcript_path, Session: session_id}]`; omite fuentes con `Path` vacío.
   - `internal/cli/metricscmds.go` `runHookTokens`: sin fuentes, sale callado; `main` = ninguna fuente tiene `Agent`; `notifyActive` solo si `main`; una sola llamada a `tokensFrom` con todas las fuentes.
@@ -50,9 +50,9 @@ En el carril light las decisiones van en el Brief.
   - R4: CUANDO corre SubagentStop, el sistema NO DEBE avisar a la persona ni podar marcas.
   - R5: CUANDO la entrada de SubagentStop no trae `transcript_path`, el sistema DEBE sumar solo al subagente, como hoy.
   - Pruebas: `TestTokenSources` (renombra `TestTokenSource` en `internal/adapters/agent/claude/transcript_test.go`; casos Stop, SubagentStop con y sin `agent_transcript_path`, sin `transcript_path`); en `cmd/bflow/e2e_marks_test.go`: `TestHookTokensMainMidTurn` (R1, R2: SubagentStop y luego Stop dan el total exacto), `TestHookTokensMidTurnCursorHeld` (R3), `TestHookTokensMidTurnNoNotify` (R4).
-- [ ] T2 OpenCode: la sesión hija lee también a su padre.
+- [x] T2 OpenCode: la sesión hija lee también a su padre.
   - `internal/adapters/agent/opencode/transcript.go` `TokenSources`: con `parentID` válido (`sessionRe`), agrega `<cacheDir>/<parentID>.jsonl` después del archivo propio; `main` sigue en false.
   - R6: CUANDO termina la ejecución de una sesión hija en OpenCode, el sistema DEBE sumar también las llamadas nuevas de su sesión padre, sin duplicarlas en el idle del padre.
   - R7: CUANDO `parentID` no cumple `sessionRe` o su archivo no existe, el sistema DEBE sumar solo a la hija.
   - Pruebas: `TestOpenCodeTokensChildReadsParent` y `TestOpenCodeTokensBadParentID` en `internal/cli/opencode_hooks_test.go`.
-- [ ] T3 Docs (R1, R6): `docs/comandos.md` (SubagentStop también suma la sesión principal), `docs/marcas-sesion.md` (cuándo se carga la principal) y quitar la línea de #84 en `docs/como-probar-y-reportar.md`.
+- [x] T3 Docs (R1, R6): `docs/comandos.md` (SubagentStop también suma la sesión principal), `docs/marcas-sesion.md` (cuándo se carga la principal) y quitar la línea de #84 en `docs/como-probar-y-reportar.md`.

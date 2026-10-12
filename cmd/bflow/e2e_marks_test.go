@@ -229,7 +229,7 @@ func TestHookTokensSubagentFollowsParent(t *testing.T) {
 	// Con marca propia va a la suya, aunque su llamada sea anterior a la marca.
 	p = sub("agent-own.jsonl", transcriptLineAt(base.Add(5*time.Minute), "o1", 1, 900, 0, 0))
 	r.hook(subStopJSON("s1", "own", tr, p), "hook", "tokens")
-	if a, b := r.taskOutput(ida), r.taskOutput(idb); a != 40 || b != 900 {
+	if a, b := r.taskOutput(ida), r.taskOutput(idb); a != 41 || b != 900 {
 		t.Errorf("subagente sin marcas sigue a la madre, con marcas va a la suya: A=%v B=%v", a, b)
 	}
 }
@@ -337,5 +337,74 @@ func TestWatchUnassigned(t *testing.T) {
 	text, _, _ = r2.hook("", "watch", "--once")
 	if !strings.Contains(text, "sin tarea  ") {
 		t.Errorf("el panel sin tarea activa muestra la línea:\n%s", text)
+	}
+}
+
+func TestHookTokensMainMidTurn(t *testing.T) {
+	r := newRepo(t)
+	r.writeConfig("")
+	id := r.startTask("Larga")
+	base := time.Now().Add(-time.Hour)
+	r.writeMarks(metrics.Mark{TS: base, Session: "s1", ID: id})
+	tr := r.writeTranscript("s.jsonl", transcriptLineAt(base.Add(time.Minute), "m1", 1, 10, 0, 0))
+	p := r.writeTranscript(filepath.Join("s", "subagents", "agent-a.jsonl"), transcriptLineAt(base.Add(2*time.Minute), "k1", 1, 100, 0, 0))
+	r.hook(subStopJSON("s1", "a", tr, p), "hook", "tokens")
+	if got := r.taskOutput(id); got != 110 {
+		t.Fatalf("SubagentStop suma subagente y principal: %v", got)
+	}
+	// La principal sigue; el Stop suma solo lo no contado.
+	f, err := os.OpenFile(tr, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.WriteString(transcriptLineAt(base.Add(3*time.Minute), "m2", 1, 5, 0, 0))
+	f.Close()
+	r.hook(stopJSON("s1", tr), "hook", "tokens")
+	if got := r.taskOutput(id); got != 115 {
+		t.Errorf("ninguna llamada se cuenta dos veces: %v", got)
+	}
+}
+
+func TestHookTokensMidTurnCursorHeld(t *testing.T) {
+	r := newRepo(t)
+	r.writeConfig("")
+	tr := r.writeTranscript("s.jsonl", transcriptLine("m1", 1, 10, 0, 0))
+	p := r.writeTranscript(filepath.Join("s", "subagents", "agent-a.jsonl"), transcriptLine("k1", 1, 100, 0, 0))
+	if err := os.MkdirAll(r.bflowPath(), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(r.bflowPath("metrics"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r.hook(subStopJSON("s1", "a", tr, p), "hook", "tokens")
+	if _, err := os.Stat(r.bflowPath("cache", "tokens-cursor.json")); err == nil {
+		t.Fatal("el cursor no se guarda si falló una escritura")
+	}
+	os.Remove(r.bflowPath("metrics"))
+	r.hook(subStopJSON("s1", "a", tr, p), "hook", "tokens")
+	var sum float64
+	for _, c := range r.unassignedCalls() {
+		sum += c["output"].(float64)
+	}
+	if sum != 110 {
+		t.Errorf("no se perdió ni se duplicó nada de ninguna fuente: %v", sum)
+	}
+}
+
+func TestHookTokensMidTurnNoNotify(t *testing.T) {
+	r := newRepo(t)
+	r.writeConfig("")
+	id := r.startTask("Poda")
+	old := time.Now().Add(-10 * 24 * time.Hour)
+	r.writeMarks(metrics.Mark{TS: old, Session: "viejo", ID: id}, metrics.Mark{TS: time.Now().Add(-time.Hour), Session: "s1", ID: id})
+	tr := r.writeTranscript("s.jsonl", transcriptLine("m1", 1, 10, 0, 0))
+	p := r.writeTranscript(filepath.Join("s", "subagents", "agent-a.jsonl"), transcriptLine("k1", 1, 100, 0, 0))
+	r.hook(subStopJSON("s1", "a", tr, p), "hook", "tokens")
+	if n := len(r.marks()); n != 2 {
+		t.Fatalf("SubagentStop no poda marcas: %d", n)
+	}
+	r.hook(stopJSON("s1", tr), "hook", "tokens")
+	if n := len(r.marks()); n != 1 {
+		t.Errorf("el Stop sí poda: %d", n)
 	}
 }
