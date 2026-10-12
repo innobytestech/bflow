@@ -57,6 +57,24 @@ export default {
       if (code !== 0) warn("el guard no pudo correr (codigo " + code + "): no esta activo")
     })
 
+    // Tras un shell, bflow restaura las pruebas congeladas que cambio y el motivo llega al modelo en result.content.
+    ctx.tool.hook("execute.after", async (x) => {
+      if (x.tool !== "shell" || !Bun.which("bflow")) return
+      let code = -1, err = "", timer
+      try {
+        const s = await resolve(x.sessionID)
+        const sub = Boolean(s.parentID)
+        const proc = run(["guard", "--tool", "opencode", "--post"], { tool: x.tool, args: x.input, sessionID: x.sessionID, agent: sub ? x.agent ?? "" : "", subagent: sub, cwd: dir })
+        timer = setTimeout(() => proc.kill(), 10000)
+        err = await new Response(proc.stderr).text()
+        code = await proc.exited
+      } catch {} finally {
+        clearTimeout(timer)
+      }
+      if (code === 2 && err.trim()) x.result.content = [...(x.result.content ?? []), { type: "text", text: "\n\n" + err.trim() }]
+      else if (code !== 0) warn("el guard posterior no pudo correr (codigo " + code + ")")
+    })
+
     // Primer prompt de una sesion raiz: el estado de bflow entra al contexto como texto sintetico.
     ctx.session.hook("prompt", async (x) => {
       try {

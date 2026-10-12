@@ -151,3 +151,33 @@ func TestSettingsGuardSeesRead(t *testing.T) {
 		t.Errorf("PreToolUse llama bflow guard --reads: %+v", pre[0].Hooks)
 	}
 }
+
+// GH-86 R18: después de cada Bash, bflow revisa que no se haya escrito una prueba congelada.
+func TestSettingsPostToolUse(t *testing.T) {
+	b, err := os.ReadFile("settings.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var s struct {
+		Hooks map[string][]struct {
+			Matcher string `json:"matcher"`
+			Hooks   []struct {
+				Type    string `json:"type"`
+				Command string `json:"command"`
+				Timeout int    `json:"timeout"`
+			} `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(b, &s); err != nil {
+		t.Fatal(err)
+	}
+	post := s.Hooks["PostToolUse"]
+	if len(post) != 1 || post[0].Matcher != "Bash" || len(post[0].Hooks) != 1 {
+		t.Fatalf("PostToolUse con matcher Bash y un comando: %+v", post)
+	}
+	h := post[0].Hooks[0]
+	if h.Type != "command" || h.Command != "bflow guard --post" || h.Timeout != 10 {
+		t.Errorf("hook posterior: %+v", h)
+	}
+	commandExists(t, "guard")
+}

@@ -64,6 +64,18 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bflow guard --post",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   },
   "statusLine": {

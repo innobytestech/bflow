@@ -134,7 +134,7 @@ func TestMergeSettingsIdempotent(t *testing.T) {
 	if changed {
 		t.Error("CRLF en el archivo no cuenta como cambio")
 	}
-	if n := strings.Count(second, "bflow guard"); n != 1 {
+	if n := strings.Count(second, "bflow guard --reads"); n != 1 {
 		t.Errorf("hooks duplicados: %d", n)
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -131,7 +132,42 @@ func (e *Engine) saveFrozen(id string, m map[string]string) error {
 	if err != nil {
 		return err
 	}
-	return e.Store.WriteFile(id, FrozenFile, b)
+	if err := e.Store.WriteFile(id, FrozenFile, b); err != nil {
+		return err
+	}
+	e.saveSnapshots(id, m)
+	return nil
+}
+
+var hashNameRe = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
+// saveSnapshots deja en frozen-tests/ una copia de cada prueba congelada
+// (nombrada por su hash) y poda las que ya nadie referencia (GH-86 R12). Es
+// de mejor esfuerzo: sin copia, RestoreFrozen avisa en vez de restaurar.
+func (e *Engine) saveSnapshots(id string, m map[string]string) {
+	dir, err := e.Store.Path(id, FrozenSnapshots)
+	if err != nil {
+		return
+	}
+	keep := map[string]bool{}
+	for f, h := range m {
+		if !hashNameRe.MatchString(h) {
+			continue
+		}
+		keep[h] = true
+		if _, err := os.Stat(filepath.Join(dir, h)); err == nil || e.testHash(f) != h {
+			continue
+		}
+		if b, err := os.ReadFile(filepath.Join(e.Cfg.Root, filepath.FromSlash(f))); err == nil {
+			_ = e.Store.WriteFile(id, FrozenSnapshots+"/"+h, b)
+		}
+	}
+	ents, _ := os.ReadDir(dir)
+	for _, en := range ents {
+		if !keep[en.Name()] {
+			_ = os.Remove(filepath.Join(dir, en.Name()))
+		}
+	}
 }
 
 func (e *Engine) readFrozen(id string) map[string]string {
@@ -195,4 +231,69 @@ func (e *Engine) testHash(rel string) string {
 	}
 	sum := sha256.Sum256(bytes.ReplaceAll(b, []byte("\r\n"), []byte("\n")))
 	return hex.EncodeToString(sum[:])
+}
+
+// FrozenSnapshots es la carpeta, dentro de la tarea, con una copia de cada
+// prueba congelada nombrada por su hash (GH-86 R12).
+const FrozenSnapshots = "frozen-tests"
+
+// FrozenRestore es lo que RestoreFrozen hizo con las pruebas congeladas que
+// cambiaron: las que restauró, las que borró (no existían al congelar) y las
+// que no pudo restaurar por falta de copia válida.
+type FrozenRestore struct{ Restored, Deleted, Missing []string }
+
+// Empty dice si no hubo nada que restaurar.
+func (r FrozenRestore) Empty() bool {
+	return len(r.Restored)+len(r.Deleted)+len(r.Missing) == 0
+}
+
+// RestoreFrozen devuelve las pruebas congeladas de la tarea a la versión que
+// bflow copió al congelar (GH-86 R13, R14, R17).
+func (e *Engine) RestoreFrozen(id string) FrozenRestore {
+	var r FrozenRestore
+	for f, h := range e.readFrozen(id) {
+		if h == "" || h == allowed || e.testHash(f) == h {
+			continue
+		}
+		abs := filepath.Join(e.Cfg.Root, filepath.FromSlash(f))
+		if h == absent {
+			if os.Remove(abs) == nil {
+				r.Deleted = append(r.Deleted, f)
+			} else {
+				r.Missing = append(r.Missing, f)
+			}
+			continue
+		}
+		b, err := []byte(nil), errors.New("hash inválido")
+		if hashNameRe.MatchString(h) {
+			b, err = e.Store.ReadFile(id, FrozenSnapshots+"/"+h)
+		}
+		sum := sha256.Sum256(bytes.ReplaceAll(b, []byte("\r\n"), []byte("\n")))
+		if err != nil || hex.EncodeToString(sum[:]) != h || os.MkdirAll(filepath.Dir(abs), 0o755) != nil || store.WriteAtomic(abs, b) != nil {
+			r.Missing = append(r.Missing, f)
+			continue
+		}
+		r.Restored = append(r.Restored, f)
+	}
+	slices.Sort(r.Restored)
+	slices.Sort(r.Deleted)
+	slices.Sort(r.Missing)
+	if !r.Empty() {
+		_ = e.Store.Append(store.Entry{TS: e.now(), ID: id, Event: "frozen_restore", By: e.User,
+			Data: map[string]any{"restored": r.Restored, "deleted": r.Deleted, "missing": r.Missing}})
+	}
+	return r
+}
+
+// FrozenRestoreReason es el aviso al agente tras restaurar (o no poder).
+func FrozenRestoreReason(r FrozenRestore) string {
+	var parts []string
+	if ch := slices.Concat(r.Restored, r.Deleted); len(ch) > 0 {
+		parts = append(parts, strings.Join(ch, ", ")+" son pruebas congeladas y el último comando las cambió: bflow las restauró (o borró, si no existían al congelar). "+
+			"No las cambies; si una prueba está mal, reporta NEEDS_DECISION. Si una persona aprueba el cambio, que corra bflow freeze --allow <archivo> desde su terminal.")
+	}
+	if len(r.Missing) > 0 {
+		parts = append(parts, "no hay copia para restaurar "+strings.Join(r.Missing, ", ")+": déjalos como estaban (git diff) antes de reportar DONE.")
+	}
+	return strings.Join(parts, " ")
 }
