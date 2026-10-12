@@ -128,11 +128,15 @@ func TestImportFeatureListTextIDsAndAcceptances(t *testing.T) {
 	v := newEnv(t, "")
 	ctx := context.Background()
 	root := v.e.Cfg.Root
-	os.MkdirAll(filepath.Join(root, "harness"), 0o755)
-	os.WriteFile(filepath.Join(root, "harness", "feature-list.json"), []byte(`{"features":[
+	if err := os.MkdirAll(filepath.Join(root, "harness"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "harness", "feature-list.json"), []byte(`{"features":[
 	 {"id": "FE-16", "name": "login", "title": "Login", "description": "D", "acceptances": ["X1", "X2"], "status": "pending"},
 	 {"id": 7, "name": "num", "title": "Num", "acceptance": ["Y1"], "status": "pending"}
-	]}`), 0o644)
+	]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	plan, err := v.e.Import(ctx, root, false)
 	if err != nil {
