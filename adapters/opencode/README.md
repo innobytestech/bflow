@@ -30,6 +30,7 @@ OpenCode 2.x no carga `bflow.js` (pide `export default { id, setup }`) y 1.x ign
 `bflow render` también escribe `<repo>/.opencode/plugins/bflow.js` (de [`plugin.js`](plugin.js); se commitea y no se edita). Solo le pasa datos a bflow por stdin, sin dependencias de npm:
 
 - `tool.execute.before` de bash, edit, write, multiedit y patch/apply_patch corre `bflow guard --tool opencode --reads`; el de `read` solo corre si la sesión es una subsesión `bflow-reviewer` (así bflow mide cuánto del diff abrió el reviewer); con exit 2 bloquea con el motivo. Si `bflow` no está en el PATH, tarda más de 10 s o falla, la herramienta pasa y el plugin avisa una vez por sesión.
+- `tool.execute.after` (1.x) y `execute.after` (2.x) de bash corren `bflow guard --tool opencode --post`: si el comando cambió una prueba congelada, bflow la restaura y el motivo se agrega a la salida que ve el modelo. Nunca lanza: el comando ya corrió.
 - `message.updated` agrega cada mensaje de asistente terminado (solo metadatos) a `.bflow/cache/opencode/<sesión>.jsonl`; `session.idle` corre `bflow hook tokens --tool opencode`, que atribuye los tokens por fase, agente y modelo.
 - No hay evento de fin de subagente ni de inicio de sesión: el nudge y el resumen de inicio no existen en OpenCode; lo cubren `bflow report`, `bflow check --verify` y el bloque de AGENTS.md.
 

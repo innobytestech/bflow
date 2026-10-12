@@ -15,6 +15,12 @@
         "hooks": [{ "type": "command", "command": "bflow guard --reads", "timeout": 10 }]
       }
     ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [{ "type": "command", "command": "bflow guard --post", "timeout": 10 }]
+      }
+    ],
     "Stop": [
       { "hooks": [{ "type": "command", "command": "bflow hook tokens", "timeout": 20 }] }
     ],

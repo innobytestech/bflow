@@ -9,6 +9,7 @@ const safe = (id) => String(id ?? "").replace(/[^A-Za-z0-9_-]/g, "")
 
 export const BflowPlugin = async ({ client, directory }) => {
   const sessions = new Map() // sessionID -> { parentID, agent }
+  const bashArgs = new Map() // callID -> args del bash (after no los trae)
   let warned = false
   const warn = (msg) => {
     if (warned) return
@@ -80,6 +81,7 @@ export const BflowPlugin = async ({ client, directory }) => {
       if (!GUARDED.has(input.tool)) return
       if (!Bun.which("bflow")) return warn("no esta en el PATH: el guard no esta activo")
       let code = -1, err = "", timer
+      if (input.tool === "bash" && input.callID) bashArgs.set(input.callID, output.args)
       try {
         const s = await resolve(input.sessionID)
         const sub = Boolean(s.parentID)
@@ -95,6 +97,23 @@ export const BflowPlugin = async ({ client, directory }) => {
       }
       if (code === 2) throw new Error(err.trim() || "bloqueado por bflow guard")
       if (code !== 0) warn("el guard no pudo correr (codigo " + code + "): no esta activo")
+    },
+    "tool.execute.after": async (input, output) => {
+      const args = bashArgs.get(input.callID) ?? {}
+      bashArgs.delete(input.callID)
+      if (!(input.tool === "bash" && Bun.which("bflow"))) return
+      let code = -1, err = "", timer
+      try {
+        const s = await resolve(input.sessionID), sub = Boolean(s.parentID)
+        const proc = run(["guard", "--tool", "opencode", "--post"], { tool: input.tool, args, sessionID: input.sessionID, agent: sub ? s.agent ?? "" : "", subagent: sub, cwd: directory })
+        timer = setTimeout(() => proc.kill(), 10000)
+        err = await new Response(proc.stderr).text()
+        code = await proc.exited
+      } catch {} finally {
+        clearTimeout(timer)
+      }
+      if (code === 2 && err.trim()) output.output = (output.output ?? "") + "\n\n" + err.trim()
+      else if (code !== 0) warn("el guard posterior no pudo correr (codigo " + code + ")")
     },
   }
 }
