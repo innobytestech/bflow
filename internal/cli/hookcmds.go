@@ -317,7 +317,7 @@ func needsTask(a guard.Action, cfg *config.Config) bool {
 		return guard.MatchesTest(cfg.Guard.TestPatterns, a.Path)
 	case guard.Bash:
 		return strings.Contains(a.Command, "rm ") || strings.Contains(a.Command, "mv ") || strings.Contains(a.Command, "del ") ||
-			guard.TaskScoped(a.Command)
+			guard.TaskScoped(a.Command) || guard.MayWrite(a.Command)
 	}
 	return false
 }

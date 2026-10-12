@@ -161,6 +161,7 @@ func splitCommand(cmd string) []string {
 			q = c
 		case c == '\\':
 			i++
+		case c == '|' && i > 0 && cmd[i-1] == '>': // >| es una redirección, no un pipe
 		case c == ';' || c == '|' || c == '\n' || c == '&' && i+1 < len(cmd) && cmd[i+1] == '&':
 			out = append(out, cmd[start:i])
 			if (c == '|' || c == '&') && i+1 < len(cmd) && cmd[i+1] == c {
@@ -438,6 +439,16 @@ func bash(a Action, c Context) Decision {
 			}
 		}
 	}
+	if isFrozenPhase(c) {
+		if p, read := heredocsAll(a.Command, c, 0); p != "" {
+			return deny("frozen_test", "%s", frozenBashReason(p, read))
+		}
+		for _, s := range Segments(a.Command) {
+			if p, read := frozenWrite(s, c); p != "" {
+				return deny("frozen_test", "%s", frozenBashReason(p, read))
+			}
+		}
+	}
 	return allow
 }
 
@@ -455,7 +466,7 @@ func edit(a Action, c Context) Decision {
 		return deny("human_file", "%s guarda las vulnerabilidades aceptadas: lo edita una persona. Si hace falta aceptar una, reporta NEEDS_DECISION.", p)
 	}
 	if isFrozenPhase(c) && slices.Contains(c.Frozen, p) {
-		return deny("frozen_test", "%s quedó congelada al aprobar el contrato. Si la prueba está mal, reporta NEEDS_DECISION con el cambio que necesitas; si una persona lo aprueba y corre `bflow freeze --allow %s`, podrás cambiarla una vez.", p, p)
+		return deny("frozen_test", "%s", frozenBashReason(p, false))
 	}
 	if c.StrictLeader && !a.Subagent && underAny(p, c.ProtectedPaths) {
 		return deny("leader_code", "la sesión principal no edita %s: eso lo hace el implementer.", p)
@@ -470,7 +481,7 @@ func agentArtifact(p string) bool {
 }
 
 func isFrozenPhase(c Context) bool {
-	return len(c.Frozen) > 0 && slices.Contains(frozenPhases, c.Phase)
+	return len(c.Frozen) > 0 && FrozenPhase(c.Phase)
 }
 
 // rel normaliza una ruta a relativa a la raíz con barras normales.
@@ -510,10 +521,3 @@ func MatchesTest(patterns []string, p string) bool {
 	}
 	return false
 }
-
-// FrozenPhase dice si en la fase p las pruebas del contrato no se tocan (GH-86).
-func FrozenPhase(p flow.Phase) bool { return false } // T2
-
-// MayWrite dice si un comando Bash podría escribir un archivo: entonces el guard
-// necesita la fase y las pruebas congeladas de la tarea activa (GH-86 R11).
-func MayWrite(cmd string) bool { return false } // T2
