@@ -177,7 +177,8 @@ func (e *Engine) Block(ctx context.Context, id, reason string) (Outcome, error) 
 	return e.apply(ctx, id, flow.Event{Kind: flow.EvBlock, Note: reason}, "")
 }
 
-// Unblock regresa la tarea a la fase donde se bloqueó.
+// Unblock regresa la tarea a la fase donde se bloqueó. Si note no está vacía,
+// la guarda para que llegue en los args del agente que retoma.
 func (e *Engine) Unblock(ctx context.Context, id, note string) (Outcome, error) {
 	return e.apply(ctx, id, flow.Event{Kind: flow.EvUnblock, Note: note}, "")
 }
