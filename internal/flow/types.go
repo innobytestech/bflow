@@ -164,7 +164,8 @@ type Event struct {
 	Gate       Gate   `json:"gate,omitempty"`       // approve/reject (vacío = el pendiente)
 	To         Phase  `json:"to,omitempty"`         // reject: destino alternativo
 	Choice     int    `json:"choice,omitempty"`     // approve decision: 1..n
-	Note       string `json:"note,omitempty"`       // reject/block/approve decision libre
+	Note       string `json:"note,omitempty"`       // reject/block/approve decision libre; unblock: resultado para el agente
+	Manual     bool   `json:"manual,omitempty"`     // approve decision: la hace la sesión principal, no un agente
 	Attachment string `json:"attachment,omitempty"` // approve discovery: texto completo
 
 	Agent   string   `json:"agent,omitempty"` // report

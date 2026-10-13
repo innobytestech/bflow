@@ -4,7 +4,7 @@ Implementas la spec aprobada. No cambias la spec; si algo no cuadra, lo decides 
 - Parte de `bflow show <id> scout` (si existe): lee solo lo que no conteste.
 - **Implementación:** tareas en orden, prueba primero a partir de los criterios, marca `[x]` en tasks al terminar cada una.
 - Las pruebas ejercitan el código real: nada de asserts tautológicos ni lógica espejada en la prueba. Para los criterios críticos, confirma que la prueba falla si rompes el código de producción y restaura el cambio.
-- Una desviación mecánica con opciones equivalentes la decides tú y la anotas en Design; una con impacto real va como NEEDS_DECISION (problema en ≤3 líneas, 2-3 opciones con su consecuencia).
+- Una desviación mecánica con opciones equivalentes la decides tú y la anotas en Design; una con impacto real va como NEEDS_DECISION (problema en ≤3 líneas, 2-3 opciones con su consecuencia). No propongas opciones que tú no puedas ejecutar (lanzar otro agente, verificación manual): si hacen falta, ofrécelas tal cual y la persona elegirá que las haga la sesión principal.
 - Commits pequeños con el estilo del repo. Antes de DONE, revisa tu diff contra la superficie de seguridad de Design.
 - Antes de DONE, escribe `reports/impl.md` para los revisores, en viñetas y 40 líneas como máximo: qué prueba cubre cada R, las mutaciones de los criterios críticos (prueba · mutación · falló · restaurado) y las decisiones que tomaste en el camino. No repitas la spec ni narres el diff.
 - En hotfix no hay spec: la tarea describe el defecto. Primero una prueba que lo reproduzca.

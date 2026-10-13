@@ -33,8 +33,8 @@ func TestNextByState(t *testing.T) {
 		{name: "spec gate", s: stateFor(row{lane: Full, from: Spec, gate: GateSpec}), action: "ask", gate: "spec", skill: "approve", options: "approve,changes", show: "bflow show T-1 brief"},
 		{name: "split", s: stateFor(row{lane: Full, from: Spec, gate: GateSplit}), action: "ask", gate: "split", options: "approve,keep"},
 		{name: "contract full", s: stateFor(row{lane: Full, from: Contract, gate: GateContract}), action: "ask", gate: "contract", options: "approve,adjust,spec", show: "bflow show T-1 contract"},
-		{name: "decision", s: stateFor(row{lane: Full, from: Implementing, gate: GateDecision}), action: "ask", gate: "decision", options: "opt1,opt2,other,contract,spec"},
-		{name: "decision hotfix", s: stateFor(row{lane: Hotfix, from: Implementing, gate: GateDecision}), action: "ask", gate: "decision", options: "opt1,opt2,other"},
+		{name: "decision", s: stateFor(row{lane: Full, from: Implementing, gate: GateDecision}), action: "ask", gate: "decision", options: "opt1,opt2,manual,other,contract,spec"},
+		{name: "decision hotfix", s: stateFor(row{lane: Hotfix, from: Implementing, gate: GateDecision}), action: "ask", gate: "decision", options: "opt1,opt2,manual,other"},
 		{name: "pause", s: stateFor(row{lane: Full, from: Paused, gate: GatePause}), action: "ask", gate: "pause", options: "approve,fix"},
 		{name: "quality paralelo", s: stateFor(row{lane: Full, from: Quality}), action: "spawn", agents: "reviewer,security-auditor"},
 		{name: "quality falta uno", s: stateFor(row{lane: Full, from: Quality, reports: ok}), action: "spawn", agents: "security-auditor"},
@@ -159,6 +159,8 @@ func eventFromCommand(c string) (Event, bool) {
 			ev.Choice = int(val[0] - '0')
 		case "--note", "--reason":
 			ev.Note = "texto del humano"
+		case "--manual":
+			ev.Manual = true
 		case "--file":
 			ev.Attachment = "discovery"
 		}
@@ -336,5 +338,43 @@ func TestAllowFiles(t *testing.T) {
 		if got := strings.Join(AllowFiles(c.in), ","); got != c.want {
 			t.Errorf("%q: %q, want %q", c.in, got, c.want)
 		}
+	}
+}
+
+func TestManualDecisionBlocksInsteadOfRelaunching(t *testing.T) {
+	cfg := testConfig()
+	s := stateFor(row{lane: Full, from: Implementing, gate: GateDecision})
+	res, err := Apply(cfg, s, Event{Kind: EvApprove, Gate: GateDecision, Choice: 2, Manual: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.State.Phase != Blocked || res.Next.Action == "spawn" {
+		t.Fatalf("debía bloquear sin lanzar agente: %s %+v", res.State.Phase, res.Next)
+	}
+	if !strings.Contains(res.State.Block.Reason, "opción B") {
+		t.Errorf("el motivo no dice la decisión: %q", res.State.Block.Reason)
+	}
+	u, err := Apply(cfg, res.State, Event{Kind: EvUnblock, Note: "el reviewer aprobó"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := u.Next.Agents[0]
+	if u.Next.Action != "spawn" || a.Args["note"] != "el reviewer aprobó" || a.Args["decision"] != "opción B" || a.Args["resume"] != "true" {
+		t.Errorf("args tras unblock: %+v", a.Args)
+	}
+	if _, err := Apply(cfg, stateFor(row{lane: Full, from: Contract, gate: GateContract}), Event{Kind: EvApprove, Manual: true}); err == nil {
+		t.Error("--manual fuera de decision debe fallar")
+	}
+}
+
+func TestUnblockWithoutNoteKeepsNoteEmpty(t *testing.T) {
+	cfg := testConfig()
+	b, _ := Apply(cfg, stateFor(row{lane: Full, from: Implementing}), Event{Kind: EvBlock, Note: "x"})
+	u, err := Apply(cfg, b.State, Event{Kind: EvUnblock})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.State.Note != "" {
+		t.Errorf("note %q", u.State.Note)
 	}
 }

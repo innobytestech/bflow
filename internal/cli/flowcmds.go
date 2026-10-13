@@ -202,10 +202,11 @@ func init() {
 			fs.String("gate", "", "gate que se aprueba (por seguridad; vacío = el pendiente)")
 			fs.Int("choice", 0, "opción elegida en un gate decision")
 			fs.String("note", "", "decisión libre o comentario")
+			fs.Bool("manual", false, "decision: la hace la sesión principal (bloquea hasta unblock --note)")
 			fs.String("file", "", "archivo adjunto (discovery completo)")
 		},
 		Run: flowCommand(func(ctx context.Context, e *engine.Engine, id string, c *Ctx, _ []string) (engine.Outcome, error) {
-			o := engine.ApproveOpts{Gate: str(c.Flags, "gate"), Note: str(c.Flags, "note")}
+			o := engine.ApproveOpts{Gate: str(c.Flags, "gate"), Note: str(c.Flags, "note"), Manual: str(c.Flags, "manual") == "true"}
 			fmt.Sscan(str(c.Flags, "choice"), &o.Choice)
 			if f := str(c.Flags, "file"); f != "" {
 				b, err := os.ReadFile(abs(c.Dir, f))
@@ -278,9 +279,10 @@ func init() {
 			return outcomeEnvelope(o)
 		}})
 
-	Register(&Command{Name: "unblock", Summary: "desbloquea la tarea y vuelve a su fase",
-		Run: flowCommand(func(ctx context.Context, e *engine.Engine, id string, _ *Ctx, _ []string) (engine.Outcome, error) {
-			return e.Unblock(ctx, id)
+	Register(&Command{Name: "unblock", Summary: "desbloquea la tarea y vuelve a su fase: unblock [ID] [--note t] (la nota llega al agente)",
+		Setup: func(fs *flag.FlagSet) { fs.String("note", "", "resultado para el agente que retoma") },
+		Run: flowCommand(func(ctx context.Context, e *engine.Engine, id string, c *Ctx, _ []string) (engine.Outcome, error) {
+			return e.Unblock(ctx, id, str(c.Flags, "note"))
 		})})
 
 	Register(&Command{Name: "freeze", Summary: "vuelve a congelar las pruebas del contrato tal como están, o con --allow deja cambiar una una vez (solo una persona): freeze [ID] [--allow <archivo>]",
