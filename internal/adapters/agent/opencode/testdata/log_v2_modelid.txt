@@ -1,0 +1,1 @@
+timestamp={{UTC-1h}} level=ERROR message="request failed" modelID=deepseek-v4-pro error="This Go model requires Global regions. Select Global in your workspace Privacy settings to use it."

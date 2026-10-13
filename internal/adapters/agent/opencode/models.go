@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"innobytes.tech/bflow/internal/agents"
 )
@@ -162,4 +163,74 @@ func (Agent) ModelsState(home string, want map[string]string) (ModelSync, string
 		return res, "stale"
 	}
 	return res, "ok"
+}
+
+// AgentModel es el modelo efectivo de un subagente de bflow. Source vale
+// "repo" (model: del frontmatter) o "personal" (agent.<n>.model de opencode.json).
+type AgentModel struct{ Agent, Model, Source string }
+
+// agentModels calcula el modelo efectivo de cada bflow-*, ordenado por agente.
+// Un agente sin modelo no entra: hereda el de la sesión.
+func agentModels(root, home string) []AgentModel {
+	byName := map[string]AgentModel{}
+	if _, m, _, editable, err := loadUser(home); err == nil && editable {
+		ags, _ := m["agent"].(map[string]any)
+		for name, v := range ags {
+			a, _ := v.(map[string]any)
+			if s, _ := a["model"].(string); strings.HasPrefix(name, "bflow-") && s != "" {
+				byName[name] = AgentModel{name, s, "personal"}
+			}
+		}
+	}
+	files, _ := filepath.Glob(filepath.Join(root, ".opencode", "agents", "bflow-*.md"))
+	for _, f := range files {
+		if model := frontmatterModel(f); model != "" {
+			name := strings.TrimSuffix(filepath.Base(f), ".md")
+			byName[name] = AgentModel{name, model, "repo"}
+		}
+	}
+	out := make([]AgentModel, 0, len(byName))
+	for _, am := range byName {
+		out = append(out, am)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Agent < out[j].Agent })
+	return out
+}
+
+func frontmatterModel(path string) string {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(strings.ReplaceAll(string(b), "\r\n", "\n"), "\n")
+	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
+		return ""
+	}
+	for _, ln := range lines[1:] {
+		if strings.TrimSpace(ln) == "---" {
+			break
+		}
+		if strings.HasPrefix(ln, "model:") {
+			return strings.Trim(strings.TrimSpace(strings.TrimPrefix(ln, "model:")), `"'`)
+		}
+	}
+	return ""
+}
+
+// modelsMtime es el mtime más reciente de opencode.json y de .opencode/agents/bflow-*.md.
+func modelsMtime(root, home string) time.Time {
+	var m time.Time
+	touch := func(p string) {
+		if fi, err := os.Stat(p); err == nil && fi.ModTime().After(m) {
+			m = fi.ModTime()
+		}
+	}
+	if dir, err := configDir(home); err == nil {
+		touch(filepath.Join(dir, userConfig))
+	}
+	files, _ := filepath.Glob(filepath.Join(root, ".opencode", "agents", "bflow-*.md"))
+	for _, f := range files {
+		touch(f)
+	}
+	return m
 }

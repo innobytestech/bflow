@@ -123,21 +123,151 @@ func (Agent) DoctorLog(root string, now time.Time) []agents.LogFinding {
 
 	// Errores del proveedor en los últimos 7 días.
 	limit := now.Add(-providerDays * 24 * time.Hour)
-	var global, cert bool
+	home, _ := os.UserHomeDir()
+	ams := agentModels(root, home)
+	changed := modelsMtime(root, home)
+	var cert, region bool
+	var last time.Time
+	named := map[string]bool{}
 	for _, l := range all {
 		if l.ts.Before(limit) {
 			continue
 		}
-		global = global || strings.Contains(l.text, "requires Global regions")
+		if strings.Contains(l.text, "requires Global regions") && l.ts.After(changed) {
+			region = true
+			if l.ts.After(last) {
+				last = l.ts
+			}
+			for _, am := range ams {
+				if namesModel(l.text, am.Model) {
+					named[am.Model] = true
+				}
+			}
+		}
 		cert = cert || strings.Contains(l.text, "self signed certificate")
 	}
-	if global {
-		out = append(out, agents.LogFinding{Area: "proveedor", Level: "warn", Msg: "el modelo pide regiones Global: actívalo en Privacy de tu workspace de OpenCode"})
+	if region {
+		out = append(out, regionFindings(ams, named, last, filepath.Join(userConfigDir(home), userConfig))...)
 	}
 	if cert {
 		out = append(out, agents.LogFinding{Area: "proveedor", Level: "warn", Msg: "certificado autofirmado (antivirus o proxy con inspección HTTPS): define NODE_EXTRA_CA_CERTS con su CA"})
 	}
 	return out
+}
+
+func userConfigDir(home string) string {
+	if d, err := configDir(home); err == nil {
+		return d
+	}
+	return "~/.config/opencode"
+}
+
+// namesModel dice si la línea nombra el modelo (id completo, o su parte tras el proveedor).
+func namesModel(line, model string) bool {
+	f := logfmt(line)
+	short := model
+	if i := strings.Index(model, "/"); i >= 0 {
+		short = model[i+1:]
+	}
+	if id := f["modelID"]; id != "" && (id == short || id == model || f["providerID"]+"/"+id == model) {
+		return true
+	}
+	if id := f["model"]; id != "" && (id == short || id == model) {
+		return true
+	}
+	return containsID(line, model) || containsID(line, short)
+}
+
+// containsID busca id en s sin que forme parte de un identificador más largo.
+func containsID(s, id string) bool {
+	if id == "" {
+		return false
+	}
+	isID := func(b byte) bool {
+		return b == '-' || b == '.' || b == '_' || b == '/' || b >= '0' && b <= '9' || b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z'
+	}
+	for off := 0; ; {
+		i := strings.Index(s[off:], id)
+		if i < 0 {
+			return false
+		}
+		st, en := off+i, off+i+len(id)
+		if (st == 0 || !isID(s[st-1])) && (en == len(s) || !isID(s[en])) {
+			return true
+		}
+		off = st + 1
+	}
+}
+
+func regionFindings(ams []AgentModel, named map[string]bool, last time.Time, ocPath string) []agents.LogFinding {
+	marked, probable := []AgentModel{}, false
+	for _, am := range ams {
+		if named[am.Model] {
+			marked = append(marked, am)
+		}
+	}
+	if len(named) == 0 {
+		for _, am := range ams {
+			if strings.HasPrefix(am.Model, "opencode-go/") {
+				marked = append(marked, am)
+			}
+		}
+		probable = len(marked) > 0
+	}
+	exits := "activa Global en Privacy de tu workspace de OpenCode"
+	if len(marked) == 0 {
+		return []agents.LogFinding{{Area: "proveedor", Level: "warn", Msg: fmt.Sprintf(
+			"el proveedor rechazó modelos por región (último: %s): %s o cambia de modelo: agent.<nombre>.model en %s (solo tú) o models.opencode en bflow.yaml y bflow render (equipo)",
+			last.UTC().Format("2006-01-02 15:04 UTC"), exits, ocPath)}}
+	}
+	var groups []string
+	idx := map[string]int{}
+	var byModel [][]string
+	var order []string
+	personal, repo := false, false
+	for _, am := range marked {
+		i, ok := idx[am.Model]
+		if !ok {
+			i = len(order)
+			idx[am.Model] = i
+			order = append(order, am.Model)
+			byModel = append(byModel, nil)
+		}
+		byModel[i] = append(byModel[i], am.Agent)
+		personal = personal || am.Source == "personal"
+		repo = repo || am.Source == "repo"
+	}
+	for i, m := range order {
+		src := map[string]bool{}
+		for _, am := range marked {
+			if am.Model == m {
+				src[am.Source] = true
+			}
+		}
+		var ss []string
+		for _, k := range []string{"personal", "repo"} {
+			if src[k] {
+				ss = append(ss, k)
+			}
+		}
+		groups = append(groups, fmt.Sprintf("%s → %s (%s)", clip(strings.Join(byModel[i], ", ")), clip(m), strings.Join(ss, ", ")))
+	}
+	var how []string
+	if personal {
+		how = append(how, fmt.Sprintf("agent.<nombre>.model en %s (solo tú)", ocPath))
+	}
+	if repo {
+		how = append(how, "models.opencode en bflow.yaml y bflow render (equipo)")
+	}
+	note := ""
+	if probable {
+		note = " (probable: el log no nombra el modelo)"
+	}
+	return []agents.LogFinding{
+		{Area: "proveedor", Level: "warn", Msg: fmt.Sprintf("el proveedor rechazó modelos por región (último: %s)%s: %s; %s o cambia de modelo: %s",
+			last.UTC().Format("2006-01-02 15:04 UTC"), note, strings.Join(groups, "; "), exits, strings.Join(how, " o "))},
+		{Area: "modelos", Level: "warn", Msg: fmt.Sprintf("opencode: %d agentes con un modelo rechazado por región; ver proveedor", len(marked))},
+	}
 }
 
 // pluginMtime es el mtime más reciente de los archivos del plugin en el repo.
