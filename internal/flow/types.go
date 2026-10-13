@@ -111,6 +111,8 @@ type PendingGate struct {
 type BlockInfo struct {
 	Reason string `json:"reason"`
 	From   Phase  `json:"from"`
+	// Manual marca el bloqueo de una decisión manual: su unblock pide nota.
+	Manual bool `json:"manual,omitempty"`
 }
 
 // State es el estado de flujo de una tarea. Es lo único que el núcleo necesita;
