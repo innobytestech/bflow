@@ -13,7 +13,7 @@
 | `reject [ID] --note "motivo" [--gate g] [--to fase]` | Rechaza el gate pendiente. En `quality` y `documenting`, sin gate pendiente, regresa la tarea a `implementing` (`--note` obligatorio). |
 | `report [ID] --agent a --verdict V [--note] [--file] [--option o]... [--stdin]` | Un agente reporta su veredicto (`--stdin`: reporte del scout). |
 | `block [ID] --reason "motivo"` | Bloquea la tarea. |
-| `unblock` | Desbloquea la tarea y vuelve a su fase. |
+| `unblock [ID] [--note t] [--no-changelog]` | Desbloquea la tarea y vuelve a su fase. Con `--no-changelog` (exige `--note`) exime al documenter del changelog cuando el diff toca `flow.public_paths`; el motivo queda en la bitácora. Solo una persona. |
 | `drop <ID> --note "motivo"` | Retira una tarea sin terminarla. |
 | `freeze [ID] [--allow <archivo>]` | Vuelve a congelar las pruebas del contrato tal como están; con `--allow` deja cambiar una una vez. Solo una persona. |
 | `show [ID] task\|brief\|spec\|contract\|review-map\|questions\|decisions\|discovery\|check\|scout [--section s]` | Muestra un artefacto. |

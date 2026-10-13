@@ -40,7 +40,6 @@ Antes de reportar, revisa si ya está:
 - [#39](https://github.com/innobytestech/bflow/issues/39): guard no reconoce ejecutables entre comillas con espacios en la ruta.
 - [#52](https://github.com/innobytestech/bflow/issues/52): el panel sigue con el binario viejo tras `go install` o `bflow update`.
 - [#53](https://github.com/innobytestech/bflow/issues/53): el contexto final queda ~0.8k abajo de Claude Code (salida de la última llamada incompleta).
-- [#55](https://github.com/innobytestech/bflow/issues/55): el documenter omite el CHANGELOG cuando cambia la salida pública.
 - [#86](https://github.com/innobytestech/bflow/issues/86): un agente puede editar pruebas congeladas desde Bash (python, sed, heredoc) sin que guard lo bloquee. Las pruebas congeladas se siguen revisando al reportar DONE.
 - [#91](https://github.com/innobytestech/bflow/issues/91): guard: un `<<EOF` entre comillas oculta las líneas siguientes como cuerpo de heredoc.
 

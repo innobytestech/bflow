@@ -197,3 +197,58 @@ func (e *Engine) lastCoverage(id string) (review.Coverage, bool) {
 	}
 	return review.Coverage{}, false
 }
+
+// changelogRequired rechaza el DONE del documenter cuando el diff toca
+// flow.public_paths y el changelog para consumidores no cambió (ni en commits
+// ni sin commitear), salvo exención humana (unblock --no-changelog).
+func (e *Engine) changelogRequired(ctx context.Context, rec *store.Record) *flow.Rejection {
+	cfg := e.flowCfg()
+	base := e.diffBase()
+	if len(cfg.PublicPaths) == 0 || e.Git == nil || base == "" {
+		return nil
+	}
+	diff, err := e.Git.DiffNames(ctx, base)
+	if err != nil {
+		return nil
+	}
+	touched := review.PublicTouched(diff, cfg.PublicPaths)
+	if len(touched) == 0 {
+		return nil
+	}
+	cl := cfg.ChangelogPath(rec.Flow.ID, rec.Flow.Slug)
+	for _, f := range diff {
+		if strings.ReplaceAll(f, `\`, "/") == cl {
+			return nil
+		}
+	}
+	if dirty, err := e.Git.Dirty(ctx, []string{cl}); err == nil && len(dirty) > 0 {
+		return nil
+	}
+	if e.changelogExempt(rec.Flow.ID) {
+		return nil
+	}
+	return &flow.Rejection{Code: "changelog_required", Reason: "el diff toca salida pública (flow.public_paths) y el changelog para consumidores no cambió:\n- " +
+		strings.Join(touched, "\n- ") + "\nEscribe " + cl + " con lo que cambia para quien usa el producto y reporta DONE otra vez. " +
+		"Si no hace falta, reporta BLOCKED con el motivo; una persona puede eximirlo con `bflow unblock " + rec.Flow.ID + " --no-changelog --note \"<motivo>\"`."}
+}
+
+// changelogExempt: hay un unblock --no-changelog posterior a la última entrada
+// a documenting (el propio unblock que regresa a la fase no cuenta como entrada).
+func (e *Engine) changelogExempt(id string) bool {
+	log, err := e.Store.Log(id)
+	if err != nil {
+		return false
+	}
+	entered := -1
+	for i, en := range log {
+		if en.To == flow.Documenting && en.Event != string(flow.EvUnblock) {
+			entered = i
+		}
+	}
+	for i := len(log) - 1; i > entered; i-- {
+		if log[i].Event == string(flow.EvUnblock) && log[i].Data["no_changelog"] == true {
+			return true
+		}
+	}
+	return false
+}

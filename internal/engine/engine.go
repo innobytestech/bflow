@@ -123,6 +123,9 @@ func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug s
 			if rej := e.docsPending(ctx, id); rej != nil {
 				return rej
 			}
+			if rej := e.changelogRequired(ctx, rec); rej != nil {
+				return rej
+			}
 		}
 		if ev.Kind == flow.EvReport && ev.Agent != flow.ScoutAgent && ev.Verdict == flow.DoneV && rec.Flow.Phase == flow.Implementing {
 			ok, detail, err := e.verify(ctx, id)
@@ -241,6 +244,9 @@ func (e *Engine) entry(id string, ev flow.Event, before, after flow.State) store
 			ids = append(ids, strings.TrimSpace(strings.SplitN(c, " · ", 2)[0]))
 		}
 		en.Data = map[string]any{"children": ids}
+	}
+	if ev.Kind == flow.EvUnblock && ev.NoChangelog {
+		en.Data = map[string]any{"no_changelog": true}
 	}
 	if ev.Kind == flow.EvStart {
 		en.Data = map[string]any{"lane": string(ev.Lane)}

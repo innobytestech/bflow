@@ -134,6 +134,10 @@ type Flow struct {
 	// ConsumerChangelog: dónde va el único changelog para consumidores, con
 	// {id} y {slug}. Por defecto, junto a la spec.
 	ConsumerChangelog string `yaml:"consumer_changelog,omitempty"`
+	// PublicPaths: rutas del repo que cambian lo que ve quien usa el producto;
+	// si el diff las toca, el documenter debe cambiar el changelog. "dir/" = carpeta,
+	// "!patrón" excluye.
+	PublicPaths []string `yaml:"public_paths,omitempty"`
 }
 
 type Step struct {
@@ -588,6 +592,13 @@ func (c *Config) Validate() error {
 	if p := c.Flow.ConsumerChangelog; p != "" && (filepath.IsAbs(p) || strings.HasPrefix(filepath.ToSlash(filepath.Clean(p)), ".bflow/") || strings.HasPrefix(filepath.Clean(p), "..")) {
 		add("flow.consumer_changelog debe ser una ruta del repo fuera de .bflow/ (se versiona)")
 	}
+	for _, p := range c.Flow.PublicPaths {
+		q := strings.TrimPrefix(p, "!")
+		cl := filepath.ToSlash(filepath.Clean(q))
+		if q == "" || filepath.IsAbs(q) || strings.HasPrefix(q, "/") || strings.HasPrefix(cl, ".bflow") || cl == ".." || strings.HasPrefix(cl, "../") || strings.Contains(cl, "/../") {
+			add("flow.public_paths: %q debe ser una ruta del repo (sin .., absoluta ni .bflow/)", p)
+		}
+	}
 	if c.Check.DBTestPattern != "" {
 		if _, err := regexp.Compile(c.Check.DBTestPattern); err != nil {
 			add("check.db_test_pattern no es una regex válida: %v", err)
@@ -652,6 +663,7 @@ func (f Flow) Core() flow.Config {
 		core.MaxQualityRounds = f.MaxQualityRounds
 	}
 	core.Changelog = f.ConsumerChangelog
+	core.PublicPaths = f.PublicPaths
 	if f.Scout == nil || *f.Scout {
 		core.Scout = flow.ScoutAgent
 	}

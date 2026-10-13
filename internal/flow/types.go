@@ -173,6 +173,8 @@ type Event struct {
 	Options []string `json:"options,omitempty"`  // report NEEDS_DECISION
 	CheckOK bool     `json:"check_ok,omitempty"` // report DONE en implementing: check verificado en HEAD
 
+	NoChangelog bool `json:"no_changelog,omitempty"` // unblock: exime del changelog en documenting
+
 	Reason string `json:"reason,omitempty"` // closed_outside: "tracker" o "pr"
 
 	// Children: en el approve del split, una línea "<ID> · <título>" por hija creada.

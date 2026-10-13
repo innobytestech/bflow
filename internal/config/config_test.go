@@ -524,3 +524,18 @@ func TestModelsValidate(t *testing.T) {
 		})
 	}
 }
+
+func TestPublicPathsValidated(t *testing.T) {
+	for _, bad := range []string{"/abs/x", "../x", "a/../../x", ".bflow/tasks/", "!/abs"} {
+		if _, err := Load(fixture(t, "", "flow:\n  public_paths: ['"+bad+"']\n")); err == nil || !strings.Contains(err.Error(), "flow.public_paths") {
+			t.Errorf("%q debía rechazarse: %v", bad, err)
+		}
+	}
+	c, err := Load(fixture(t, "", "flow:\n  public_paths: [internal/cli/, '!*_test.go']\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(c.Flow.PublicPaths, []string{"internal/cli/", "!*_test.go"}) || !slices.Equal(c.Flow.Core().PublicPaths, c.Flow.PublicPaths) {
+		t.Errorf("no llegó a flow.Config: %v", c.Flow.Core().PublicPaths)
+	}
+}

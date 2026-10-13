@@ -564,3 +564,39 @@ func DocsPending(listed, diff []string, docsReport string) []string {
 	}
 	return out
 }
+
+// PublicTouched devuelve las rutas del diff que caen en alguna entrada
+// positiva de patterns y en ninguna con "!" al inicio. Una entrada con "/"
+// final cubre la carpeta; las demás se comparan con path.Match contra la ruta
+// completa y, si no llevan "/", también contra el nombre base.
+func PublicTouched(diff, patterns []string) []string {
+	match := func(p, f string) bool {
+		if strings.HasSuffix(p, "/") {
+			return strings.HasPrefix(f, p)
+		}
+		if ok, _ := path.Match(p, f); ok {
+			return true
+		}
+		if !strings.Contains(p, "/") {
+			ok, _ := path.Match(p, path.Base(f))
+			return ok
+		}
+		return false
+	}
+	var out []string
+	for _, raw := range diff {
+		f := strings.ReplaceAll(raw, `\`, "/")
+		pub, excl := false, false
+		for _, p := range patterns {
+			if neg, ok := strings.CutPrefix(p, "!"); ok {
+				excl = excl || match(neg, f)
+			} else {
+				pub = pub || match(p, f)
+			}
+		}
+		if pub && !excl {
+			out = append(out, f)
+		}
+	}
+	return out
+}

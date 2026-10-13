@@ -121,6 +121,18 @@ agents:
 
 Con `read`, el agente no carga CLAUDE.md (`omit_claude_md: false` lo cambia): las reglas del repo le llegan por esas rutas. Un agente propio se agrega a una fase en `flow.agents` y define su oficio en `extra`; bflow le antepone el contrato. Los agentes generados llevan el prefijo `bflow-` para no chocar con los tuyos; `render` nunca pisa un archivo que no generó. Si el repo tiene `AGENTS.md` (lo leen Codex y OpenCode), `render` mantiene en él un bloque que dice cómo retomar una tarea con bflow. `bflow doctor` avisa si los agentes están desactualizados y si alguna skill instalada parece de proceso (ramas, PR, tracker, specs), porque puede chocar con el flujo; `doctor.ignore_skills` silencia las que no chocan. Más ejemplos de oficio en la [guía](guia.md#ajustar-a-los-agentes).
 
+### Salida pública y changelog
+
+`flow.public_paths` lista las rutas del repo que cambian lo que ve quien usa el producto (comandos, JSON, panel, config). Si el diff las toca y el changelog para consumidores no cambió, bflow rechaza el DONE del documenter con `changelog_required`. Sin la clave, el gate no actúa.
+
+```yaml
+# bflow.yaml
+flow:
+  public_paths: [cmd/, internal/cli/, internal/config/config.go, "!*_test.go"]
+```
+
+Una entrada que termina en `/` cubre la carpeta; las demás se comparan con `path.Match` (un patrón sin `/` también contra el nombre base); `!` al inicio excluye. Deben ser rutas del repo: sin `..`, absolutas ni `.bflow/`. Para eximir una tarea: `bflow unblock <ID> --no-changelog --note "motivo"`.
+
 ## Claude Code y OpenCode
 
 ### Claude Code

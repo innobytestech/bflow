@@ -279,10 +279,13 @@ func init() {
 			return outcomeEnvelope(o)
 		}})
 
-	Register(&Command{Name: "unblock", Summary: "desbloquea la tarea y vuelve a su fase: unblock [ID] [--note t] (la nota llega al agente)",
-		Setup: func(fs *flag.FlagSet) { fs.String("note", "", "resultado para el agente que retoma") },
+	Register(&Command{Name: "unblock", Summary: "desbloquea la tarea y vuelve a su fase: unblock [ID] [--note t] [--no-changelog] (la nota llega al agente; --no-changelog exime del changelog)",
+		Setup: func(fs *flag.FlagSet) {
+			fs.String("note", "", "resultado para el agente que retoma")
+			fs.Bool("no-changelog", false, "exime a documenting del changelog para consumidores (exige --note)")
+		},
 		Run: flowCommand(func(ctx context.Context, e *engine.Engine, id string, c *Ctx, _ []string) (engine.Outcome, error) {
-			return e.Unblock(ctx, id, str(c.Flags, "note"))
+			return e.Unblock(ctx, id, str(c.Flags, "note"), str(c.Flags, "no-changelog") == "true")
 		})})
 
 	Register(&Command{Name: "freeze", Summary: "vuelve a congelar las pruebas del contrato tal como están, o con --allow deja cambiar una una vez (solo una persona): freeze [ID] [--allow <archivo>]",
