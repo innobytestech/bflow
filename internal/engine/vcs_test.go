@@ -37,7 +37,7 @@ func (g *fakeGit) EnsureBranch(_ context.Context, name, base string) (string, er
 	return "created", nil
 }
 func (g *fakeGit) Dirty(_ context.Context, p []string) ([]string, error) {
-	if g.onlyFor != "" && !(len(p) == 1 && p[0] == g.onlyFor) {
+	if g.onlyFor != "" && (len(p) != 1 || p[0] != g.onlyFor) {
 		return nil, nil
 	}
 	return g.dirty, nil
