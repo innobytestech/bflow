@@ -235,3 +235,84 @@ func TestDoctorLogSoloCola(t *testing.T) {
 		t.Errorf("lo que queda fuera del último MiB no se lee: %+v", a)
 	}
 }
+
+// regionEnv deja opencode.json personal con agentes y el log dado.
+func regionEnv(t *testing.T, now time.Time, fx string, personal string) (root, ocPath string) {
+	t.Helper()
+	root = logEnv(t, now, map[string]string{"opencode.log": fx})
+	cfg := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfg)
+	dir := filepath.Join(cfg, "opencode")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ocPath = filepath.Join(dir, "opencode.json")
+	if err := os.WriteFile(ocPath, []byte(personal), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := now.Add(-3 * time.Hour)
+	_ = os.Chtimes(ocPath, old, old)
+	return root, ocPath
+}
+
+const personalAgents = `{"agent":{
+ "bflow-scout":{"model":"opencode-go/deepseek-v4.1-flash"},
+ "bflow-documenter":{"model":"opencode-go/deepseek-v4.1-flash"},
+ "bflow-implementer":{"model":"opencode-go/deepseek-v4-pro"},
+ "bflow-reviewer":{"model":"opencode-go/deepseek-v4-pro"},
+ "bflow-ux-auditor":{"model":"anthropic/sonnet"}}}`
+
+func TestDoctorLogRegionAgentes(t *testing.T) {
+	now := time.Now()
+	root, oc := regionEnv(t, now, "log_v2_modelid.txt", personalAgents)
+	fs := Agent{}.DoctorLog(root, now)
+	p := find(fs, "proveedor", "warn")
+	if len(p) != 1 {
+		t.Fatalf("un solo warn de proveedor: %+v", p)
+	}
+	m := p[0].Msg
+	for _, s := range []string{"bflow-implementer, bflow-reviewer → opencode-go/deepseek-v4-pro (personal)", "Global", "Privacy", "agent.<nombre>.model en " + oc, "(solo tú)"} {
+		if !strings.Contains(m, s) {
+			t.Errorf("falta %q: %s", s, m)
+		}
+	}
+	for _, s := range []string{"bflow-scout", "v4.1-flash", "probable", "models.opencode"} {
+		if strings.Contains(m, s) {
+			t.Errorf("no debe aparecer %q: %s", s, m)
+		}
+	}
+	if mo := find(fs, "modelos", "warn"); len(mo) != 1 || !strings.Contains(mo[0].Msg, "2 agentes") {
+		t.Errorf("modelos warn con 2 agentes: %+v", mo)
+	}
+}
+
+func TestDoctorLogRegionProbable(t *testing.T) {
+	now := time.Now()
+	root, _ := regionEnv(t, now, "log_v2.txt", personalAgents)
+	fs := Agent{}.DoctorLog(root, now)
+	p := find(fs, "proveedor", "warn")
+	if len(p) != 1 || !strings.Contains(p[0].Msg, "probable") || !strings.Contains(p[0].Msg, "bflow-scout, bflow-documenter") && !strings.Contains(p[0].Msg, "bflow-documenter, bflow-scout") {
+		t.Fatalf("marca opencode-go como probable: %+v", p)
+	}
+	if strings.Contains(p[0].Msg, "bflow-ux-auditor") || strings.Contains(p[0].Msg, "anthropic") {
+		t.Errorf("deja fuera al agente de otro proveedor: %s", p[0].Msg)
+	}
+	if mo := find(fs, "modelos", "warn"); len(mo) != 1 || !strings.Contains(mo[0].Msg, "4 agentes") {
+		t.Errorf("modelos warn con 4 agentes: %+v", mo)
+	}
+}
+
+func TestDoctorLogRegionTrasCambio(t *testing.T) {
+	now := time.Now()
+	root, oc := regionEnv(t, now, "log_v2_modelid.txt", personalAgents)
+	if err := os.Chtimes(oc, now, now); err != nil {
+		t.Fatal(err)
+	}
+	fs := Agent{}.DoctorLog(root, now)
+	if p := find(fs, "proveedor", "warn"); p != nil {
+		t.Errorf("rechazo anterior al cambio: sin warn: %+v", p)
+	}
+	if mo := find(fs, "modelos", "warn"); mo != nil {
+		t.Errorf("sin modelos warn: %+v", mo)
+	}
+}

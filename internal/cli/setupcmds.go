@@ -787,6 +787,14 @@ func doctorOpenCode(c *Ctx, cfg *config.Config, add func(string, string, string,
 			add("comando", "warn", "opencode: el comando /bflow instalado (%s) difiere del de este bflow; corre bflow install opencode", path)
 		}
 	}
+	var logFs []LogFinding
+	if ld, ok := t.(LogDoctor); ok {
+		logFs = ld.DoctorLog(cfg.Root, time.Now())
+	}
+	regionBad := false
+	for _, f := range logFs {
+		regionBad = regionBad || f.Area == "modelos" && f.Level == "warn"
+	}
 	if p, err := planRender(c, cfg); err == nil {
 		if un := p.Unresolved["opencode"]; len(un) > 0 {
 			var parts []string
@@ -794,8 +802,13 @@ func doctorOpenCode(c *Ctx, cfg *config.Config, add func(string, string, string,
 				parts = append(parts, fmt.Sprintf("%s (%s)", u.Alias, strings.Join(u.Agents, ", ")))
 			}
 			add("modelos", "warn", "opencode: alias sin equivalente, esos agentes salen sin model: %s; define models.opencode.<alias> en bflow.yaml (equipo) o en %s (solo tú)", strings.Join(parts, "; "), config.GlobalPath())
-		} else {
+		} else if !regionBad {
 			add("modelos", "ok", "opencode: modelos de los agentes resueltos")
+		}
+		for _, f := range logFs {
+			if f.Area == "modelos" {
+				add(f.Area, f.Level, "%s", f.Msg)
+			}
 		}
 		if cfg.ProfileModelsIgnored {
 			add("modelos", "warn", "opencode: los models del perfil %s no se aplican; ponlos en bflow.yaml o en %s", cfg.Profile, config.GlobalPath())
@@ -834,8 +847,8 @@ func doctorOpenCode(c *Ctx, cfg *config.Config, add func(string, string, string,
 			add("plugin", "ok", "opencode: plugin de guard y tokens al día (1.x y 2.x)")
 		}
 	}
-	if ld, ok := t.(LogDoctor); ok {
-		for _, f := range ld.DoctorLog(cfg.Root, time.Now()) {
+	for _, f := range logFs {
+		if f.Area != "modelos" {
 			add(f.Area, f.Level, "%s", f.Msg)
 		}
 	}

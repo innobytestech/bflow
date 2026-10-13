@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"innobytes.tech/bflow/internal/config"
 )
@@ -364,5 +365,34 @@ func TestDoctorOpenCodeModels(t *testing.T) {
 	}
 	if !anyDetail(items, "warn", "sonnet") {
 		t.Errorf("y sonnet sigue sin resolver: %v", items)
+	}
+}
+
+// C3: con un rechazo de región vigente, doctor no da modelos ok.
+func TestDoctorOpenCodeModelosRegion(t *testing.T) {
+	data := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", data)
+	env, oc := personalEnv(t, "agent: [claude, opencode]\n", "models:\n  opencode: { haiku: opencode-go/deepseek-v4.1-flash, sonnet: opencode-go/deepseek-v4-pro }\n")
+	if code, _, raw := runJSON(t, env, "render"); code != 0 {
+		t.Fatalf("render: %s", raw)
+	}
+	old := time.Now().Add(-3 * time.Hour)
+	_ = os.Chtimes(oc, old, old)
+	if !anyDetail(modelosItems(t, env), "ok", "resueltos") {
+		t.Fatalf("sin rechazo, modelos ok: %v", modelosItems(t, env))
+	}
+	dir := filepath.Join(data, "opencode", "log")
+	_ = os.MkdirAll(dir, 0o755)
+	ts := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	line := "timestamp=" + ts + ` level=ERROR message="x" modelID=deepseek-v4-pro error="This Go model requires Global regions."` + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "opencode.log"), []byte(line), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	items := modelosItems(t, env)
+	if anyDetail(items, "ok", "resueltos") {
+		t.Errorf("con rechazo vigente no hay modelos ok: %v", items)
+	}
+	if !anyDetail(items, "warn", "agentes con un modelo rechazado", "proveedor") {
+		t.Errorf("falta modelos warn: %v", items)
 	}
 }

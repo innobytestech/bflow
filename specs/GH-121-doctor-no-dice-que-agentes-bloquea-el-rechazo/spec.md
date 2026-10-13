@@ -56,7 +56,7 @@ Carril light: los criterios van en Tasks.
 
 ## Tasks
 
-- [ ] **T1 Contrato.** Firmas de `AgentModel`, `agentModels` y `modelsMtime`. Pruebas que fallan:
+- [x] **T1 Contrato.** Firmas de `AgentModel`, `agentModels` y `modelsMtime`. Pruebas que fallan:
   - `TestAgentModels` (opencode): frontmatter gana, el personal cubre el resto, el agente sin modelo queda fuera.
   - `TestDoctorLogRegionAgentes`: el fixture tiene una línea con `modelID=deepseek-v4-pro`. Marca solo esos agentes y el mensaje trae agente → modelo, el origen y las dos salidas.
   - `TestDoctorLogRegionProbable`: con el log sin modelo, marca los `opencode-go/` con «probable» y deja fuera un agente `anthropic/…`.
@@ -68,7 +68,7 @@ Carril light: los criterios van en Tasks.
     - C3: CUANDO algún agente queda marcado, `doctor` NO DEBE dar `modelos ok` y DEBE dar `modelos` warn.
     - C4: CUANDO el rechazo es anterior al último cambio de `opencode.json` o de `.opencode/agents/bflow-*.md`, no cuenta.
     - C5: El warn DEBE nombrar la salida sin Global que toca: `agent.<nombre>.model` en la ruta real de `opencode.json` o `models.opencode` + `bflow render`.
-- [ ] **T2 Modelo efectivo por agente.** Implementar `agentModels` y `modelsMtime`; `TestAgentModels` pasa. (C1, C4)
-- [ ] **T3 Rechazo por agente en `DoctorLog`.** Rehacer el bloque `global`. Agregar al `testdata/` un fixture con `modelID` y ajustar `TestDoctorLogProveedor` al texto nuevo, que sigue conteniendo `Global` y `Privacy`. Las tres `TestDoctorLogRegion*` pasan y `TestDoctorLogNoFiltraPrompt` sigue en verde. (C1, C2, C4, C5)
-- [ ] **T4 `modelos` en `doctorOpenCode`.** Llamar a `DoctorLog` antes y suprimir `modelos ok` cuando corresponda. `TestDoctorOpenCodeModelosRegion`, `TestDoctorOpenCodeModels`, `TestDoctorOpenCode` y `TestDoctorOpenCodeLog` pasan. (C3)
-- [ ] **T5 Skill y documentación.** Cambiar la línea 15 de `adapters/leader/bflow.md`. Si alguna prueba compara la skill renderizada (`SkillState`), actualizar lo que haga falta. En `adapters/opencode/README.md` (l. 42), dar las dos salidas y explicar que doctor lista los agentes. En `docs/guia.md` (l. 107), mencionar `modelos`. `go test ./...` en verde. (C5)
+- [x] **T2 Modelo efectivo por agente.** Implementar `agentModels` y `modelsMtime`; `TestAgentModels` pasa. (C1, C4)
+- [x] **T3 Rechazo por agente en `DoctorLog`.** Rehacer el bloque `global`. Agregar al `testdata/` un fixture con `modelID` y ajustar `TestDoctorLogProveedor` al texto nuevo, que sigue conteniendo `Global` y `Privacy`. Las tres `TestDoctorLogRegion*` pasan y `TestDoctorLogNoFiltraPrompt` sigue en verde. (C1, C2, C4, C5)
+- [x] **T4 `modelos` en `doctorOpenCode`.** Llamar a `DoctorLog` antes y suprimir `modelos ok` cuando corresponda. `TestDoctorOpenCodeModelosRegion`, `TestDoctorOpenCodeModels`, `TestDoctorOpenCode` y `TestDoctorOpenCodeLog` pasan. (C3)
+- [x] **T5 Skill y documentación.** Cambiar la línea 15 de `adapters/leader/bflow.md`. Si alguna prueba compara la skill renderizada (`SkillState`), actualizar lo que haga falta. En `adapters/opencode/README.md` (l. 42), dar las dos salidas y explicar que doctor lista los agentes. En `docs/guia.md` (l. 107), mencionar `modelos`. `go test ./...` en verde. (C5)
