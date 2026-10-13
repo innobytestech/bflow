@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -449,6 +450,65 @@ func TestPluginsSpawnConWindowsHide(t *testing.T) {
 			if strings.Contains(line, "Bun.spawn(") && !strings.Contains(line, "windowsHide: true") {
 				t.Errorf("%s: Bun.spawn sin windowsHide: %s", name, strings.TrimSpace(line))
 			}
+		}
+	}
+}
+
+// GH-118: sin .bflow (o con sessionID no seguro) step.ended no deja entradas en steps. Ejecuta el plugin real en node.
+func TestPlugin2StepSinBflowLimpiaMapa(t *testing.T) {
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node no está en el PATH")
+	}
+	tmp := t.TempDir()
+	plugin := filepath.Join(tmp, "index.mjs")
+	if err := os.WriteFile(plugin, files.Plugin2, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	proj := filepath.Join(tmp, "proj") // sin .bflow
+	if err := os.Mkdir(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	harness := filepath.Join(tmp, "run.mjs")
+	js := `import { pathToFileURL } from "node:url"
+const maps = []
+const M = Map
+globalThis.Map = class extends M { constructor(...a) { super(...a); maps.push(this) } }
+globalThis.Bun = { which: () => null }
+const mod = await import(pathToFileURL(process.argv[2]).href)
+const evs = []
+let wake
+const it = { [Symbol.asyncIterator]() { return this }, next: () => evs.length ? Promise.resolve({ value: evs.shift(), done: false }) : new Promise((r) => { wake = r }), return: async () => ({ done: true }) }
+const noop = () => {}
+const ctx = { location: { directory: process.argv[3] }, tool: { hook: noop }, session: { hook: noop, get: async () => ({}) }, event: { subscribe: () => it } }
+const off = await mod.default.setup(ctx)
+const steps = maps.find((m) => !m.has("x"))
+const start = (id) => ({ type: "session.step.started", data: { assistantMessageID: id, agent: "a" } })
+evs.push(start("m1"), { type: "session.step.ended", data: { assistantMessageID: "m1", sessionID: "s1" } },
+  start("m2"), { type: "session.step.failed", data: { assistantMessageID: "m2", sessionID: "../x" } })
+wake?.({ value: evs.shift(), done: false })
+await new Promise((r) => setTimeout(r, 300))
+off()
+console.log(JSON.stringify({ sizes: maps.map((m) => m.size) }))
+`
+	if err := os.WriteFile(harness, []byte(js), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := exec.Command(node, harness, plugin, proj).CombinedOutput()
+	if err != nil {
+		t.Fatalf("harness: %v\n%s", err, out)
+	}
+	var res struct{ Sizes []int }
+	line := strings.TrimSpace(string(out))
+	if i := strings.LastIndex(line, "\n"); i >= 0 {
+		line = line[i+1:]
+	}
+	if err := json.Unmarshal([]byte(strings.ToLower(line[:1])+line[1:]), &res); err != nil {
+		t.Fatalf("salida: %s", out)
+	}
+	for _, n := range res.Sizes {
+		if n != 0 {
+			t.Fatalf("steps debe quedar vacío, tamaños %v", res.Sizes)
 		}
 	}
 }

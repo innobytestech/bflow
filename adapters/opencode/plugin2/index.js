@@ -108,9 +108,9 @@ export default {
           } else if (ev.type === "session.step.started") {
             steps.set(d.assistantMessageID, { providerID: d.model?.providerID, modelID: d.model?.id, agent: d.agent, started: d.started })
           } else if (ev.type === "session.step.ended" || ev.type === "session.step.failed") {
-            if (!existsSync(join(dir, ".bflow")) || !safe(d.sessionID)) continue
             const st = steps.get(d.assistantMessageID) ?? {}
             steps.delete(d.assistantMessageID)
+            if (!existsSync(join(dir, ".bflow")) || !safe(d.sessionID)) continue
             if (ev.type === "session.step.failed" && !d.tokens) continue
             const s = await resolve(d.sessionID)
             const cache = join(dir, ".bflow", "cache", "opencode")
