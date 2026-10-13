@@ -39,11 +39,11 @@ Van dentro de Tasks (carril light).
 
 ## Tasks
 
-- [ ] T1 Paso `render` en `bflow.yaml`, después de `build`: `- name: render` / `run: go run ./cmd/bflow render --check`.
+- [x] T1 Paso `render` en `bflow.yaml`, después de `build`: `- name: render` / `run: go run ./cmd/bflow render --check`.
   - R1: CUANDO una plantilla de `internal/agents/` o del plugin cambia y no se corrió `bflow render`, `bflow check` DEBE fallar en el paso `render` y el extracto DEBE incluir `render_outdated` y los archivos desactualizados.
   - R2: CUANDO los agentes están al día, el paso `render` DEBE pasar.
-- [ ] T2 Prueba `TestRepoCheckRunsRender` en `cmd/bflow/` que carga el `bflow.yaml` del repo con `config.Load` y exige un paso cuyo `run` contenga `cmd/bflow render --check`.
+- [x] T2 Prueba `TestRepoCheckRunsRender` en `cmd/bflow/` que carga el `bflow.yaml` del repo con `config.Load` y exige un paso cuyo `run` contenga `cmd/bflow render --check`.
   - R3: CUANDO alguien quite el paso de `bflow.yaml`, `go test ./...` DEBE fallar.
-- [ ] T3 En `.github/workflows/ci.yml`, job `test`, después de `go vet`: `- run: go run ./cmd/bflow render --check` (sin `if`, ambos sistemas).
+- [x] T3 En `.github/workflows/ci.yml`, job `test`, después de `go vet`: `- run: go run ./cmd/bflow render --check` (sin `if`, ambos sistemas).
   - R4: CUANDO un PR trae agentes sin renderizar, el CI DEBE fallar en ese paso.
-- [ ] T4 Verificación manual (se anota en el PR): editar una línea de `internal/agents/craft/implementer.md` sin renderizar, correr `bflow check` y ver el fallo de R1; revertir y ver que pasa (R2).
+- [x] T4 Verificación manual (se anota en el PR): editar una línea de `internal/agents/craft/implementer.md` sin renderizar, correr `bflow check` y ver el fallo de R1; revertir y ver que pasa (R2).
