@@ -240,16 +240,23 @@ func TestModelsState(t *testing.T) {
 func TestAgentModels(t *testing.T) {
 	root, cfg := t.TempDir(), t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", cfg)
-	os.MkdirAll(filepath.Join(cfg, "opencode"), 0o755)
+	must(t, os.MkdirAll(filepath.Join(cfg, "opencode"), 0o755))
 	os.WriteFile(filepath.Join(cfg, "opencode", "opencode.json"),
 		[]byte(`{"agent":{"bflow-scout":{"model":"p/a"},"bflow-reviewer":{"model":"p/b"},"otro":{"model":"p/z"}}}`), 0o644)
 	ad := filepath.Join(root, ".opencode", "agents")
-	os.MkdirAll(ad, 0o755)
-	os.WriteFile(filepath.Join(ad, "bflow-reviewer.md"), []byte("---\nmodel: repo/r\nmode: subagent\n---\ncuerpo\n"), 0o644)
-	os.WriteFile(filepath.Join(ad, "bflow-implementer.md"), []byte("---\nmode: subagent\n---\n"), 0o644)
+	must(t, os.MkdirAll(ad, 0o755))
+	must(t, os.WriteFile(filepath.Join(ad, "bflow-reviewer.md"), []byte("---\nmodel: repo/r\nmode: subagent\n---\ncuerpo\n"), 0o644))
+	must(t, os.WriteFile(filepath.Join(ad, "bflow-implementer.md"), []byte("---\nmode: subagent\n---\n"), 0o644))
 	got := agentModels(root, "")
 	want := []AgentModel{{"bflow-reviewer", "repo/r", "repo"}, {"bflow-scout", "p/a", "personal"}}
 	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
 		t.Fatalf("got %+v want %+v", got, want)
+	}
+}
+
+func must(t *testing.T, err error) {
+	t.Helper()
+	if err != nil {
+		t.Fatal(err)
 	}
 }
