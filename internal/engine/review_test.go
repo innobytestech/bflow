@@ -487,3 +487,23 @@ func TestReviewerPendingUnmeasured(t *testing.T) {
 		}
 	})
 }
+
+// R4: un caminos: de relleno se rechaza con APPROVED y el motivo lo explica.
+func TestReviewRejectsFillerExits(t *testing.T) {
+	m := "## 🔴 Primero\n- `internal/a.go`: lógica\n  - caminos: ninguno\n## Docs\n- `README.md`\n"
+	v, id, _ := inQuality(t, m, diff4, 3000)
+	rj := rejection(t, func() error { _, err := approve(v, id); return err }(), "review_incomplete")
+	if !strings.Contains(rj.Reason, "internal/a.go") || !strings.Contains(rj.Reason, "relleno") {
+		t.Errorf("nombra la viñeta y el relleno:\n%s", rj.Reason)
+	}
+}
+
+// R5: REJECTED no se bloquea por un caminos: de relleno.
+func TestReviewRejectedIgnoresFillerExits(t *testing.T) {
+	m := "## 🔴 Primero\n- `internal/a.go`: lógica\n  - caminos: ninguno\n## Docs\n- `README.md`\n"
+	v, id, _ := inQuality(t, m, diff4, 3000)
+	o, err := v.e.Report(context.Background(), id, ReportOpts{Agent: "reviewer", Verdict: flow.RejectedV, Note: "falta un caso"})
+	if err != nil || o.To != flow.Implementing {
+		t.Fatalf("REJECTED pasa: %+v %v", o, err)
+	}
+}

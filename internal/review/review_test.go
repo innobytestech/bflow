@@ -468,3 +468,30 @@ func TestParseMapRedNoExits(t *testing.T) {
 		t.Errorf("recorte: %q", long.RedNoExits)
 	}
 }
+
+// R1: un caminos: vacío o de relleno cuenta como ausente.
+func TestParseMapRedNoExitsFiller(t *testing.T) {
+	for _, c := range []string{"caminos:", "caminos: ninguno", "caminos: N/A.", "caminos: -", "caminos: …", "CAMINOS: Ninguna", "caminos: ..."} {
+		m := ParseMap("## 🔴 X\n- `a.go`: algo\n  - " + c + "\n")
+		if len(m.RedNoExits) != 1 {
+			t.Errorf("%q debe quedar en RedNoExits: %q", c, m.RedNoExits)
+		}
+	}
+}
+
+// R2 y R3: texto real pasa; basta un caminos: válido en el bloque.
+func TestParseMapRedNoExitsConcrete(t *testing.T) {
+	for _, c := range []string{
+		"caminos: review.go:297-380 flush … reinicia cur/curOK en todas las salidas",
+		"caminos: region=false -> sin warn; rechazo anterior al mtime se salta sin estado",
+		"caminos: sin ramas nuevas, el diff solo agrega windowsHide:true",
+		"caminos: a.go:3 return limpia",
+	} {
+		if m := ParseMap("## 🔴 X\n- `a.go`: algo\n  - " + c + "\n"); len(m.RedNoExits) != 0 {
+			t.Errorf("%q no debe rechazarse: %q", c, m.RedNoExits)
+		}
+	}
+	if m := ParseMap("## 🔴 X\n- `a.go`: algo\n  - caminos: ninguno\n  - caminos: a.go:9 devuelve error\n"); len(m.RedNoExits) != 0 {
+		t.Errorf("basta uno válido: %q", m.RedNoExits)
+	}
+}
