@@ -495,3 +495,19 @@ func TestParseMapRedNoExitsConcrete(t *testing.T) {
 		t.Errorf("basta uno válido: %q", m.RedNoExits)
 	}
 }
+
+func TestPublicTouched(t *testing.T) {
+	pats := []string{"internal/cli/", "cmd/*.go", "bflow.yaml", "*.json", "!*_test.go", "!internal/cli/gen/"}
+	diff := []string{
+		"internal/cli/a.go", `internal\cli\sub\b.go`, "internal/cli/a_test.go", "internal/cli/gen/z.go",
+		"cmd/main.go", "cmd/deep/main.go", "bflow.yaml", "docs/x.json", "internal/other/c.go",
+	}
+	got := PublicTouched(diff, pats)
+	want := []string{"internal/cli/a.go", "internal/cli/sub/b.go", "cmd/main.go", "bflow.yaml", "docs/x.json"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	if len(PublicTouched(diff, nil)) != 0 {
+		t.Error("sin patrones no hay rutas públicas")
+	}
+}

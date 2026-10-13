@@ -28,5 +28,7 @@ check:
   quick:
     - go vet {pkg}
     - go test -count=1 {pkg}
+flow:
+  public_paths: [cmd/, internal/cli/, internal/config/config.go, internal/agents/, "!*_test.go"]
 guard:
   forbid_coauthor: true # en este repo los commits van sin coautor

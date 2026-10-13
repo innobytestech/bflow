@@ -77,7 +77,7 @@ bflow le antepone el contrato: en quality escribe `reports/perf-auditor.md` y re
 
 En quality trabaja por defecto solo el reviewer, que revisa también seguridad, resiliencia y rendimiento. Si quieres una segunda mirada de seguridad con su propio agente, pon `flow: { security_audit: true }`: suma el `security-auditor`, que corre en paralelo con el reviewer y cuesta sus propios tokens.
 
-Si la tarea cambia lo que consumen otros equipos, el documenter escribe un solo changelog para ellos, versionado y en el PR. Por defecto va junto a la spec; si tu repo ya tiene un lugar para eso, dilo con `flow: { consumer_changelog: "docs/consumers/{id}-{slug}.md" }`.
+Si la tarea cambia lo que consumen otros equipos, el documenter escribe un solo changelog para ellos, versionado y en el PR. Por defecto va junto a la spec; si tu repo ya tiene un lugar para eso, dilo con `flow: { consumer_changelog: "docs/consumers/{id}-{slug}.md" }`. Con `flow.public_paths` declaras qué rutas son salida pública; si el diff las toca y el changelog no cambió, bflow rechaza el DONE del documenter (`changelog_required`). Si de verdad no hace falta, el documenter reporta BLOCKED con el motivo y tú lo eximes con `bflow unblock <ID> --no-changelog --note "motivo"`.
 
 ## Skills: cuáles convienen y cuáles chocan
 

@@ -7,6 +7,7 @@ Documentas el cambio sin tocar la lógica, las firmas ni las pruebas.
 - El walkthrough no repite el review-map ni `impl.md`: remite a ellos.
 - En el walkthrough afirma que una prueba pasa o cubre algo solo si consta en `bflow show <id> check` o en `impl.md`; no lo supongas.
 - Changelog para consumidores (ruta en `changelog`), solo si cambia lo que consumen otros equipos (endpoints, campos, enums, errores, permisos, comportamiento). Es su contrato: debe bastar para adaptar el cliente sin leer el código.
+  - Es obligatorio si el diff toca salida pública (comandos, salida JSON, panel, config) o `flow.public_paths`: bflow rechaza tu DONE con `changelog_required` si no cambió. Para omitirlo, reporta BLOCKED con el motivo (decide una persona); nunca escribas "sin cambio" para el changelog en `reports/docs.md`.
   - Primero lo que rompe compatibilidad, marcado como tal.
   - Por cambio: endpoint o campo, antes y después, ejemplo de request y response si cambia la forma, errores nuevos con código HTTP y cuerpo, y qué tiene que hacer el consumidor.
   - Nada de cómo se implementó ni de lo que ya dice la spec.

@@ -23,6 +23,8 @@ type Config struct {
 	// Changelog: plantilla de la ruta del changelog para consumidores, con
 	// {id} y {slug}; vacía, va junto a la spec.
 	Changelog string
+	// PublicPaths: ver config.Flow.PublicPaths; vacío = el gate no actúa.
+	PublicPaths []string
 	// Scout: nombre del agente scout; vacío = apagado.
 	Scout string
 }

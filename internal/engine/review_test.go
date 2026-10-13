@@ -507,3 +507,119 @@ func TestReviewRejectedIgnoresFillerExits(t *testing.T) {
 		t.Fatalf("REJECTED pasa: %+v %v", o, err)
 	}
 }
+
+// publicToDocumenting deja una tarea en documenting con diff dado y public_paths.
+func publicToDocumenting(t *testing.T, diff []string, public []string) (*env, string, *fakeGit) {
+	t.Helper()
+	v, id, g := inQuality(t, "", diff, 100)
+	v.e.Cfg.Flow.PublicPaths = public
+	if _, err := approve(v, id); err != nil {
+		t.Fatal(err)
+	}
+	if phaseOf(t, v, id) != flow.Documenting {
+		t.Fatalf("debía quedar en documenting")
+	}
+	return v, id, g
+}
+
+func changelogOf(t *testing.T, v *env, id string) string {
+	t.Helper()
+	rec, err := v.e.Store.Load(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return v.e.flowCfg().ChangelogPath(id, rec.Flow.Slug)
+}
+
+func docsDone(v *env, id string) error {
+	_, err := v.e.Report(context.Background(), id, ReportOpts{Agent: "documenter", Verdict: flow.DoneV})
+	return err
+}
+
+func TestChangelogRequiredRejects(t *testing.T) {
+	v, id, _ := publicToDocumenting(t, []string{"internal/cli/a.go", "internal/cli/a_test.go", "internal/x/b.go"}, []string{"internal/cli/", "!*_test.go"})
+	rj := rejection(t, docsDone(v, id), "changelog_required")
+	cl := changelogOf(t, v, id)
+	if !strings.Contains(rj.Reason, "internal/cli/a.go") || strings.Contains(rj.Reason, "a_test.go") || strings.Contains(rj.Reason, "internal/x/b.go") ||
+		!strings.Contains(rj.Reason, cl) || !strings.Contains(rj.Reason, "--no-changelog") {
+		t.Errorf("rechazo incompleto:\n%s", rj.Reason)
+	}
+	if phaseOf(t, v, id) != flow.Documenting {
+		t.Error("no avanza")
+	}
+}
+
+func TestChangelogRequiredPassesWithChangelog(t *testing.T) {
+	cl := "specs/MEM-1-demo/consumer-changelog.md"
+	v, id, _ := publicToDocumenting(t, []string{"cmd/x.go", cl}, []string{"cmd/"})
+	if changelogOf(t, v, id) != cl {
+		t.Fatalf("ruta del changelog inesperada: %s", changelogOf(t, v, id))
+	}
+	if err := docsDone(v, id); err != nil {
+		t.Fatalf("changelog en el diff: %v", err)
+	}
+	v, id, g := publicToDocumenting(t, []string{"cmd/x.go"}, []string{"cmd/"})
+	g.dirty, g.onlyFor = []string{cl}, cl
+	if err := docsDone(v, id); err != nil {
+		t.Fatalf("changelog sin commitear: %v", err)
+	}
+}
+
+func TestChangelogRequiredIgnoredWithoutPublicPaths(t *testing.T) {
+	v, id, _ := publicToDocumenting(t, []string{"cmd/x.go"}, nil)
+	if err := docsDone(v, id); err != nil {
+		t.Fatalf("sin public_paths: %v", err)
+	}
+	v, id, _ = publicToDocumenting(t, []string{"internal/x/y.go"}, []string{"cmd/"})
+	if err := docsDone(v, id); err != nil {
+		t.Fatalf("sin ruta pública tocada: %v", err)
+	}
+}
+
+func TestUnblockNoChangelogExempts(t *testing.T) {
+	ctx := context.Background()
+	v, id, _ := inQuality(t, "", []string{"cmd/x.go"}, 100)
+	v.e.Cfg.Flow.PublicPaths = []string{"cmd/"}
+	// Una exención anterior a documenting no vale: se simula en la bitácora.
+	if err := v.e.Store.Append(store.Entry{TS: v.now, ID: id, Event: "unblock", By: "dev", Data: map[string]any{"no_changelog": true}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := approve(v, id); err != nil {
+		t.Fatal(err)
+	}
+	_ = rejection(t, docsDone(v, id), "changelog_required")
+	if _, err := v.e.Unblock(ctx, id, "x", true); err == nil {
+		t.Fatal("unblock fuera de blocked debe fallar")
+	}
+	if _, err := v.e.Block(ctx, id, "no hace falta changelog"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v.e.Unblock(ctx, id, "refactor interno", true); err != nil {
+		t.Fatal(err)
+	}
+	if phaseOf(t, v, id) != flow.Documenting {
+		t.Fatal("vuelve a documenting")
+	}
+	if err := docsDone(v, id); err != nil {
+		t.Fatalf("con exención pasa: %v", err)
+	}
+	log, _ := v.e.Store.Log(id)
+	var found bool
+	for _, en := range log {
+		if en.Event == "unblock" && en.Note == "refactor interno" && en.Data["no_changelog"] == true {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("la bitácora debe guardar la exención y el motivo")
+	}
+}
+
+func TestUnblockNoChangelogNeedsNoteEngine(t *testing.T) {
+	v, id, _ := publicToDocumenting(t, []string{"cmd/x.go"}, []string{"cmd/"})
+	if _, err := v.e.Block(context.Background(), id, "x"); err != nil {
+		t.Fatal(err)
+	}
+	_, err := v.e.Unblock(context.Background(), id, " ", true)
+	_ = rejection(t, err, "note_required")
+}

@@ -187,6 +187,20 @@ func TestDocumenterWritesDocsReport(t *testing.T) {
 	}
 }
 
+// GH-55: el oficio del documenter exige changelog si cambia salida pública.
+func TestDocumenterChangelogPublicOutput(t *testing.T) {
+	specs, err := Build(flow.DefaultConfig(), nil, testutil.TempDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := byName(t, specs)["documenter"].Body
+	for _, want := range []string{"salida pública (comandos, salida JSON, panel, config)", "`flow.public_paths`", "reporta BLOCKED con el motivo", `nunca escribas "sin cambio" para el changelog`} {
+		if !strings.Contains(doc, want) {
+			t.Errorf("falta %q en el oficio del documenter", want)
+		}
+	}
+}
+
 // variableInPrefix: lo que cambia entre tareas o entre máquinas y rompería el
 // prefijo de caché si entrara en el cuerpo de un agente (GH-19).
 var variableInPrefix = []*regexp.Regexp{

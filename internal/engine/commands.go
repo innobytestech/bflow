@@ -179,8 +179,12 @@ func (e *Engine) Block(ctx context.Context, id, reason string) (Outcome, error) 
 
 // Unblock regresa la tarea a la fase donde se bloqueó. Si note no está vacía,
 // la guarda para que llegue en los args del agente que retoma.
-func (e *Engine) Unblock(ctx context.Context, id, note string) (Outcome, error) {
-	return e.apply(ctx, id, flow.Event{Kind: flow.EvUnblock, Note: note}, "")
+// Con noChangelog, además, exime a documenting del changelog (exige nota).
+func (e *Engine) Unblock(ctx context.Context, id, note string, noChangelog bool) (Outcome, error) {
+	if noChangelog && strings.TrimSpace(note) == "" {
+		return Outcome{}, &flow.Rejection{Code: "note_required", Reason: "--no-changelog necesita --note con el motivo"}
+	}
+	return e.apply(ctx, id, flow.Event{Kind: flow.EvUnblock, Note: note, NoChangelog: noChangelog}, "")
 }
 
 // Drop retira la tarea sin terminarla: la cierra en el tracker y la saca de
