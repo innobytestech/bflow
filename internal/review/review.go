@@ -255,7 +255,8 @@ var (
 	// tellRe encuentra las marcas que delatan la opción que hace el código.
 	tellRe        = regexp.MustCompile(`(?i)(?:(?:^|[^\pL\pN_])(?:el código|lo que hace|implementad[oa]s?|implementación|actual(?:mente)?|hoy|correct[oa]s?|recomendad[oa]s?|esperad[oa]s?)(?:$|[^\pL\pN_])|[✓✔✅←])`)
 	codeAnswersRe = regexp.MustCompile(`(?i)^el código responde\s*:`)
-	exitsRe       = regexp.MustCompile(`(?i)(?:^|[^\pL])caminos\s*:`)
+	exitsRe       = regexp.MustCompile(`(?i)(?:^|[^\pL])caminos\s*:(.*)$`)
+	fillerRe      = regexp.MustCompile(`(?i)^(?:ninguno|ninguna|nada|n/?a|-+|\.{3}|…|\?+)$`)
 )
 
 // OptionScanner reconoce, línea a línea, las opciones de respuesta de las
@@ -290,6 +291,18 @@ func (o *OptionScanner) Next(line string) (string, bool) {
 		return "", false // viñeta que abre una pregunta
 	}
 	return m[2], true
+}
+
+// exitsOK dice si s trae un caminos: con texto que no sea vacío ni de relleno.
+func exitsOK(s string) bool {
+	for _, m := range exitsRe.FindAllStringSubmatch(s, -1) {
+		t := strings.Trim(m[1], " 	*_`")
+		t = strings.TrimSpace(t)
+		if t != "" && !fillerRe.MatchString(t) && !fillerRe.MatchString(strings.TrimSpace(strings.TrimSuffix(t, "."))) {
+			return true
+		}
+	}
+	return false
 }
 
 // ParseMap lee las secciones 🔴 y Docs del review-map.
@@ -347,9 +360,9 @@ func ParseMap(md string) Map {
 		if b != nil {
 			flush()
 			if redLvl > 0 {
-				cur, curOK = strings.TrimSpace(b[1]), exitsRe.MatchString(b[1])
+				cur, curOK = strings.TrimSpace(b[1]), exitsOK(b[1])
 			}
-		} else if cur != "" && exitsRe.MatchString(line) {
+		} else if cur != "" && exitsOK(line) {
 			curOK = true
 		}
 		if b == nil || (redLvl == 0 && docsLvl == 0) {

@@ -255,7 +255,7 @@ func TestReviewerCraftCorreccion(t *testing.T) {
 			rv = s.Body
 		}
 	}
-	for _, want := range []string{"Corrección", "caminos:", "## Pruebas sin ejecutar"} {
+	for _, want := range []string{"Corrección", "caminos:", "## Pruebas sin ejecutar", "sin prueba", "después de leer las pruebas"} {
 		if !strings.Contains(rv, want) {
 			t.Errorf("el reviewer no dice %q", want)
 		}
