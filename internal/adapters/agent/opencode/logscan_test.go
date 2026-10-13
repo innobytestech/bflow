@@ -51,7 +51,7 @@ func logEnv(t *testing.T, now time.Time, logs map[string]string) (root string) {
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 	t.Setenv("BFLOW_CONFIG_HOME", t.TempDir())
-	dir :=filepath.Join(data, "opencode", "log")
+	dir := filepath.Join(data, "opencode", "log")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
