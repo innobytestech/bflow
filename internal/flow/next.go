@@ -52,10 +52,14 @@ func NextFor(cfg Config, s State) output.Next {
 		if s.Block != nil {
 			reason = s.Block.Reason
 		}
+		unblock := output.Option{ID: "unblock", Label: "Desbloquear y continuar", Command: cmd("unblock", s.ID)}
+		if s.Block != nil && s.Block.Manual {
+			unblock = output.Option{ID: "unblock", Label: "Desbloquear y continuar (con --note el agente ve el resultado)", NeedsNote: true, Command: cmd("unblock", s.ID, `--note "<resultado>"`)}
+		}
 		return output.Next{Action: output.ActionAsk, Gate: "blocked",
 			Question: fmt.Sprintf("%s está bloqueada: %s. ¿Se resolvió?", s.ID, reason),
 			Options: []output.Option{
-				{ID: "unblock", Label: "Desbloquear y continuar (con --note el agente ve el resultado)", NeedsNote: true, Command: cmd("unblock", s.ID, `--note "<resultado>"`)},
+				unblock,
 				{ID: "keep", Label: "Sigue bloqueada"},
 			}}
 	case Backlog:

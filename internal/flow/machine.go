@@ -225,7 +225,11 @@ func (t *tx) approve(ev Event) error {
 			// La opción exige trabajo que un agente no puede hacer (lanzar otro
 			// agente, verificar a mano): se bloquea hasta que la sesión principal
 			// lo haga y corra unblock --note con el resultado.
-			return t.block("la sesión principal debe hacer esto antes de seguir: " + s.Decision)
+			if err := t.block("la sesión principal debe hacer esto antes de seguir: " + s.Decision); err != nil {
+				return err
+			}
+			s.Block.Manual = true
+			return nil
 		}
 	case GatePause:
 		t.enter(t.cfg.after(s.Lane, Paused))

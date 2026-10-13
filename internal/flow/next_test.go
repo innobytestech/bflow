@@ -354,6 +354,9 @@ func TestManualDecisionBlocksInsteadOfRelaunching(t *testing.T) {
 	if !strings.Contains(res.State.Block.Reason, "opción B") {
 		t.Errorf("el motivo no dice la decisión: %q", res.State.Block.Reason)
 	}
+	if !res.State.Block.Manual {
+		t.Error("el bloqueo de decisión manual debe quedar con Manual")
+	}
 	u, err := Apply(cfg, res.State, Event{Kind: EvUnblock, Note: "el reviewer aprobó"})
 	if err != nil {
 		t.Fatal(err)
@@ -376,5 +379,37 @@ func TestUnblockWithoutNoteKeepsNoteEmpty(t *testing.T) {
 	}
 	if u.State.Note != "" {
 		t.Errorf("note %q", u.State.Note)
+	}
+}
+
+func TestBlockedUnblockNote(t *testing.T) {
+	cfg := testConfig()
+	find := func(n output.Next) output.Option {
+		for _, o := range n.Options {
+			if o.ID == "unblock" {
+				return o
+			}
+		}
+		t.Fatal("sin opción unblock")
+		return output.Option{}
+	}
+	b, err := Apply(cfg, stateFor(row{lane: Full, from: Implementing}), Event{Kind: EvBlock, Note: "falta acceso"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.State.Block.Manual {
+		t.Error("bflow block no es manual")
+	}
+	o := find(NextFor(cfg, b.State))
+	if o.NeedsNote || o.Command != "bflow unblock T-1" {
+		t.Errorf("bloqueo normal: %+v", o)
+	}
+	m, err := Apply(cfg, stateFor(row{lane: Full, from: Implementing, gate: GateDecision}), Event{Kind: EvApprove, Gate: GateDecision, Choice: 2, Manual: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	o = find(NextFor(cfg, m.State))
+	if !o.NeedsNote || !strings.Contains(o.Command, "--note") {
+		t.Errorf("bloqueo manual: %+v", o)
 	}
 }
