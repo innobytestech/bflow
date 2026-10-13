@@ -99,7 +99,7 @@ func (t *tx) apply(ev Event) error {
 	case EvBlock:
 		return t.block(ev.Note)
 	case EvUnblock:
-		return t.unblock()
+		return t.unblock(ev.Note)
 	case EvMerged:
 		if s.Phase != InReview {
 			return reject("not_in_review", "solo se cierra por merge una tarea en in_review (está en %s)", s.Phase)
@@ -184,6 +184,9 @@ func (t *tx) approve(ev Event) error {
 	if err != nil {
 		return err
 	}
+	if ev.Manual && g.Name != GateDecision {
+		return reject("bad_choice", "--manual solo aplica al gate decision")
+	}
 	if ev.Choice != 0 && g.Name != GateDecision {
 		return reject("bad_choice", "--choice solo aplica al gate decision")
 	}
@@ -218,6 +221,12 @@ func (t *tx) approve(ev Event) error {
 		}
 		s.Gate = nil
 		s.Resume = true
+		if ev.Manual {
+			// La opción exige trabajo que un agente no puede hacer (lanzar otro
+			// agente, verificar a mano): se bloquea hasta que la sesión principal
+			// lo haga y corra unblock --note con el resultado.
+			return t.block("la sesión principal debe hacer esto antes de seguir: " + s.Decision)
+		}
 	case GatePause:
 		t.enter(t.cfg.after(s.Lane, Paused))
 	case GateRounds:
@@ -508,13 +517,17 @@ func (t *tx) drop(note string) error {
 	return nil
 }
 
-func (t *tx) unblock() error {
+func (t *tx) unblock(note string) error {
 	s := &t.s
 	if s.Phase != Blocked || s.Block == nil {
 		return reject("not_blocked", "la tarea %s no está bloqueada", s.ID)
 	}
 	s.Phase = s.Block.From
 	s.Block = nil
+	if note = strings.TrimSpace(note); note != "" {
+		s.Note = note // llega en los args del agente que retoma
+		s.Resume = true
+	}
 	t.moved = true
 	return nil
 }

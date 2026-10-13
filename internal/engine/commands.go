@@ -68,6 +68,7 @@ type ApproveOpts struct {
 	Gate       string
 	Choice     int
 	Note       string
+	Manual     bool
 	Attachment string // discovery completo
 }
 
@@ -77,7 +78,7 @@ func (e *Engine) Approve(ctx context.Context, id string, o ApproveOpts) (Outcome
 	if rec, err := e.Store.Load(id); err == nil {
 		pending = rec.Flow.Gate
 	}
-	ev := flow.Event{Kind: flow.EvApprove, Gate: flow.Gate(o.Gate), Choice: o.Choice, Note: o.Note, Attachment: o.Attachment}
+	ev := flow.Event{Kind: flow.EvApprove, Gate: flow.Gate(o.Gate), Choice: o.Choice, Note: o.Note, Manual: o.Manual, Attachment: o.Attachment}
 	if pending != nil && pending.Name == flow.GateSplit && (o.Gate == "" || o.Gate == string(flow.GateSplit)) {
 		children, err := e.createChildren(ctx, id)
 		if err != nil {
@@ -177,8 +178,8 @@ func (e *Engine) Block(ctx context.Context, id, reason string) (Outcome, error) 
 }
 
 // Unblock regresa la tarea a la fase donde se bloqueó.
-func (e *Engine) Unblock(ctx context.Context, id string) (Outcome, error) {
-	return e.apply(ctx, id, flow.Event{Kind: flow.EvUnblock}, "")
+func (e *Engine) Unblock(ctx context.Context, id, note string) (Outcome, error) {
+	return e.apply(ctx, id, flow.Event{Kind: flow.EvUnblock, Note: note}, "")
 }
 
 // Drop retira la tarea sin terminarla: la cierra en el tracker y la saca de

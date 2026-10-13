@@ -55,7 +55,7 @@ func NextFor(cfg Config, s State) output.Next {
 		return output.Next{Action: output.ActionAsk, Gate: "blocked",
 			Question: fmt.Sprintf("%s está bloqueada: %s. ¿Se resolvió?", s.ID, reason),
 			Options: []output.Option{
-				{ID: "unblock", Label: "Desbloquear y continuar", Command: cmd("unblock", s.ID)},
+				{ID: "unblock", Label: "Desbloquear y continuar (con --note el agente ve el resultado)", NeedsNote: true, Command: cmd("unblock", s.ID, `--note "<resultado>"`)},
 				{ID: "keep", Label: "Sigue bloqueada"},
 			}}
 	case Backlog:
@@ -181,6 +181,8 @@ func gateNext(cfg Config, s State) output.Next {
 			opt.Description = strings.Join(lines, "\n")
 			n.Options = append(n.Options, opt)
 		}
+		n.Options = append(n.Options, output.Option{ID: "manual", Label: "La hace la sesión principal (lanzar otro agente o verificar a mano), no el agente", NeedsNote: true,
+			Command: cmd("approve", id, "--gate", "decision", "--manual", `--note "<qué hacer>"`)})
 		n.Options = append(n.Options, output.Option{ID: "other", Label: "Otra decisión", NeedsNote: true,
 			Command: cmd("approve", id, "--gate", "decision", `--note "<decisión>"`)})
 		for _, p := range decisionTargets(cfg, s.Lane, s.Phase) {

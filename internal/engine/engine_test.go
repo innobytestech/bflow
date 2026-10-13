@@ -335,7 +335,7 @@ func TestDecisionRecorded(t *testing.T) {
 	mustT(t)(v.e.Start(ctx, id, flow.Hotfix, "", ""))
 	o := mustT(t)(v.e.Report(ctx, id, ReportOpts{Agent: "implementer", Verdict: flow.NeedsDecision,
 		Note: "¿Reintento o fallo rápido?", Options: []string{"Reintentar 3 veces", "Fallar rápido"}}))
-	if o.Next.Gate != "decision" || len(o.Next.Options) != 3 {
+	if o.Next.Gate != "decision" || len(o.Next.Options) != 4 {
 		t.Fatalf("decisión: %+v", o.Next)
 	}
 	mustT(t)(v.e.Approve(ctx, id, ApproveOpts{Choice: 2}))
