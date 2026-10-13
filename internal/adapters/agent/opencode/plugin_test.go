@@ -437,3 +437,18 @@ func TestPlugin2ExecuteAfter(t *testing.T) {
 		t.Error("after nunca lanza: el comando ya corrió")
 	}
 }
+
+// GH-122: en Windows, bflow.exe lanzado sin windowsHide abre una consola por llamada.
+func TestPluginsSpawnConWindowsHide(t *testing.T) {
+	for name, src := range map[string]string{"plugin": string(files.Plugin), "plugin2": string(files.Plugin2)} {
+		n := strings.Count(src, "Bun.spawn(")
+		if n == 0 {
+			t.Fatalf("%s: sin Bun.spawn, la prueba no verifica nada", name)
+		}
+		for _, line := range strings.Split(src, "\n") {
+			if strings.Contains(line, "Bun.spawn(") && !strings.Contains(line, "windowsHide: true") {
+				t.Errorf("%s: Bun.spawn sin windowsHide: %s", name, strings.TrimSpace(line))
+			}
+		}
+	}
+}

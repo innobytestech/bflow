@@ -30,7 +30,7 @@ export const BflowPlugin = async ({ client, directory }) => {
     return sessions.get(id) ?? {}
   }
   const run = (args, input, wait = true) => { // wait=false: no se lee stderr ni se espera al proceso
-    const proc = Bun.spawn(["bflow", ...args], { cwd: directory, stdin: "pipe", stdout: "ignore", stderr: wait ? "pipe" : "ignore" })
+    const proc = Bun.spawn(["bflow", ...args], { cwd: directory, stdin: "pipe", windowsHide: true, stdout: "ignore", stderr: wait ? "pipe" : "ignore" })
     proc.stdin.write(JSON.stringify(input))
     proc.stdin.end()
     return proc
@@ -39,7 +39,7 @@ export const BflowPlugin = async ({ client, directory }) => {
   // Sesion raiz nueva: el estado de bflow entra al contexto sin pedirle respuesta al modelo.
   const inject = async (id) => {
     if (!Bun.which("bflow") || !existsSync(join(directory, ".bflow"))) return
-    const proc = Bun.spawn(["bflow", "hook", "session-start"], { cwd: directory, stdin: "pipe", stdout: "pipe", stderr: "ignore" })
+    const proc = Bun.spawn(["bflow", "hook", "session-start"], { cwd: directory, stdin: "pipe", windowsHide: true, stdout: "pipe", stderr: "ignore" })
     proc.stdin.write("{}")
     proc.stdin.end()
     const timer = setTimeout(() => proc.kill(), 10000)

@@ -30,7 +30,7 @@ export default {
       return sessions.get(sid) ?? {}
     }
     const run = (args, input, wait = true) => { // wait=false: no se lee stderr ni se espera al proceso
-      const proc = Bun.spawn(["bflow", ...args], { cwd: dir, stdin: "pipe", stdout: "ignore", stderr: wait ? "pipe" : "ignore" })
+      const proc = Bun.spawn(["bflow", ...args], { cwd: dir, stdin: "pipe", windowsHide: true, stdout: "ignore", stderr: wait ? "pipe" : "ignore" })
       proc.stdin.write(JSON.stringify(input))
       proc.stdin.end()
       return proc
@@ -82,7 +82,7 @@ export default {
         if (injected.has(sid) || !Bun.which("bflow") || !existsSync(join(dir, ".bflow"))) return
         if ((await resolve(sid)).parentID) return
         injected.add(sid)
-        const proc = Bun.spawn(["bflow", "hook", "session-start"], { cwd: dir, stdin: "pipe", stdout: "pipe", stderr: "ignore" })
+        const proc = Bun.spawn(["bflow", "hook", "session-start"], { cwd: dir, stdin: "pipe", windowsHide: true, stdout: "pipe", stderr: "ignore" })
         proc.stdin.write("{}")
         proc.stdin.end()
         const timer = setTimeout(() => proc.kill(), 10000)
