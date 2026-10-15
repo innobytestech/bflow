@@ -116,6 +116,7 @@ func (t *tx) enter(p Phase) {
 	s.Phase = p
 	s.Gate = nil
 	s.Reports = nil
+	s.RejectNotes = nil
 	s.Resume = false
 	s.Decision = ""
 	s.Note = ""
@@ -467,10 +468,17 @@ func (t *tx) report(ev Event) error {
 			return nil
 		}
 		round := s.Round + 1
+		notes := s.RejectNotes
 		t.enter(Implementing)
 		s.Round = round
 		s.Resume = true
-		s.Note = "Compuerta de calidad rechazada por: " + strings.Join(rejected, ", ") + ". Lee sus reportes en " + TaskDir(s.ID) + "/reports/."
+		s.RejectHead = ""
+		s.Note = "Compuerta de calidad rechazada por: " + strings.Join(rejected, ", ") + ". Corrige lo siguiente y haz commit antes de reportar DONE:"
+		for _, a := range rejected {
+			if n := notes[a]; n != "" {
+				s.Note += "\n- " + a + ": " + n
+			}
+		}
 		t.comments = append(t.comments, fmt.Sprintf("**Compuerta de calidad rechazada (ronda %d):** %s", round, strings.Join(rejected, ", ")))
 		if round >= t.cfg.MaxQualityRounds {
 			s.Gate = &PendingGate{Name: GateRounds}
@@ -486,6 +494,12 @@ func (t *tx) record(ev Event) {
 		t.s.Reports = map[string]Verdict{}
 	}
 	t.s.Reports[ev.Agent] = ev.Verdict
+	if ev.Verdict == RejectedV && strings.TrimSpace(ev.Note) != "" {
+		if t.s.RejectNotes == nil {
+			t.s.RejectNotes = map[string]string{}
+		}
+		t.s.RejectNotes[ev.Agent] = strings.TrimSpace(ev.Note)
+	}
 }
 
 func (t *tx) allReported() bool {
@@ -540,6 +554,9 @@ func clone(s State) State {
 	c := s
 	if s.Reports != nil {
 		c.Reports = maps.Clone(s.Reports)
+	}
+	if s.RejectNotes != nil {
+		c.RejectNotes = maps.Clone(s.RejectNotes)
 	}
 	if s.Gate != nil {
 		g := *s.Gate

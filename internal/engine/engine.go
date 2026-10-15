@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -138,6 +139,11 @@ func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug s
 			if changed := e.FrozenChanged(id); len(changed) > 0 {
 				return frozenRejection(changed)
 			}
+			if rec.Flow.RejectHead != "" && e.Git != nil {
+				if head, err := e.Git.HeadSHA(ctx); err == nil && head == rec.Flow.RejectHead {
+					return &flow.Rejection{Code: "no_new_commits", Reason: "la compuerta de calidad rechazó (ronda " + strconv.Itoa(rec.Flow.Round) + ") y HEAD no avanzó: no hay commit con la corrección. Aplica lo que pide la nota del rechazo, haz commit y reporta DONE otra vez."}
+				}
+			}
 			e.refreezeAllowed(id)
 			if open := openTasks(e, *rec); len(open) > 0 {
 				return &flow.Rejection{Code: "tasks_open", Reason: "DONE exige todas las tareas de la spec marcadas [x]; faltan:\n" + strings.Join(open, "\n") +
@@ -175,6 +181,11 @@ func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug s
 			}
 		}
 		rec.Flow = res.State
+		if before.Phase == flow.Quality && rec.Flow.Phase == flow.Implementing && e.Git != nil {
+			if head, err := e.Git.HeadSHA(ctx); err == nil {
+				rec.Flow.RejectHead = head
+			}
+		}
 		rec.Nudges = nil // cualquier evento cuenta como avance: el agente vuelve a tener sus intentos
 		if g := rec.Flow.Gate; g == nil {
 			rec.GateSince = time.Time{}
