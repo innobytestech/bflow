@@ -197,18 +197,35 @@ func init() {
 			return env
 		}})
 
-	Register(&Command{Name: "approve", Summary: "aprueba el gate pendiente: approve [ID] [--gate g] [--choice n] [--note t] [--file f]",
+	Register(&Command{Name: "approve", Summary: "aprueba el gate pendiente: approve [ID] [--gate g] [--choice n] [--note t] [--file f | --stdin]",
 		Setup: func(fs *flag.FlagSet) {
 			fs.String("gate", "", "gate que se aprueba (por seguridad; vacío = el pendiente)")
 			fs.Int("choice", 0, "opción elegida en un gate decision")
 			fs.String("note", "", "decisión libre o comentario")
 			fs.Bool("manual", false, "decision: la hace la sesión principal (bloquea hasta unblock --note)")
 			fs.String("file", "", "archivo adjunto (discovery completo)")
+			fs.Bool("stdin", false, "el discovery completo llega por stdin (solo gate discovery)")
 		},
 		Run: flowCommand(func(ctx context.Context, e *engine.Engine, id string, c *Ctx, _ []string) (engine.Outcome, error) {
 			o := engine.ApproveOpts{Gate: str(c.Flags, "gate"), Note: str(c.Flags, "note"), Manual: str(c.Flags, "manual") == "true"}
 			fmt.Sscan(str(c.Flags, "choice"), &o.Choice)
-			if f := str(c.Flags, "file"); f != "" {
+			if str(c.Flags, "stdin") == "true" {
+				if str(c.Flags, "file") != "" {
+					return engine.Outcome{}, &flow.Rejection{Code: "usage", Reason: "usa --stdin o --file, no los dos"}
+				}
+				if g := o.Gate; g != "" && g != "discovery" {
+					return engine.Outcome{}, &flow.Rejection{Code: "bad_attachment", Reason: "--stdin solo aplica al gate discovery"}
+				}
+				const limit = 64 << 10
+				b, err := io.ReadAll(io.LimitReader(c.Stdin, limit+1))
+				if err != nil {
+					return engine.Outcome{}, err
+				}
+				if len(b) > limit {
+					return engine.Outcome{}, &flow.Rejection{Code: "discovery_too_long", Reason: "el discovery pasa de 64 KiB; recórtalo y ciérralo otra vez"}
+				}
+				o.Attachment = string(b)
+			} else if f := str(c.Flags, "file"); f != "" {
 				b, err := os.ReadFile(abs(c.Dir, f))
 				if err != nil {
 					return engine.Outcome{}, err

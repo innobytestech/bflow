@@ -142,9 +142,9 @@ func gateNext(cfg Config, s State) output.Next {
 	switch g.Name {
 	case GateDiscovery:
 		n.Skill = "discovery"
-		n.Question = "Conduce el discovery (alcance, datos clave, errores, restricciones; máx. 3 preguntas por tanda). Cuando no quede ambigüedad, escribe el discovery completo en un archivo y ciérralo."
+		n.Question = "Conduce el discovery (alcance, datos clave, errores, restricciones; máx. 3 preguntas por tanda). Cuando no quede ambigüedad, ciérralo pasando el discovery completo por stdin."
 		n.Options = []output.Option{{ID: "approve", Label: "Cerrar discovery",
-			Command: cmd("approve", id, "--gate", "discovery", "--file", "<discovery.md>")}}
+			Command: cmd("approve", id, "--gate", "discovery", "--stdin")}}
 	case GateSpec:
 		n.Skill = "approve"
 		n.Show = []string{cmd("show", id, "brief")}

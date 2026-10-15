@@ -43,26 +43,26 @@ Hoy el mismo texto queda en hasta cuatro lugares: el archivo que la sesión prin
 
 ## Tasks
 
-- [ ] T1 `approve` lee el discovery por stdin. En `internal/cli/flowcmds.go` (comando `approve`) se agrega `fs.Bool("stdin", ...)`.
+- [x] T1 `approve` lee el discovery por stdin. En `internal/cli/flowcmds.go` (comando `approve`) se agrega `fs.Bool("stdin", ...)`.
   - CUANDO llega `--stdin`, el sistema DEBE leer hasta 64 KiB de `c.Stdin` y guardarlo en `ApproveOpts.Attachment`. Si pasa de 64 KiB, DEBE rechazar con `discovery_too_long`.
   - CUANDO llegan `--stdin` y `--file` juntos, el sistema DEBE rechazar con `usage`.
   - `--stdin` solo aplica al gate discovery. Con otro gate, DEBE rechazar con `bad_attachment`.
   - Pruebas: `TestApproveDiscoveryStdin` y `TestApproveDiscoveryStdinTooLong` en `internal/cli`.
-- [ ] T2 La opción y la skill dejan de pedir un archivo.
+- [x] T2 La opción y la skill dejan de pedir un archivo.
   - En `gateNext` de `internal/flow/next.go`, el comando de la opción `approve` DEBE ser `bflow approve <id> --gate discovery --stdin`, y la pregunta ya no menciona ningún archivo.
   - En `adapters/leader/bflow.md`, `## discovery` DEBE decir: "Al cerrar, pasa el discovery completo por stdin al comando de la opción; no lo guardes en un archivo."
   - Se actualizan `internal/flow/next_test.go` y las pruebas de adaptadores que fijan el texto.
-- [ ] T3 El discovery queda en la spec y no en `.bflow`.
+- [x] T3 El discovery queda en la spec y no en `.bflow`.
   - En `Engine.Approve` (`internal/engine/commands.go:93`), CUANDO se cierra el gate discovery con adjunto, el sistema DEBE dejar de escribir `discovery.md` y DEBE reemplazar el cuerpo de `## Discovery` de `spec.md` con el adjunto (sin espacios sobrantes). El tracker sigue recibiendo su comentario.
   - Para eso se agrega `func (e *Engine) fillSection(rec store.Record, key, body string) error` en `internal/engine/spec.go`. Reemplaza el cuerpo entre `## <Heading>` y el siguiente `## `, escribe con `store.WriteAtomic` y crea la spec con `ensureSpec` si todavía no existe.
   - Si falla, va un aviso en `out.Warnings` ("no se pudo escribir el discovery en la spec: ..."), igual que hoy.
   - La pista de la sección pasa a ser: "Discovery completo; lo escribe bflow al cerrar el gate discovery. No lo edites."
   - Pruebas: se amplía `internal/engine/engine_test.go:108`. Comprueba que `## Discovery` trae "entra: X" y que `.bflow/tasks/<id>/discovery.md` no existe. El e2e (`cmd/bflow/e2e_test.go:195`) pasa a usar `--stdin`.
-- [ ] T4 `show discovery` lee la spec.
+- [x] T4 `show discovery` lee la spec.
   - En `Engine.Show`, CUANDO se pide `discovery`, el sistema DEBE devolver la sección `discovery` de la spec. CUANDO esa sección está vacía o solo trae la pista, DEBE devolver `.bflow/tasks/<id>/discovery.md` si existe. Si tampoco existe, DEBE devolver el error de siempre ("todavía no tiene discovery").
   - `"discovery"` sale del mapa `artifacts`.
   - Pruebas: `TestShowDiscoveryFromSpec` y `TestShowDiscoveryLegacyFile` en `internal/engine`.
-- [ ] T5 Oficio, docs y changelog.
+- [x] T5 Oficio, docs y changelog.
   - `internal/agents/craft/spec-author.md` DEBE decir que la sección `## Discovery` la llena bflow, que el spec-author no la toca y que la lee con `bflow show <id> discovery`.
   - Se corre `bflow render` para regenerar `.claude/agents/`.
   - `docs/conceptos.md:104-106` DEBE decir que el discovery completo está en la spec y en el tracker. `docs/comandos.md` documenta `approve --stdin`.

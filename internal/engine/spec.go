@@ -24,7 +24,7 @@ type Section struct {
 // Sections son los encabezados fijos de specs/<ID>-<slug>/spec.md, en orden.
 var Sections = []Section{
 	{"brief", "Brief", "Objetivo en una frase · entra / no entra · decisiones nuevas [N] con la alternativa descartada · riesgos · tamaño. ≤35 líneas: es lo único que el humano lee para aprobar.", false},
-	{"discovery", "Discovery", "Resumen en ≤5 líneas. El discovery completo está como comentario en el tracker.", false},
+	{"discovery", "Discovery", "Discovery completo; lo escribe bflow al cerrar el gate discovery. No lo edites.", false},
 	{"requirements", "Requirements", "Criterios EARS numerados R1..Rn, cada uno [D] (del discovery) o [N] (nuevo).", false},
 	{"design", "Design", "Estructuras, firmas, decisiones tomadas y descartadas, superficie de seguridad.", false},
 	{"tasks", "Tasks", "Checklist T1..Tn; T1 es el contrato. Cada tarea cita sus R.", false},
@@ -61,7 +61,6 @@ var artifacts = map[string]string{
 	"contract":   "contract.md",
 	"review-map": "reports/review-map.md",
 	"decisions":  "decisions.md",
-	"discovery":  "discovery.md",
 	"check":      "check.md",
 	"scout":      "reports/scout.md",
 }
@@ -91,6 +90,16 @@ func (e *Engine) Show(ctx context.Context, id, what, section string) (string, er
 			return string(b), err
 		}
 		return e.specSection(rec, section)
+	}
+	if what == "discovery" {
+		if body, err := e.specSection(rec, "discovery"); err == nil && body != "" {
+			return body, nil
+		}
+		b, err := e.Store.ReadFile(id, "discovery.md")
+		if errors.Is(err, os.ErrNotExist) {
+			return "", fmt.Errorf("%s todavía no tiene discovery (.bflow/tasks/%s/discovery.md)", id, id)
+		}
+		return string(b), err
 	}
 	rel, ok := artifacts[what]
 	if !ok {
@@ -142,6 +151,52 @@ func (e *Engine) specSection(rec store.Record, key string) (string, error) {
 		return "", fmt.Errorf("spec: %w", err)
 	}
 	return cutSection(string(b), sec.Heading)
+}
+
+// fillSection reemplaza el cuerpo de la sección key del spec (la crea si falta).
+func (e *Engine) fillSection(rec store.Record, key, body string) error {
+	var heading string
+	for _, s := range Sections {
+		if s.Key == key {
+			heading = s.Heading
+		}
+	}
+	if heading == "" {
+		return fmt.Errorf("sección %q no existe", key)
+	}
+	if err := e.ensureSpec(rec); err != nil {
+		return err
+	}
+	path := e.specAbs(rec.Flow)
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(strings.ReplaceAll(string(raw), "\r\n", "\n"), "\n")
+	start := -1
+	for i, l := range lines {
+		if strings.EqualFold(strings.TrimSpace(l), "## "+heading) {
+			start = i + 1
+			break
+		}
+	}
+	if start < 0 {
+		return fmt.Errorf("el spec no tiene la sección «## %s»", heading)
+	}
+	end := len(lines)
+	for i := start; i < len(lines); i++ {
+		if strings.HasPrefix(lines[i], "## ") {
+			end = i
+			break
+		}
+	}
+	out := append([]string{}, lines[:start]...)
+	out = append(out, "", strings.TrimSpace(body))
+	if end < len(lines) {
+		out = append(out, "")
+	}
+	out = append(out, lines[end:]...)
+	return store.WriteAtomic(path, []byte(strings.Join(out, "\n")))
 }
 
 var commentRe = regexp.MustCompile(`(?s)<!--.*?-->`)

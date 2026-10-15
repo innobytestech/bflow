@@ -91,8 +91,15 @@ func (r *repo) writeConfig(yaml string) {
 // run ejecuta bflow con --json y decodifica el envelope.
 func (r *repo) run(args ...string) envelope {
 	r.t.Helper()
+	return r.runStdin("", args...)
+}
+
+// runStdin es run con stdin.
+func (r *repo) runStdin(stdin string, args ...string) envelope {
+	r.t.Helper()
 	cmd := exec.Command(binary, append(args, "--json")...)
 	cmd.Dir = r.dir
+	cmd.Stdin = strings.NewReader(stdin)
 	var out, errb bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errb
 	err := cmd.Run()
@@ -192,9 +199,13 @@ func TestFullFeatureWithLocalTracker(t *testing.T) {
 	env = r.ok(option(t, env, "full", nil)...)
 	expectNext(t, env, "ask", "discovery")
 
-	disc := filepath.Join(r.dir, "discovery.md")
-	os.WriteFile(disc, []byte("# Discovery\n- entra: borrador compartido\n- no entra: folio definitivo\n"), 0o644)
-	env = r.ok(option(t, env, "approve", map[string]string{"<discovery.md>": disc})...)
+	env = r.runStdin("# Discovery\n- entra: borrador compartido\n- no entra: folio definitivo\n", option(t, env, "approve", nil)...)
+	if !env.OK {
+		t.Fatalf("approve --stdin: %v", env.Data)
+	}
+	if _, err := os.Stat(filepath.Join(r.dir, ".bflow", "tasks", id, "discovery.md")); err == nil {
+		t.Error("no debe crearse discovery.md")
+	}
 	spawned(t, env, "spec-author")
 	spec := env.Next.Agents[0].Args["spec"]
 	if _, err := os.Stat(filepath.Join(r.dir, spec)); err != nil {

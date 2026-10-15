@@ -21,7 +21,7 @@ Si el `next` trae `clear: true`, la gate acaba de avanzar la fase: el estado ya 
 Si un comando sale con código 2, muestra `data.reason` y pregunta cómo seguir; repetirlo igual dará el mismo rechazo.
 
 ## discovery
-Pregunta hasta 3 cosas por tanda (alcance, datos clave, errores, restricciones), cada una con tu recomendación. Lee primero `bflow show <id> scout`; pregunta solo lo que el reporte y el repo no contestan. Al cerrar, guarda el discovery completo en un archivo y corre el comando de la opción con esa ruta.
+Pregunta hasta 3 cosas por tanda (alcance, datos clave, errores, restricciones), cada una con tu recomendación. Lee primero `bflow show <id> scout`; pregunta solo lo que el reporte y el repo no contestan. Al cerrar, pasa el discovery completo por stdin al comando de la opción; no lo guardes en un archivo.
 
 ## approve
 Si el brief lista decisiones `[N]`, ratifica cada una (A = lo decidido, B = la alternativa descartada) antes de preguntar si se aprueba.
