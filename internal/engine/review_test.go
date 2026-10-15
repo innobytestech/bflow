@@ -640,7 +640,9 @@ func TestRejectionNoteReachesImplementerAndDoneNeedsCommit(t *testing.T) {
 	}
 	v.tick(time.Minute)
 	_, err = v.e.Report(ctx, id, ReportOpts{Agent: "implementer", Verdict: flow.DoneV})
-	rejection(t, err, "no_new_commits")
+	if rj := rejection(t, err, "no_new_commits"); rj == nil {
+		t.Fatal("sin rechazo")
+	}
 	g.head = "sha2"
 	mustT(t)(v.e.Report(ctx, id, ReportOpts{Agent: "implementer", Verdict: flow.DoneV}))
 	if phaseOf(t, v, id) != flow.Quality {
