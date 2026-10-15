@@ -119,6 +119,12 @@ func TestFullLaneEndToEnd(t *testing.T) {
 	if strings.Contains(string(b), "## UI blueprint") {
 		t.Error("sin UI no debe haber sección ui-blueprint")
 	}
+	if !strings.Contains(string(b), "entra: X") {
+		t.Error("## Discovery debe traer el discovery completo")
+	}
+	if _, err := os.Stat(filepath.Join(v.e.Cfg.Root, ".bflow", "tasks", id, "discovery.md")); err == nil {
+		t.Error("no debe existir discovery.md")
+	}
 	cs, _ := v.tr.Comments(ctx, id)
 	if len(cs) != 1 || !strings.Contains(cs[0].Body, "entra: X") {
 		t.Errorf("el discovery completo debe ir al tracker: %+v", cs)
@@ -555,5 +561,39 @@ func TestRejectBackLogsWithoutGate(t *testing.T) {
 	last := log[len(log)-1]
 	if last.Event != "reject" || last.Gate != "" || last.From == last.To || last.To != flow.Implementing || last.Note != "defecto" {
 		t.Errorf("entrada: %+v", last)
+	}
+}
+
+func TestShowDiscoveryFromSpec(t *testing.T) {
+	v := newEnv(t, "")
+	ctx := context.Background()
+	id := v.task(t, "Crédito: reabrir")
+	mustT(t)(v.e.Start(ctx, id, flow.Full, "", ""))
+	if _, err := v.e.Show(ctx, id, "discovery", ""); err == nil {
+		t.Error("sin discovery debe fallar")
+	}
+	mustT(t)(v.e.Approve(ctx, id, ApproveOpts{Gate: "discovery", Attachment: "  # D\n- entra: X\n"}))
+	got, err := v.e.Show(ctx, id, "discovery", "")
+	if err != nil || got != "# D\n- entra: X" {
+		t.Errorf("show discovery: %q %v", got, err)
+	}
+	rec, _ := v.e.Store.Load(id)
+	b, _ := os.ReadFile(v.e.specAbs(rec.Flow))
+	if s := string(b); !strings.Contains(s, "- entra: X") || !strings.Contains(s, "## Requirements") {
+		t.Errorf("spec: %s", s)
+	}
+}
+
+func TestShowDiscoveryLegacyFile(t *testing.T) {
+	v := newEnv(t, "")
+	ctx := context.Background()
+	id := v.task(t, "Crédito: reabrir")
+	mustT(t)(v.e.Start(ctx, id, flow.Full, "", ""))
+	if err := v.e.Store.WriteFile(id, "discovery.md", []byte("viejo: Z")); err != nil {
+		t.Fatal(err)
+	}
+	got, err := v.e.Show(ctx, id, "discovery", "")
+	if err != nil || got != "viejo: Z" {
+		t.Errorf("legacy: %q %v", got, err)
 	}
 }

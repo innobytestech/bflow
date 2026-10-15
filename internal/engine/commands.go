@@ -91,8 +91,12 @@ func (e *Engine) Approve(ctx context.Context, id string, o ApproveOpts) (Outcome
 		return out, err
 	}
 	if pending != nil && pending.Name == flow.GateDiscovery && strings.TrimSpace(o.Attachment) != "" {
-		if err := e.Store.WriteFile(id, "discovery.md", []byte(o.Attachment)); err != nil {
-			out.Warnings = append(out.Warnings, "no se pudo guardar discovery.md: "+err.Error())
+		rec, err := e.Store.Load(id)
+		if err == nil {
+			err = e.fillSection(rec, "discovery", o.Attachment)
+		}
+		if err != nil {
+			out.Warnings = append(out.Warnings, "no se pudo escribir el discovery en la spec: "+err.Error())
 		}
 	}
 	if pending != nil && pending.Name == flow.GateContract && out.To == flow.Implementing {

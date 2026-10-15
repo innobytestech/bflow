@@ -101,9 +101,9 @@ Ningún subagente le pregunta nada al humano: devuelve su veredicto y `bflow` de
 
 ## Qué queda en el repo y qué no
 
-- **En el repo:** solo `specs/<ID>-<slug>/spec.md`, con encabezados fijos (brief, discovery, requirements, design, tasks y ui-blueprint si el stack tiene UI). `bflow show <ID> spec --section design` corta por encabezado para que el agente lea solo lo que necesita.
+- **En el repo:** solo `specs/<ID>-<slug>/spec.md`, con encabezados fijos (brief, discovery, requirements, design, tasks y ui-blueprint si el stack tiene UI). La sección `## Discovery` tiene el discovery completo: bflow la escribe al cerrar el gate discovery, y ya no se crea `discovery.md` suelto en `.bflow/tasks/<ID>/`. `bflow show <ID> spec --section design` corta por encabezado para que el agente lea solo lo que necesita.
 - **En la descripción del PR:** el review-map, el walkthrough, las decisiones tomadas en vuelo y el contrato para los equipos que consumen el cambio.
-- **En el tracker:** el discovery completo, los rechazos y los recordatorios de gates que llevan más de 24 horas esperando.
+- **En el tracker:** una copia del discovery completo (para leerlo sin abrir el repo), los rechazos y los recordatorios de gates que llevan más de 24 horas esperando.
 - **En `.bflow/`,** que se ignora sola en git: el estado de cada tarea, `log.jsonl`, el contrato, los reportes y el resultado del check.
 
 ## Qué garantiza (y qué no)
