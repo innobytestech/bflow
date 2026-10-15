@@ -125,8 +125,12 @@ type State struct {
 	Gate    *PendingGate       `json:"gate,omitempty"`
 	Reports map[string]Verdict `json:"reports,omitempty"` // veredictos de la fase actual
 	Round   int                `json:"round"`             // rechazos de la compuerta de calidad
-	Block   *BlockInfo         `json:"block,omitempty"`
-	Scout   ScoutStatus        `json:"scout,omitempty"`
+	// RejectNotes guarda la nota de cada reviewer que rechazó en la fase actual.
+	RejectNotes map[string]string `json:"reject_notes,omitempty"`
+	// RejectHead es el commit en que se rechazó; el DONE de la ronda de corrección exige que HEAD haya avanzado.
+	RejectHead string      `json:"reject_head,omitempty"`
+	Block      *BlockInfo  `json:"block,omitempty"`
+	Scout      ScoutStatus `json:"scout,omitempty"`
 
 	BranchCreated bool   `json:"branch_created,omitempty"`
 	Started       bool   `json:"started,omitempty"` // start_date sellada

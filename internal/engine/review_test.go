@@ -623,3 +623,29 @@ func TestUnblockNoChangelogNeedsNoteEngine(t *testing.T) {
 	_, err := v.e.Unblock(context.Background(), id, " ", true)
 	_ = rejection(t, err, "note_required")
 }
+
+// GH-134: la nota del REJECTED llega al implementer y un DONE sin commit nuevo se rechaza.
+func TestRejectionNoteReachesImplementerAndDoneNeedsCommit(t *testing.T) {
+	v, id, g := inQuality(t, "", nil, 0)
+	ctx := context.Background()
+	g.head = "sha1"
+	mustT(t)(v.e.Report(ctx, id, ReportOpts{Agent: "reviewer", Verdict: flow.RejectedV, Note: "engine.go:42 ignora el error de Commit"}))
+	sv, err := v.e.Status(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := sv.Next
+	if len(n.Agents) != 1 || !strings.Contains(n.Agents[0].Args["note"], "engine.go:42 ignora el error de Commit") {
+		t.Fatalf("el note del spawn debe traer el texto del rechazo: %+v", n.Agents)
+	}
+	v.tick(time.Minute)
+	_, err = v.e.Report(ctx, id, ReportOpts{Agent: "implementer", Verdict: flow.DoneV})
+	if rj := rejection(t, err, "no_new_commits"); rj == nil {
+		t.Fatal("sin rechazo")
+	}
+	g.head = "sha2"
+	mustT(t)(v.e.Report(ctx, id, ReportOpts{Agent: "implementer", Verdict: flow.DoneV}))
+	if phaseOf(t, v, id) != flow.Quality {
+		t.Errorf("con commit nuevo el DONE avanza a quality")
+	}
+}

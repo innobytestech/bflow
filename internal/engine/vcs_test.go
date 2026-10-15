@@ -28,6 +28,7 @@ type fakeGit struct {
 	// onlyFor: si no está vacío, Dirty solo devuelve dirty cuando se le pregunta
 	// exactamente por esa ruta (la consulta del gate del changelog).
 	onlyFor string
+	head    string // HeadSHA; vacío: "abc"
 }
 
 func (g *fakeGit) CurrentBranch(context.Context) (string, error) { return g.branch, nil }
@@ -42,7 +43,12 @@ func (g *fakeGit) Dirty(_ context.Context, p []string) ([]string, error) {
 	}
 	return g.dirty, nil
 }
-func (g *fakeGit) HeadSHA(context.Context) (string, error) { return "abc", nil }
+func (g *fakeGit) HeadSHA(context.Context) (string, error) {
+	if g.head != "" {
+		return g.head, nil
+	}
+	return "abc", nil
+}
 func (g *fakeGit) DiffKept(context.Context, string, []string) ([]string, error) {
 	return g.kept, nil
 }
