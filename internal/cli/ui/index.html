@@ -1068,6 +1068,8 @@ dlg.addEventListener("close", () => {
 });
 
 const HIDDEN_KEY = "bflow.hidden-repos", COLLAPSED_KEY = "bflow.sidebar-collapsed", UNDO_MS = 6000;
+// Repos ocultos de la vista (solo filtro de la página; bflow sigue registrando su flujo).
+// Un valor guardado que no sea un arreglo de keys de 8 hex se descarta entero.
 function loadHidden() {
   let v = [];
   try { v = JSON.parse(localStorage.getItem(HIDDEN_KEY) || "[]"); } catch (e) { return new Set(); }
@@ -1085,8 +1087,10 @@ function saveCollapsed(on) {
 }
 let hidden = loadHidden(), collapsed = loadCollapsed(), hiddenOpen = false, drawerOpen = false, undoTimer = 0, undoLeft = 0, undoAt = 0;
 
+// Urgencia de un repo: 0 espera a TÚ, 1 tiene tarea con agente, 2 vía libre.
 function repoRank(r) { return r.task && r.task.now && r.task.now.human ? 0 : r.task ? 1 : 2; }
 function sinceOf(r) { const t = r.task && r.task.now && r.task.now.since ? Date.parse(r.task.now.since) : NaN; return isNaN(t) ? null : t; }
+// Orden del sidebar: por urgencia, luego por actividad más reciente, luego por nombre.
 function sortRepos(all) {
   return all.slice().sort((a, b) => {
     const ra = repoRank(a.r), rb = repoRank(b.r);
@@ -1101,6 +1105,8 @@ function allRepos() {
   (state.network || []).forEach((g) => g.repos.forEach((r) => all.push({ r, profile: g.profile })));
   return all;
 }
+// Si el repo seleccionado queda oculto, la vista salta al primer visible por urgencia.
+// Sin repos visibles deja body.all-hidden y muestra el aviso "Todos tus repos están ocultos".
 function ensureVisibleSelection() {
   const all = allRepos(), vis = sortRepos(all.filter((x) => !hidden.has(x.r.key)));
   document.body.classList.toggle("all-hidden", vis.length === 0 && all.length >= 2);
@@ -1113,6 +1119,7 @@ function refreshRepos() {
   renderRepos();
   ensureVisibleSelection();
 }
+// Quitar: solo oculta en la vista y guarda; el foco pasa a la fila siguiente.
 function hideRepo(key, name) {
   const rows = [...$("repo-list").querySelectorAll("li.repo")], i = rows.findIndex((li) => li.dataset.key === key);
   const next = rows[i + 1] || rows[i - 1];
@@ -1137,6 +1144,7 @@ function showUndo(name, key) {
   $("undo").hidden = false;
   startUndoTimer(UNDO_MS);
 }
+// El aviso "Deshacer" se pausa mientras el cursor o el foco están en él; al salir, reanuda con el tiempo que le quedaba (mínimo 1 s).
 function pauseUndo() { if (undoTimer) { clearTimeout(undoTimer); undoTimer = 0; undoLeft = Math.max(1000, undoLeft - (Date.now() - undoAt)); } }
 function resumeUndo() { if (!$("undo").hidden && !undoTimer && !$("undo").matches(":hover") && !$("undo").contains(document.activeElement)) startUndoTimer(undoLeft); }
 $("undo-btn").addEventListener("click", undoHide);
