@@ -40,7 +40,7 @@
 
 ## Tasks
 
-- [ ] T1 · `Create` fuerza backlog.
+- [x] T1 · `Create` fuerza backlog.
   - En plane.go, `Create` llama a `c.writeState(sts, flow.Backlog)`. Si no hay estado, devuelve el error con el formato de `Transition` (fase backlog y los nombres de `c.States[flow.Backlog].Names`) sin hacer el POST.
   - El body pasa a `map[string]any{"name", "description_html", "state": st.ID}`.
   - Se actualiza el comentario de la función.
@@ -49,7 +49,7 @@
     - CUANDO se crea una tarea en un proyecto con estado de backlog, el POST DEBE incluir `state` con el id de ese estado, y la tarea devuelta DEBE tener `State` "Backlog" y `Phase` backlog. Lo cubre la prueba `TestCreateLeavesBacklog` en plane_test.go, que también afirma el `state` recibido por el fake.
     - CUANDO el proyecto no tiene estado para backlog, `Create` DEBE devolver un error que mencione `bflow tracker setup` y NO DEBE hacer el POST. Prueba: `TestCreateWithoutBacklogState` (el fake no tiene `st-backlog` y se afirma que `len(f.items)==0`).
     - `TestCreate`, `TestCreateError`, `TestConformance` y `TestPlaneWiring` (cmd/bflow/e2e_plane_test.go) DEBEN seguir pasando.
-- [ ] T2 · Prueba manual contra un Plane real. La hace el humano, o el implementador si tiene credenciales; si nadie las tiene, el paso queda marcado como pendiente en el PR.
+- [x] T2 · Prueba manual contra un Plane real. La hace el humano, o el implementador si tiene credenciales; si nadie las tiene, el paso queda marcado como pendiente en el PR.
   - Se usa un proyecto desechable cuyo estado por defecto no sea Backlog, se compila el binario de la rama y se corren estos pasos:
     1. `bflow task add` deja el item en Backlog.
     2. `bflow new` deja el item en Backlog.
@@ -60,4 +60,8 @@
     7. Proyecto sin estado Backlog: el error y luego `bflow tracker setup`.
   - El resultado va como `### Prueba manual` al final de Tasks: versión de Plane y ok/falla por paso, sin URL, token ni workspace.
   - Criterio: CUANDO un paso falle por algo que no sea `Create`, se DEBE abrir un issue y enlazarlo, no corregirlo en esta rama.
-- [ ] T3 · En docs/configuracion.md, sección de Plane, agregar una línea: las tareas nuevas nacen en el estado de la fase backlog y, si el proyecto no lo tiene, `bflow tracker setup` lo crea.
+- [x] T3 · En docs/configuracion.md, sección de Plane, agregar una línea: las tareas nuevas nacen en el estado de la fase backlog y, si el proyecto no lo tiene, `bflow tracker setup` lo crea.
+
+### Prueba manual
+
+Pendiente: el implementador no tiene credenciales de una instancia real de Plane; la hace un humano antes de mergear (pasos 1-7 de T2).

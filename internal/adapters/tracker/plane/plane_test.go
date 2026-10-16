@@ -43,17 +43,18 @@ var beStates = []map[string]any{
 
 // fakePlane imita la API v1 de Plane en lo que bflow usa.
 type fakePlane struct {
-	mu           sync.Mutex
-	t            *testing.T
-	states       []map[string]any
-	items        []map[string]any
-	comments     map[string][]map[string]any
-	calls        []string
-	noWSEndpoint bool // el endpoint por identificador a nivel workspace no existe (versiones viejas)
-	unauthorized bool
-	throttleOnce bool
-	postedHTML   []string
-	failCreate   bool
+	mu              sync.Mutex
+	t               *testing.T
+	states          []map[string]any
+	items           []map[string]any
+	comments        map[string][]map[string]any
+	calls           []string
+	noWSEndpoint    bool // el endpoint por identificador a nivel workspace no existe (versiones viejas)
+	unauthorized    bool
+	throttleOnce    bool
+	postedHTML      []string
+	failCreate      bool
+	lastCreateState string
 }
 
 func newFake(t *testing.T) *fakePlane {
@@ -123,7 +124,12 @@ func (f *fakePlane) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		var in map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&in)
-		it := f.add(len(f.items)+200, in["name"].(string), "st-backlog")
+		state := "st-todo"
+		if v, ok := in["state"].(string); ok {
+			state = v
+		}
+		f.lastCreateState = state
+		it := f.add(len(f.items)+200, in["name"].(string), state)
 		it["description_html"] = in["description_html"]
 		w.WriteHeader(201)
 		_ = json.NewEncoder(w).Encode(it)
@@ -236,6 +242,40 @@ func TestCreate(t *testing.T) {
 	got, err := c.Get(context.Background(), "API-200")
 	if err != nil || got.Title != "Idea nueva" {
 		t.Errorf("la tarea creada se puede leer: %+v, %v", got, err)
+	}
+}
+
+func TestCreateLeavesBacklog(t *testing.T) {
+	f := newFake(t)
+	c := newClient(t, f)
+	task, err := c.Create(context.Background(), "Idea", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.lastCreateState != "st-backlog" {
+		t.Errorf("el POST debe llevar state st-backlog, got %q", f.lastCreateState)
+	}
+	if task.State != "Backlog" || task.Phase != flow.Backlog {
+		t.Errorf("tarea = %+v", task)
+	}
+}
+
+func TestCreateWithoutBacklogState(t *testing.T) {
+	f := newFake(t)
+	var sts []map[string]any
+	for _, s := range f.states {
+		if s["id"] != "st-backlog" && s["id"] != "st-todo" { // Backlog cae a Todo si falta
+			sts = append(sts, s)
+		}
+	}
+	f.states = sts
+	c := newClient(t, f)
+	_, err := c.Create(context.Background(), "Idea", "")
+	if err == nil || !strings.Contains(err.Error(), "bflow tracker setup") {
+		t.Fatalf("debe sugerir bflow tracker setup, got %v", err)
+	}
+	if len(f.items) != 0 {
+		t.Errorf("no debe hacer el POST, items %d", len(f.items))
 	}
 }
 
