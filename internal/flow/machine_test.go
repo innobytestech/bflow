@@ -517,6 +517,60 @@ func TestQualityReportsResetOnPhaseChange(t *testing.T) {
 	}
 }
 
+// TestQualityRejectedWithoutNoteFallsBackToReports cubre el caso del
+// review-map "sin prueba": un rechazo de calidad sin --note no debe dejar al
+// implementer sin nada que leer, sino apuntarlo a reports/ como respaldo.
+func TestQualityRejectedWithoutNoteFallsBackToReports(t *testing.T) {
+	s := stateFor(row{lane: Full, from: Quality, reports: ko}) // ko: RejectedV sin RejectNotes
+	res, err := Apply(testConfig(), s, rep(sec, Approved))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.State.Phase != Implementing {
+		t.Fatalf("fase: %v", res.State.Phase)
+	}
+	want := TaskDir(s.ID) + "/reports/"
+	if !strings.Contains(res.State.Note, want) {
+		t.Errorf("sin nota de rechazo, la nota del implementer debe apuntar a %q: %q", want, res.State.Note)
+	}
+	if !strings.Contains(res.State.Note, rv) {
+		t.Errorf("la nota debe seguir diciendo quién rechazó: %q", res.State.Note)
+	}
+}
+
+// TestRejectHeadClearedOnEnter cubre que RejectHead no se quede con un valor
+// viejo: enter() lo limpia en cualquier transición de fase, no solo en el
+// rechazo de calidad que lo generó.
+func TestRejectHeadClearedOnEnter(t *testing.T) {
+	s := stateFor(row{lane: Full, from: Quality, reports: ok})
+	s.RejectHead = "sha-vieja-de-una-ronda-anterior"
+	res, err := Apply(testConfig(), s, rep(sec, Approved))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.State.Phase != Documenting {
+		t.Fatalf("fase: %v", res.State.Phase)
+	}
+	if res.State.RejectHead != "" {
+		t.Errorf("RejectHead debe limpiarse al salir de implementing/quality: %q", res.State.RejectHead)
+	}
+
+	// También se limpia cuando un rechazo de walkthrough devuelve la tarea a
+	// implementing (enter() corre igual sin pasar por la rama de calidad).
+	s2 := stateFor(row{lane: Full, from: Documenting})
+	s2.RejectHead = "sha-vieja"
+	res2, err := Apply(testConfig(), s2, rej("corrige X"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res2.State.Phase != Implementing {
+		t.Fatalf("fase: %v", res2.State.Phase)
+	}
+	if res2.State.RejectHead != "" {
+		t.Errorf("RejectHead debe limpiarse al reentrar a implementing desde un rechazo fuera de quality: %q", res2.State.RejectHead)
+	}
+}
+
 func TestConfigValidation(t *testing.T) {
 	bad := []func(c *Config){
 		func(c *Config) { c.Lanes[Hotfix] = []Phase{Implementing, Documenting, Walkthrough, InReview, Done} },  // sin quality

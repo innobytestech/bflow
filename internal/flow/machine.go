@@ -120,6 +120,7 @@ func (t *tx) enter(p Phase) {
 	s.Resume = false
 	s.Decision = ""
 	s.Note = ""
+	s.RejectHead = ""
 	t.moved = true
 	if (p == Contract || p == Implementing) && !s.BranchCreated {
 		s.BranchCreated = true
@@ -472,13 +473,13 @@ func (t *tx) report(ev Event) error {
 		t.enter(Implementing)
 		s.Round = round
 		s.Resume = true
-		s.RejectHead = ""
 		s.Note = "Compuerta de calidad rechazada por: " + strings.Join(rejected, ", ") + ". Corrige lo siguiente y haz commit antes de reportar DONE:"
 		for _, a := range rejected {
 			if n := notes[a]; n != "" {
 				s.Note += "\n- " + a + ": " + n
 			}
 		}
+		s.Note += "\nLee sus reportes completos en " + TaskDir(s.ID) + "/reports/."
 		t.comments = append(t.comments, fmt.Sprintf("**Compuerta de calidad rechazada (ronda %d):** %s", round, strings.Join(rejected, ", ")))
 		if round >= t.cfg.MaxQualityRounds {
 			s.Gate = &PendingGate{Name: GateRounds}
