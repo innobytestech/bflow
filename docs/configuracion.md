@@ -135,7 +135,7 @@ Una entrada que termina en `/` cubre la carpeta; las demás se comparan con `pat
 
 ### Presupuesto de tokens y detección de ciclos
 
-`flow.budget` fija un presupuesto de tokens nuevos por fase. Cuando una fase lo supera, `bflow watch` lo marca en rojo y el siguiente comando (`next`, `report`, etc.) es una pregunta al gate `budget`: "¿Seguir?", "Sí" continúa, "No" bloquea con una nota que el implementer verá. No corta el trabajo, solo pide confirmación.
+`flow.budget` fija un presupuesto de tokens nuevos por fase. Cuando una fase lo supera, `bflow watch` lo marca en ámbar y el siguiente comando (`next`, `report`, etc.) es una pregunta al gate `budget`: "¿Sigue?", "Sigue" continúa, "Bloquear" bloquea con una nota que el implementer verá. No corta el trabajo, solo pide confirmación.
 
 ```yaml
 flow:

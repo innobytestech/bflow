@@ -35,10 +35,10 @@
 
 - **`bflow approve [ID] --gate budget`** y **`bflow reject [ID] --gate budget --note <motivo>`**:
   
-  Nuevo gate `budget` que pregunta al persona cuando una fase supera su presupuesto (1×, 2×, 3×... en `flow.budget`).
+  Nuevo gate `budget` que pregunta a la persona cuando una fase supera su presupuesto (1×, 2×, 3×... en `flow.budget`).
   
-  - `approve`: "Sí, seguir"; continúa la fase sin bloqueo.
-  - `reject --note <motivo>`: "No, parar"; bloquea la tarea con la nota. La fase no avanza hasta que alguien corra `bflow unblock`. El motivo queda en el log y el implementer lo verá.
+  - `approve`: "Sigue"; continúa la fase sin bloqueo.
+  - `reject --note <motivo>`: "Bloquear"; bloquea la tarea con la nota. La fase no avanza hasta que alguien corra `bflow unblock`. El motivo queda en el log y el implementer lo verá.
   
   El gate solo aparece en fases presupuestadas (`flow.budget` tiene la fase) que no son terminales (Done, Dropped, InReview, Blocked, Backlog). Múltiplos respondidos no vuelven a preguntar hasta el siguiente múltiplo.
 
@@ -48,12 +48,12 @@
 
 - **`bflow watch` muestra "presupuesto" por fase configurada.**
   
-  Una línea `presupuesto: <usado> / <presupuestado> nuevos` por cada fase en `flow.budget`. Si el gasto supera el presupuesto, la línea se marca en rojo brillante (`1;31`).
+  Una línea `presupuesto: <usado> / <presupuestado> nuevos` por cada fase en `flow.budget`. Si el gasto supera el presupuesto, la línea se marca en ámbar.
   
   Ejemplo:
   ```
   presupuesto  implementing 142.1k / 200k nuevos
-  presupuesto  quality 1.8M / 1.5M nuevos    (← en rojo)
+  presupuesto  quality 1.8M / 1.5M nuevos    (← en ámbar)
   ```
 
 - **`bflow watch` avisa de ciclos detectados.**
@@ -70,7 +70,7 @@
 1. Actualiza `bflow.yaml` con `flow.budget` y `flow.loop_repeats` si los necesitas.
 2. Si tu cliente llama `bflow approve/reject`, aguanta el nuevo parámetro `--gate budget`.
 3. En el panel (`bflow watch`), aguanta las líneas nuevas de "presupuesto" y los eventos de "ciclo" en el log.
-4. Al implementer: cuando `bflow next` lleve `gate: budget`, la pregunta es "¿Seguir?" tras haber superado el presupuesto de esa fase. `bflow approve --gate budget` o `bflow reject --gate budget --note <motivo>`. No es un rechazo: solo confirma que quiere continuar, o pide parar.
+4. Al implementer: cuando `bflow next` lleve `gate: budget`, la pregunta es "¿Sigue?" tras haber superado el presupuesto de esa fase. `bflow approve --gate budget` o `bflow reject --gate budget --note <motivo>`. No es un rechazo: solo confirma que quiere continuar, o pide parar.
 
 ## Sin cambios
 
