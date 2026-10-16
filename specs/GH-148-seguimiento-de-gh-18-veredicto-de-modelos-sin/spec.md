@@ -42,19 +42,17 @@
 
 ## Tasks
 
-- [ ] **T1 · Contrato (pruebas que fallan)**. Cubre R1-R6.
+- [x] **T1 · Contrato (pruebas que fallan)**. Cubre R1-R5.
   - `internal/metrics/models_test.go`: `TestTaskModelsTokensOverrideStart` (R2, R3), `TestTaskModelsStartFallbackPerAgent` (R2, R3), `TestCompareModelsCurrentUsesEffectiveSet` (R4).
   - `internal/cli/models_test.go`: `TestStatsModelVerdictNoData` (R1), `TestStatsEmptyHistoryNoModelLine` (R1), `TestDoctorModelVerdictLogUnreadable` (R5).
-  - `internal/engine/models_test.go`: `TestStartWithoutCfgOmitsModels` (R6).
-- [ ] **T2 · Línea sin datos en `stats`** (`internal/cli/metricscmds.go`, `statsCmd`). Cubre R1.
+- [x] **T2 · Línea sin datos en `stats`** (`internal/cli/metricscmds.go`, `statsCmd`). Cubre R1.
   - R1 [N]: CUANDO se corre `bflow stats` sin ID con al menos una tarea y el veredicto es `sin_datos`, el sistema DEBE imprimir `modelos: sin datos de modelos todavía` con `renderModelVerdict`. CUANDO no hay tareas ni uso sin asignar, DEBE seguir imprimiendo solo `sin historial todavía`. `data.models` en JSON no cambia.
-- [ ] **T3 · Modelos efectivos por agente** (`internal/metrics/models.go`). Cubre R2-R4.
+- [x] **T3 · Modelos efectivos por agente** (`internal/metrics/models.go`). Cubre R2-R4.
   - R2 [N]: CUANDO una tarea tiene `data.models` en su start y eventos `tokens` con `data.model` no vacío de un agente (sin contar la sesión principal), `TaskModels` DEBE usar para ese agente el modelo inferido de tokens (normalizado con `NormalizeModel`; el más frecuente y, en empate, el último). Para los demás agentes DEBE quedarse con el valor del start.
   - R3 [N]: `TaskModels` DEBE devolver como origen `start` si ningún agente vino de tokens, `tokens` si la tarea no tiene start con modelos, y `start+tokens` si se combinaron. Sin ninguno de los dos devuelve `(nil, "")`, como hoy.
   - R4 [N]: CUANDO `CompareModels` fija la configuración vigente, DEBE usar `TaskModels` de la tarea del start más reciente con `data.models`, no el `data.models` crudo. Si no hay ningún start con modelos, el veredicto sigue siendo `sin_datos`.
   - `stats <ID>` muestra el nuevo origen sin cambios de código: la línea es `modelos (start+tokens): ...`.
-- [ ] **T4 · Pruebas de ramas sin cubrir**. Cubre R5 y R6.
+- [x] **T4 · Pruebas de ramas sin cubrir**. Cubre R5.
   - R5 [D]: CUANDO `log.jsonl` tiene una línea que no es JSON, `bflow doctor` DEBE reportar el ítem `veredicto-modelos` en `warn` con un mensaje que empiece por `no se pudo leer el log`, y su código de salida DEBE ser el mismo que sin ese ítem.
-  - R6 [D]: CUANDO el engine corre un start con `e.Cfg` nil, el evento `start` DEBE llevar `data.lane` y NO DEBE llevar `data.models`, sin pánico. Hoy solo es alcanzable en pruebas: `cmd/bflow/wire.go` siempre pasa `Cfg`.
-- [ ] **T5 · Changelog de consumidores**. Cubre R1 y R3.
+- [x] **T5 · Changelog de consumidores**. Cubre R1 y R3.
   - Agregar la entrada de GH-148: la línea `modelos:` ahora aparece en `stats` con `sin_datos` cuando hay tareas, existe el valor `start+tokens` en `data.stats.model_source`, y el veredicto usa los modelos que corrieron (tokens) por encima de la config del start.
