@@ -40,6 +40,10 @@ func ParsePreToolUse(raw []byte) (a guard.Action, cwd string, ok bool) {
 	if json.Unmarshal(raw, &in) != nil || in.ToolName == "" {
 		return a, "", false
 	}
+	var rawTool struct {
+		ToolInput json.RawMessage `json:"tool_input"`
+	}
+	_ = json.Unmarshal(raw, &rawTool)
 	sub := in.AgentType != "" || in.AgentID != ""
 	switch in.ToolName {
 	case "Bash":
@@ -60,6 +64,7 @@ func ParsePreToolUse(raw []byte) (a guard.Action, cwd string, ok bool) {
 	if in.AgentID != "" && in.SessionID != "" {
 		a.Session = in.SessionID + ":" + in.AgentID
 	}
+	a.Fingerprint = guard.Fingerprint(in.ToolName, rawTool.ToolInput)
 	return a, in.Cwd, true
 }
 

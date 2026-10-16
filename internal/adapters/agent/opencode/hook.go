@@ -43,7 +43,8 @@ func (Agent) ParseActions(raw []byte) ([]guard.Action, string, bool) {
 		file = args.Path
 	}
 	mk := func(tool, path string) guard.Action {
-		a := guard.Action{Tool: tool, Subagent: in.Subagent, Agent: in.Agent, Session: in.SessionID}
+		a := guard.Action{Tool: tool, Subagent: in.Subagent, Agent: in.Agent, Session: in.SessionID,
+			Fingerprint: guard.Fingerprint(in.Tool, in.Args)}
 		if path != "" {
 			a.Path = path
 			if !filepath.IsAbs(path) && in.Cwd != "" {

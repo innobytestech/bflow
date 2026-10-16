@@ -11,6 +11,20 @@ import (
 	"innobytes.tech/bflow/internal/guard"
 )
 
+// stripFP quita la huella (no determinista salvo por herramienta+entrada) para
+// comparar el resto de los campos de la acción.
+func stripFP(acts []guard.Action) []guard.Action {
+	if acts == nil {
+		return nil
+	}
+	out := make([]guard.Action, len(acts))
+	for i, a := range acts {
+		a.Fingerprint = ""
+		out[i] = a
+	}
+	return out
+}
+
 // input arma la entrada que el plugin le pasa a `bflow guard --tool opencode`.
 func input(t *testing.T, tool string, args any, extra map[string]any) []byte {
 	t.Helper()
@@ -30,7 +44,7 @@ func TestParseActionsBash(t *testing.T) {
 	acts, gotCwd, ok := Agent{}.ParseActions(input(t, "bash", map[string]any{"command": "git reset --hard"},
 		map[string]any{"cwd": cwd, "subagent": true, "agent": "bflow-implementer"}))
 	want := []guard.Action{{Tool: guard.Bash, Command: "git reset --hard", Subagent: true, Agent: "bflow-implementer"}}
-	if !ok || gotCwd != cwd || !reflect.DeepEqual(acts, want) {
+	if !ok || gotCwd != cwd || !reflect.DeepEqual(stripFP(acts), want) {
 		t.Fatalf("bash: ok=%v cwd=%q acts=%+v, want %+v", ok, gotCwd, acts, want)
 	}
 }
@@ -40,7 +54,7 @@ func TestParseActionsEditWrite(t *testing.T) {
 	f := filepath.Join(cwd, "a.go")
 	for tool, want := range map[string]string{"edit": guard.Edit, "multiedit": guard.Edit, "write": guard.Write} {
 		acts, _, ok := Agent{}.ParseActions(input(t, tool, map[string]any{"filePath": f}, map[string]any{"cwd": cwd}))
-		if !ok || !reflect.DeepEqual(acts, []guard.Action{{Tool: want, Path: f}}) {
+		if !ok || !reflect.DeepEqual(stripFP(acts), []guard.Action{{Tool: want, Path: f}}) {
 			t.Errorf("%s: ok=%v acts=%+v, want una acción %s sobre %s", tool, ok, acts, want, f)
 		}
 	}
@@ -159,7 +173,7 @@ func TestParseActionsCaptura(t *testing.T) {
 		ses = p[0].Session
 	}
 	want := []guard.Action{{Tool: guard.Write, Path: filepath.Join(cwd, "b.txt"), Session: ses}, {Tool: guard.Edit, Path: filepath.Join(cwd, "a.txt"), Session: ses}}
-	if p := got["apply_patch"]; ses == "" || !reflect.DeepEqual(p, want) {
+	if p := got["apply_patch"]; ses == "" || !reflect.DeepEqual(stripFP(p), want) {
 		t.Errorf("apply_patch: %+v, want %+v", p, want)
 	}
 }
@@ -170,12 +184,12 @@ func TestParseActionsRead(t *testing.T) {
 	acts, _, ok := Agent{}.ParseActions(input(t, "read", map[string]any{"filePath": "internal/a.go"},
 		map[string]any{"cwd": cwd, "subagent": true, "agent": "bflow-reviewer"}))
 	want := []guard.Action{{Tool: guard.Read, Path: filepath.Join(cwd, "internal/a.go"), Subagent: true, Agent: "bflow-reviewer"}}
-	if !ok || !reflect.DeepEqual(acts, want) {
+	if !ok || !reflect.DeepEqual(stripFP(acts), want) {
 		t.Errorf("read: ok=%v acts=%+v, quiero %+v", ok, acts, want)
 	}
 	f := filepath.Join(cwd, "b.go")
 	acts, _, _ = Agent{}.ParseActions(input(t, "read", map[string]any{"filePath": f}, map[string]any{"cwd": cwd}))
-	if !reflect.DeepEqual(acts, []guard.Action{{Tool: guard.Read, Path: f}}) {
+	if !reflect.DeepEqual(stripFP(acts), []guard.Action{{Tool: guard.Read, Path: f}}) {
 		t.Errorf("ruta absoluta de la sesión principal: %+v", acts)
 	}
 }
@@ -205,7 +219,7 @@ func TestParseActionsSpawn(t *testing.T) {
 		map[string]any{"subagent_type": "bflow-implementer", "prompt": `{"id":"GH-7","lane":"full"}`},
 		map[string]any{"sessionID": "ses_9"}))
 	want := []guard.Action{{Tool: guard.Spawn, Target: "bflow-implementer", Command: `{"id":"GH-7","lane":"full"}`, Session: "ses_9"}}
-	if !ok || !reflect.DeepEqual(acts, want) {
+	if !ok || !reflect.DeepEqual(stripFP(acts), want) {
 		t.Fatalf("task: ok=%v acts=%+v, want %+v", ok, acts, want)
 	}
 	acts, _, _ = Agent{}.ParseActions(input(t, "bash", map[string]any{"command": "bflow status GH-7"}, map[string]any{"sessionID": "ses_9"}))
@@ -302,8 +316,26 @@ func TestParseActionsV1SinCambios(t *testing.T) {
 	}
 	for _, c := range cases {
 		acts, _, ok := Agent{}.ParseActions(input(t, c.tool, c.args, map[string]any{"cwd": cwd}))
-		if !ok || !reflect.DeepEqual(acts, c.want) {
+		if !ok || !reflect.DeepEqual(stripFP(acts), c.want) {
 			t.Errorf("%s: ok=%v %+v, want %+v", c.tool, ok, acts, c.want)
 		}
+	}
+}
+
+// GH-16 R17/R18: la huella depende de la herramienta y los args crudos; dos
+// llamadas iguales dan la misma huella, y una distinta, otra.
+func TestOpenCodeFingerprint(t *testing.T) {
+	cwd := t.TempDir()
+	acts1, _, ok := Agent{}.ParseActions(input(t, "bash", map[string]any{"command": "go test ./..."}, map[string]any{"cwd": cwd}))
+	if !ok || len(acts1) != 1 || acts1[0].Fingerprint == "" {
+		t.Fatalf("esperaba una huella no vacía: %+v ok=%v", acts1, ok)
+	}
+	acts2, _, _ := Agent{}.ParseActions(input(t, "bash", map[string]any{"command": "go test ./..."}, map[string]any{"cwd": cwd}))
+	if acts2[0].Fingerprint != acts1[0].Fingerprint {
+		t.Errorf("la misma herramienta y args debía dar la misma huella: %q != %q", acts1[0].Fingerprint, acts2[0].Fingerprint)
+	}
+	acts3, _, _ := Agent{}.ParseActions(input(t, "bash", map[string]any{"command": "go vet ./..."}, map[string]any{"cwd": cwd}))
+	if acts3[0].Fingerprint == acts1[0].Fingerprint {
+		t.Errorf("args distintos debían dar huellas distintas")
 	}
 }
