@@ -109,11 +109,11 @@ func TestNormalizeModel(t *testing.T) {
 
 func TestTaskModelsFromStart(t *testing.T) {
 	log := logOf(mt{id: "T-1", models: map[string]string{"reviewer": "anthropic/Claude-Opus-4", "implementer": "", "scout": "haiku"},
-		infer: map[string]string{"reviewer": "sonnet"}})
+		infer: map[string]string{"scout": "sonnet"}})
 	got, src := TaskModels("T-1", log)
-	want := ModelSet{"reviewer": "opus", "implementer": "heredado", "scout": "haiku"}
-	if src != "start" || !reflect.DeepEqual(got, want) {
-		t.Errorf("TaskModels = %v (%s), quiero %v (start): data.models manda sobre tokens", got, src, want)
+	want := ModelSet{"reviewer": "opus", "implementer": "heredado", "scout": "sonnet"}
+	if src != "start+tokens" || !reflect.DeepEqual(got, want) {
+		t.Errorf("TaskModels = %v (%s), quiero %v (start+tokens)", got, src, want)
 	}
 	// Un data.models que no es un mapa de strings se ignora y cae a tokens.
 	bad := logOf(mt{id: "T-2", infer: map[string]string{"reviewer": "opus"}})
@@ -318,5 +318,50 @@ func TestCompareModelsNoData(t *testing.T) {
 	noModels := nTasks("A", 1, nil, 4, func(i int, m *mt) { m.infer = map[string]string{"reviewer": "opus"} })
 	if v := CompareModels(logOf(noModels...), at(0)); v.Verdict != "sin_datos" {
 		t.Errorf("ningún start trae data.models: %q", v.Verdict)
+	}
+}
+
+func TestTaskModelsTokensOverrideStart(t *testing.T) {
+	log := logOf(mt{id: "T-1", models: map[string]string{"reviewer": "sonnet", "implementer": "heredado"},
+		infer: map[string]string{"reviewer": "anthropic/claude-opus-4"}})
+	got, src := TaskModels("T-1", log)
+	want := ModelSet{"reviewer": "opus", "implementer": "heredado"}
+	if src != "start+tokens" || !reflect.DeepEqual(got, want) {
+		t.Errorf("TaskModels = %v (%s), quiero %v (start+tokens)", got, src, want)
+	}
+	only := logOf(mt{id: "T-2", infer: map[string]string{"reviewer": "opus"}})
+	if _, src := TaskModels("T-2", only); src != "tokens" {
+		t.Errorf("sin start con modelos el origen es tokens, no %q", src)
+	}
+}
+
+func TestTaskModelsStartFallbackPerAgent(t *testing.T) {
+	log := logOf(mt{id: "T-1", models: map[string]string{"reviewer": "sonnet", "scout": "haiku"},
+		infer: map[string]string{"implementer": "opus"}})
+	log = append(log, store.Entry{TS: at(5), ID: "T-1", Event: "tokens", Agent: MainSession, Data: map[string]any{"model": "opus"}})
+	got, src := TaskModels("T-1", log)
+	want := ModelSet{"reviewer": "sonnet", "scout": "haiku", "implementer": "opus"}
+	if src != "start+tokens" || !reflect.DeepEqual(got, want) {
+		t.Errorf("TaskModels = %v (%s), quiero %v", got, src, want)
+	}
+	// Solo la sesión principal: no hay agente de tokens, queda el start.
+	main := logOf(mt{id: "T-3", models: map[string]string{"reviewer": "sonnet"}})
+	main = append(main, store.Entry{TS: at(5), ID: "T-3", Event: "tokens", Agent: MainSession, Data: map[string]any{"model": "opus"}})
+	if got, src := TaskModels("T-3", main); src != "start" || got["reviewer"] != "sonnet" {
+		t.Errorf("solo main: %v (%s), quiero start", got, src)
+	}
+}
+
+func TestCompareModelsCurrentUsesEffectiveSet(t *testing.T) {
+	// El start dice sonnet, pero lo que corrió fue opus: las tareas con opus
+	// real son "después" y la anterior (sonnet real) es "antes".
+	antes := nTasks("A", 0, cfgA, 3, nil)
+	despues := nTasks("D", 10, cfgA, 3, func(i int, m *mt) { m.infer = map[string]string{"reviewer": "claude-opus-4"} })
+	v := CompareModels(groupLog(antes, despues), t0.Add(60*24*time.Hour))
+	if v.Current.Models["reviewer"] != "opus" {
+		t.Errorf("la vigente debe ser el conjunto efectivo, no el start: %v", v.Current.Models)
+	}
+	if len(v.Current.Tasks) != 3 || v.Previous == nil || v.Previous.Models["reviewer"] != "sonnet" {
+		t.Errorf("después/antes mal partidos: %+v", v)
 	}
 }

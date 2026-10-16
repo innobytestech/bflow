@@ -100,7 +100,7 @@ func runStats(c *Ctx) output.Envelope {
 	data := map[string]any{"tasks": all}
 	mv := metrics.CompareModels(log, now)
 	data["models"] = mv
-	if mv.Verdict != "sin_datos" {
+	if mv.Verdict != "sin_datos" || len(all) > 0 {
 		fmt.Fprintf(&b, "%s\n", renderModelVerdict(mv, bannerFor(c) == bannerColor))
 	}
 	un := metrics.UnassignedUsage(e.Store.Dir())

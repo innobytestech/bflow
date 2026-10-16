@@ -1,7 +1,10 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -143,5 +146,84 @@ func TestDoctorModelsWarnKeepsExit(t *testing.T) {
 	seedModelLog(t, same, 1)
 	if _, m := item(same); m["status"] != "ok" {
 		t.Errorf("sin regresión es ok: %v", m)
+	}
+}
+
+// stripStartModels quita data.models de los start del log, como una tarea vieja.
+func stripStartModels(t *testing.T, env *Env) {
+	t.Helper()
+	e, err := env.Build(env.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(e.Store.Dir(), "log.jsonl")
+	raw, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []string
+	for _, l := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
+		var m map[string]any
+		if err := json.Unmarshal([]byte(l), &m); err != nil {
+			t.Fatal(err)
+		}
+		if d, ok := m["data"].(map[string]any); ok {
+			delete(d, "models")
+		}
+		b, _ := json.Marshal(m)
+		out = append(out, string(b))
+	}
+	if err := os.WriteFile(p, []byte(strings.Join(out, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+func TestStatsModelVerdictNoData(t *testing.T) {
+	env, _, _, _ := tokensEnv(t, true)
+	stripStartModels(t, env)
+	code, text := textOf(t, env, "stats")
+	if code != 0 || !strings.Contains(text, "modelos: sin datos de modelos todavía") {
+		t.Errorf("con tareas y sin datos debe decirlo (exit %d): %s", code, text)
+	}
+}
+
+func TestStatsEmptyHistoryNoModelLine(t *testing.T) {
+	env := ghEnv(t, "tracker: { adapter: local }\n", trackertest.NewMemory())
+	code, text := textOf(t, env, "stats")
+	if code != 0 || strings.TrimSpace(text) != "sin historial todavía" || strings.Contains(text, "modelos") {
+		t.Errorf("sin tareas solo 'sin historial todavía' (exit %d): %q", code, text)
+	}
+}
+
+func TestDoctorModelVerdictLogUnreadable(t *testing.T) {
+	t.Setenv("BFLOW_AS_CLI", "1")
+	clean := ghEnv(t, "tracker: { adapter: local }\n", trackertest.NewMemory())
+	baseCode, _, _ := runJSON(t, clean, "doctor")
+
+	bad := ghEnv(t, "tracker: { adapter: local }\n", trackertest.NewMemory())
+	e, err := bad.Build(bad.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(e.Store.Dir(), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(e.Store.Dir(), "log.jsonl"), []byte("esto no es json\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, out, raw := runJSON(t, bad, "doctor")
+	var found map[string]any
+	for _, it := range dataOf(out)["checks"].([]any) {
+		if m := it.(map[string]any); m["area"] == "veredicto-modelos" {
+			found = m
+		}
+	}
+	if found == nil {
+		t.Fatalf("doctor sin ítem veredicto-modelos: %s", raw)
+	}
+	if found["status"] != "warn" || !strings.HasPrefix(fmt.Sprint(found["detail"]), "no se pudo leer el log") {
+		t.Errorf("ítem: %v", found)
+	}
+	if code != baseCode {
+		t.Errorf("el warn no cambia el código de salida: %d contra %d", code, baseCode)
 	}
 }

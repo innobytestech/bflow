@@ -50,7 +50,9 @@ func modelsOfStart(e store.Entry) (ModelSet, bool) {
 	return out, true
 }
 
-// TaskModels da los modelos de la tarea y su origen: "start" | "tokens" | "".
+// TaskModels da los modelos de la tarea y su origen: "start" | "tokens" | "start+tokens" | "".
+// Por agente, el modelo que más aparece en sus eventos tokens (en empate, el último) pisa
+// el de data.models del start; los agentes sin tokens conservan el del start.
 func TaskModels(id string, entries []store.Entry) (ModelSet, string) {
 	var fromStart ModelSet
 	type tally struct {
@@ -85,13 +87,16 @@ func TaskModels(id string, entries []store.Entry) (ModelSet, string) {
 			t.last[m] = i
 		}
 	}
-	if fromStart != nil {
-		return fromStart, "start"
-	}
 	if len(toks) == 0 {
+		if fromStart != nil {
+			return fromStart, "start"
+		}
 		return nil, ""
 	}
 	out := ModelSet{}
+	for a, m := range fromStart {
+		out[a] = m
+	}
 	for a, t := range toks {
 		best := ""
 		for m, n := range t.n {
@@ -100,6 +105,9 @@ func TaskModels(id string, entries []store.Entry) (ModelSet, string) {
 			}
 		}
 		out[a] = best
+	}
+	if fromStart != nil {
+		return out, "start+tokens"
 	}
 	return out, "tokens"
 }
@@ -171,12 +179,14 @@ type modelTask struct {
 	hotfixes   int
 }
 
-// CompareModels aplica R8-R14 sobre el log.
+// CompareModels aplica R8-R14 sobre el log. La configuración vigente es el conjunto
+// efectivo de la tarea del start más reciente (TaskModels: start más tokens), no solo data.models.
 func CompareModels(entries []store.Entry, now time.Time) ModelVerdict {
 	byID := map[string][]store.Entry{}
 	var order []string
 	fixes := map[string]int{}
 	var cur ModelSet
+	var curID string
 	var curTS time.Time
 	for _, e := range entries {
 		if _, seen := byID[e.ID]; !seen {
@@ -190,12 +200,13 @@ func CompareModels(entries []store.Entry, now time.Time) ModelVerdict {
 			fixes[f]++
 		}
 		if ms, ok := modelsOfStart(e); ok && (cur == nil || !e.TS.Before(curTS)) {
-			cur, curTS = ms, e.TS
+			cur, curID, curTS = ms, e.ID, e.TS
 		}
 	}
 	if cur == nil {
 		return ModelVerdict{Verdict: "sin_datos"}
 	}
+	cur, _ = TaskModels(curID, byID[curID])
 
 	var tasks []modelTask
 	for i, id := range order {
