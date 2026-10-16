@@ -69,10 +69,10 @@ func TestUIPageBanner(t *testing.T) {
 	}
 }
 
-// R9, R12, R16, R20: la página cabe en una pantalla, con ventana de detalle y chips de repos.
+// R18 (GH-46): la página cabe en una pantalla, con ventana de detalle y sidebar de repos.
 func TestUIPageOneScreen(t *testing.T) {
 	page := string(uiPage)
-	for _, want := range []string{"100dvh", `<dialog id="calls"`, `id="repos"`} {
+	for _, want := range []string{"100dvh", `<dialog id="calls"`, `id="repos"`, `id="shell"`} {
 		if !strings.Contains(page, want) {
 			t.Errorf("la página debe tener %q", want)
 		}
@@ -81,6 +81,53 @@ func TestUIPageOneScreen(t *testing.T) {
 		if strings.Contains(page, bad) {
 			t.Errorf("la página no debe tener %q", bad)
 		}
+	}
+}
+
+// R1, R15, R16, R17, R19: sidebar de repos en lugar de la tira de chips.
+func TestUIPageSidebar(t *testing.T) {
+	page := string(uiPage)
+	for _, want := range []string{`<aside class="side`, `id="repos"`, `id="repo-list"`, `id="repos-collapse"`,
+		`id="repos-open"`, `id="repos-close"`, "bflow.sidebar-collapsed", "position: sticky", "(hover: none)"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("la página debe tener %q", want)
+		}
+	}
+	for _, bad := range []string{`<nav class="repos"`, `class="chip`} {
+		if strings.Contains(page, bad) {
+			t.Errorf("la página no debe tener %q", bad)
+		}
+	}
+}
+
+// R7-R14: ocultar repos, deshacer, lista de ocultos y estado de todos ocultos.
+func TestUIPageHiddenRepos(t *testing.T) {
+	page := string(uiPage)
+	for _, want := range []string{"bflow.hidden-repos", `id="hidden-toggle"`, "aria-expanded", `id="hidden-list"`,
+		`id="undo"`, `role="status"`, "Deshacer", "Mostrar", "Quitar", "UNDO_MS = 6000", `id="all-hidden"`,
+		"function loadHidden", "function saveHidden", "function repoRank", "function sortRepos",
+		"function ensureVisibleSelection"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("la página debe tener %q", want)
+		}
+	}
+}
+
+// R12: todo acceso a localStorage va en try/catch, incluidas las claves nuevas.
+func TestUIPageStorageGuarded(t *testing.T) {
+	var hidden, collapsed bool
+	for _, line := range strings.Split(string(uiPage), "\n") {
+		if !strings.Contains(line, "localStorage.") {
+			continue
+		}
+		if !strings.Contains(line, "try {") {
+			t.Errorf("localStorage sin try/catch: %s", strings.TrimSpace(line))
+		}
+		hidden = hidden || strings.Contains(line, "HIDDEN_KEY")
+		collapsed = collapsed || strings.Contains(line, "COLLAPSED_KEY")
+	}
+	if !hidden || !collapsed {
+		t.Errorf("faltan accesos protegidos a HIDDEN_KEY (%v) o COLLAPSED_KEY (%v)", hidden, collapsed)
 	}
 }
 

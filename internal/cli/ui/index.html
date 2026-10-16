@@ -135,7 +135,7 @@ h2 { font: 30px/1 var(--px); letter-spacing: 3px; text-transform: uppercase; mar
 .line { grid-area: line; }
 .gauges { grid-area: gauges; }
 .tokens { grid-area: tok; }
-#tokens[hidden], #repos[hidden], .line[hidden] { display: none; }
+#tokens[hidden], .line[hidden] { display: none; }
 @media (min-width: 1180px) {
   .layout { grid-template-columns: minmax(0, 1fr) clamp(380px, 30vw, 440px); grid-template-areas: "board tok" "line tok" "gauges tok"; }
   .layout.no-tok { grid-template-columns: minmax(0, 1fr); grid-template-areas: "board" "line" "gauges"; }
@@ -324,23 +324,67 @@ ol.log::before { content: ""; position: absolute; left: 4px; top: 8px; bottom: 8
 .log li > span { overflow-wrap: anywhere; }
 svg.px.arrow { display: inline-block; width: 14px; height: 10px; margin: 0 6px; vertical-align: 1px; }
 
-/* ---------- Tus repos: una fila de chips en la franja ---------- */
-.repos { flex: 1 1 100%; display: flex; gap: 10px; height: 52px; padding: 4px 4px; overflow-x: auto; overflow-y: hidden; align-items: center; }
-.chip {
-  flex: none; display: flex; align-items: center; gap: 8px; background: var(--panel); border: 0; cursor: pointer; padding: 4px 10px 6px;
-  --f: var(--rule-soft); transition: background .15s ease-out; white-space: nowrap;
+/* ---------- Tus repos: sidebar vertical ---------- */
+.shell { display: grid; grid-template-columns: minmax(0, 1fr); max-width: 1440px; width: 100%; margin-inline: auto; }
+.shell .layout { max-width: none; margin: 0; min-width: 0; }
+.side { background: var(--panel); display: flex; flex-direction: column; gap: 8px; padding: 8px; margin: 4px 0 24px 12px; min-width: 0; --f: var(--rule-soft); }
+.side[hidden] { display: none; }
+.side-head { display: flex; justify-content: space-between; gap: 8px; }
+.side-list, #hidden-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.side-list { overflow-y: auto; min-height: 0; flex: 1 1 auto; }
+#hidden-list[hidden] { display: none; }
+.repo { display: flex; align-items: stretch; gap: 2px; }
+.pick {
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 8px; background: var(--panel); border: 0; cursor: pointer;
+  padding: 4px 8px 6px; text-align: left; white-space: nowrap; --f: var(--rule-soft); box-shadow: inset 0 0 0 1px var(--f);
+  font: inherit; color: inherit; transition: background .15s ease-out;
 }
-.chip:hover { --f: var(--agent); }
-.chip[aria-current="true"] { --f: var(--ink); background: var(--current-row); }
-.chip .badge.idle { background: var(--panel); color: var(--ink-2); --f: var(--ink-3); }
-.chip .badge.idle svg { width: 18px; height: 14px; }
-.chip .rn { color: var(--ink); }
-.chip .rw { letter-spacing: 2px; }
-.chip .rw.agent-c { color: var(--agent); }
-.chip .rw.human-c { color: var(--you-ink); }
-.chip.wait .rw { background: var(--amber); color: var(--led-face); padding: 0 6px 2px; }
-.chip .more { color: var(--ink-2); }
-.chip .err { color: var(--offline); }
+.pick:hover { --f: var(--agent); }
+.pick[aria-current="true"] { --f: var(--full); box-shadow: inset 3px 0 0 var(--full), inset 0 0 0 1px var(--full); background: var(--current-row); }
+.pick .badge.idle { background: var(--panel); color: var(--ink-2); --f: var(--ink-3); }
+.pick .badge.idle svg { width: 18px; height: 14px; }
+.pick .rn { color: var(--ink); overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
+.pick .rp { color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.rw { letter-spacing: 2px; margin-left: auto; }
+.rw.agent-c { color: var(--agent); }
+.rw.human-c { color: var(--you-ink); }
+.repo.wait .rw { background: var(--amber); color: var(--led-face); padding: 0 6px 2px; }
+.repo.idle .pick .rn, .repo.idle .pick .rw { color: var(--ink-3); }
+.repo.idle .badge { opacity: .55; }
+.pick .more { color: var(--ink-2); }
+.pick .err { color: var(--offline); overflow: hidden; text-overflow: ellipsis; }
+.drop, .show { background: var(--panel); border: 0; cursor: pointer; padding: 2px 8px; font: inherit; color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--rule-soft); }
+.drop:hover, .show:hover { color: var(--agent); }
+.drop { visibility: hidden; }
+.repo:hover .drop, .repo:focus-within .drop { visibility: visible; }
+@media (hover: none) { .drop { visibility: visible; } }
+.side-hidden { display: flex; flex-direction: column; gap: 6px; }
+#hidden-toggle[aria-expanded="true"] { background: var(--current-row); }
+#hidden-toggle.wait, #repos-open.wait { background: var(--amber); color: var(--led-face); }
+#hidden-list li { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
+#hidden-list .rn { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.shell.collapsed .drop, .shell.collapsed .rn, .shell.collapsed .rw, .shell.collapsed .rp, .shell.collapsed .more, .shell.collapsed .err { display: none; }
+.shell.collapsed .pick { justify-content: center; padding-inline: 4px; }
+.shell.collapsed .repo.wait .pick { box-shadow: inset 0 0 0 2px var(--amber); }
+.shell.collapsed #hidden-list { display: none; }
+.undo { position: fixed; left: 16px; bottom: 16px; z-index: 30; background: var(--panel); padding: 8px 12px; display: flex; gap: 12px; align-items: center; --f: var(--ink); }
+.undo[hidden], .scrim[hidden] { display: none; }
+.scrim { position: fixed; inset: 0; z-index: 10; background: rgba(0, 0, 0, .35); }
+.empty { padding: 24px; color: var(--ink-2); }
+.empty[hidden] { display: none; }
+body.all-hidden .board, body.all-hidden .line, body.all-hidden .gauges, body.all-hidden .tokens { display: none; }
+#repos-open, #repos-close, #repos-collapse { display: none; }
+@media (min-width: 1180px) {
+  .shell:has(#repos:not([hidden])) { grid-template-columns: clamp(200px, 16vw, 240px) minmax(0, 1fr); }
+  .shell.collapsed:has(#repos:not([hidden])) { grid-template-columns: 64px minmax(0, 1fr); }
+  .side { position: sticky; top: 0; max-height: 100dvh; align-self: start; }
+  #repos-collapse { display: inline-block; }
+}
+@media (max-width: 1179.98px) {
+  .side { position: fixed; inset: 0 auto 0 0; width: min(300px, 86vw); max-height: none; margin: 0; transform: translateX(-105%); z-index: 20; transition: transform .15s ease-out; }
+  .side.open { transform: none; }
+  #repos-open:not([hidden]), #repos-close { display: inline-block; }
+}
 
 .skel { height: 20px; background: rgba(150, 205, 255, .16); margin: 12px 0; }
 
@@ -393,7 +437,8 @@ svg.px.arrow { display: inline-block; width: 14px; height: 10px; margin: 0 6px; 
   .wordmark { width: 150px; height: 42px; }
   .lockup .by { min-height: 42px; }
   .strip { padding-top: 8px; padding-bottom: 8px; margin-bottom: 4px; }
-  .repos { height: 44px; padding-block: 2px; }
+  .shell { min-height: 0; }
+  .side { margin-bottom: 16px; max-height: 100%; }
   .b-title { font-size: 30px; -webkit-line-clamp: 1; }
   .route .badge { width: 34px; height: 34px; font-size: 30px; }
   .row.now .who, .row.now .what { font-size: 30px; }
@@ -418,7 +463,7 @@ svg.px.arrow { display: inline-block; width: 14px; height: 10px; margin: 0 6px; 
   .board { padding-block: 10px; }
 }
 
-@media (prefers-reduced-motion: reduce) { .wipe { animation: none; } .train.moving, .btn, .chip { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .wipe { animation: none; } .train.moving, .btn, .pick, .side, .undo { transition: none; } }
 </style>
 </head>
 <body>
@@ -438,9 +483,21 @@ svg.px.arrow { display: inline-block; width: 14px; height: 10px; margin: 0 6px; 
     </div>
     <button class="btn frame" id="notify" hidden>Avisarme cuando me toque</button>
   </div>
-  <nav class="repos" id="repos" aria-label="Tus repos" hidden></nav>
+  <button class="btn frame" id="repos-open" type="button" aria-controls="repos" aria-expanded="false" hidden>Repos</button>
 </header>
 
+<div class="shell" id="shell">
+<aside class="side frame" id="repos" aria-label="Tus repos" hidden>
+  <div class="side-head">
+    <button class="btn" id="repos-collapse" type="button" aria-controls="repos" aria-expanded="true" aria-label="Colapsar la lista de repos">«</button>
+    <button class="btn" id="repos-close" type="button" aria-label="Cerrar la lista de repos">Cerrar</button>
+  </div>
+  <ul class="side-list" id="repo-list"></ul>
+  <div class="side-hidden">
+    <button class="btn" id="hidden-toggle" type="button" aria-expanded="false" aria-controls="hidden-list" hidden>Ocultos (0)</button>
+    <ul id="hidden-list" hidden></ul>
+  </div>
+</aside>
 <div class="layout no-tok" id="layout">
   <section class="board frame" id="board" aria-label="Tablero">
     <div id="b-body"><div class="skel" style="width:40%"></div><div class="skel" style="width:75%;height:40px"></div><div class="skel" style="width:60%"></div></div>
@@ -448,7 +505,12 @@ svg.px.arrow { display: inline-block; width: 14px; height: 10px; margin: 0 6px; 
   <section class="line frame" id="line" aria-label="Línea del carril" hidden></section>
   <div class="gauges" id="gauges"></div>
   <section class="tokens frame" id="tokens" aria-label="Tokens" hidden></section>
+  <p class="empty" id="all-hidden" hidden>Todos tus repos están ocultos. Usa "Mostrar" en la lista de Ocultos para volver a verlos.</p>
 </div>
+</div>
+
+<div class="undo frame" id="undo" role="status" aria-live="polite" hidden><span id="undo-msg"></span> <button class="btn" id="undo-btn" type="button">Deshacer</button></div>
+<div class="scrim" id="scrim" hidden></div>
 
 <dialog id="calls" aria-labelledby="calls-h">
   <div class="dlg">
@@ -1005,35 +1067,196 @@ dlg.addEventListener("close", () => {
   if (r) r.focus();
 });
 
-function renderRepos() {
-  const nw = state.network || [], nav = $("repos");
+const HIDDEN_KEY = "bflow.hidden-repos", COLLAPSED_KEY = "bflow.sidebar-collapsed", UNDO_MS = 6000;
+// Repos ocultos de la vista (solo filtro de la página; bflow sigue registrando su flujo).
+// Un valor guardado que no sea un arreglo de keys de 8 hex se descarta entero.
+function loadHidden() {
+  let v = [];
+  try { v = JSON.parse(localStorage.getItem(HIDDEN_KEY) || "[]"); } catch (e) { return new Set(); }
+  return Array.isArray(v) && v.every((k) => typeof k === "string" && /^[0-9a-f]{8}$/.test(k)) ? new Set(v) : new Set();
+}
+function saveHidden(set) {
+  try { localStorage.setItem(HIDDEN_KEY, JSON.stringify([...set])); } catch (e) {}
+}
+function loadCollapsed() {
+  try { return localStorage.getItem(COLLAPSED_KEY) === "1"; } catch (e) { return false; }
+}
+function saveCollapsed(on) {
+  if (on) { try { localStorage.setItem(COLLAPSED_KEY, "1"); } catch (e) {} }
+  else { try { localStorage.removeItem(COLLAPSED_KEY); } catch (e) {} }
+}
+let hidden = loadHidden(), collapsed = loadCollapsed(), hiddenOpen = false, drawerOpen = false, undoTimer = 0, undoLeft = 0, undoAt = 0;
+
+// Urgencia de un repo: 0 espera a TÚ, 1 tiene tarea con agente, 2 vía libre.
+function repoRank(r) { return r.task && r.task.now && r.task.now.human ? 0 : r.task ? 1 : 2; }
+function sinceOf(r) { const t = r.task && r.task.now && r.task.now.since ? Date.parse(r.task.now.since) : NaN; return isNaN(t) ? null : t; }
+// Orden del sidebar: por urgencia, luego por actividad más reciente, luego por nombre.
+function sortRepos(all) {
+  return all.slice().sort((a, b) => {
+    const ra = repoRank(a.r), rb = repoRank(b.r);
+    if (ra !== rb) return ra - rb;
+    const sa = sinceOf(a.r), sb = sinceOf(b.r);
+    if (sa !== sb) return sa === null ? 1 : sb === null ? -1 : sb - sa;
+    return a.r.name < b.r.name ? -1 : a.r.name > b.r.name ? 1 : 0;
+  });
+}
+function allRepos() {
   const all = [];
-  nw.forEach((g) => g.repos.forEach((r) => all.push({ r, profile: g.profile })));
-  nav.hidden = all.length < 2;
-  if (all.length < 2 || !changed("repos", { nw, key: state.key, others: state.others })) return;
-  const focused = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.key : "";
-  nav.replaceChildren();
-  const wait = (x) => !!(x.r.task && x.r.task.waiting);
-  all.filter(wait).concat(all.filter((x) => !wait(x))).forEach(({ r, profile }) => {
-    const cur = r.key === state.key, others = cur && state.others ? state.others : [];
-    const b = el("button", "chip frame" + (wait({ r }) ? " wait" : ""));
+  (state.network || []).forEach((g) => g.repos.forEach((r) => all.push({ r, profile: g.profile })));
+  return all;
+}
+// Si el repo seleccionado queda oculto, la vista salta al primer visible por urgencia.
+// Sin repos visibles deja body.all-hidden y muestra el aviso "Todos tus repos están ocultos".
+function ensureVisibleSelection() {
+  const all = allRepos(), vis = sortRepos(all.filter((x) => !hidden.has(x.r.key)));
+  document.body.classList.toggle("all-hidden", vis.length === 0 && all.length >= 2);
+  $("all-hidden").hidden = !(vis.length === 0 && all.length >= 2);
+  if (state.key && hidden.has(state.key) && vis.length) location.hash = "r=" + vis[0].r.key;
+}
+function refreshRepos() {
+  lastSig.repos = "";
+  if (!state) return;
+  renderRepos();
+  ensureVisibleSelection();
+}
+// Quitar: solo oculta en la vista y guarda; el foco pasa a la fila siguiente.
+function hideRepo(key, name) {
+  const rows = [...$("repo-list").querySelectorAll("li.repo")], i = rows.findIndex((li) => li.dataset.key === key);
+  const next = rows[i + 1] || rows[i - 1];
+  hidden.add(key);
+  saveHidden(hidden);
+  refreshRepos();
+  showUndo(name, key);
+  const f = next && $("repo-list").querySelector('li[data-key="' + CSS.escape(next.dataset.key) + '"] .pick');
+  if (f) f.focus(); else if (!$("hidden-toggle").hidden) $("hidden-toggle").focus();
+}
+function showRepo(key) { hidden.delete(key); saveHidden(hidden); refreshRepos(); }
+let undoKey = "";
+function undoHide() {
+  if (undoKey) showRepo(undoKey);
+  hideUndo();
+}
+function hideUndo() { clearTimeout(undoTimer); undoTimer = 0; undoKey = ""; $("undo").hidden = true; }
+function startUndoTimer(ms) { clearTimeout(undoTimer); undoAt = Date.now(); undoLeft = ms; undoTimer = setTimeout(hideUndo, ms); }
+function showUndo(name, key) {
+  undoKey = key;
+  $("undo-msg").textContent = "Quitaste " + name + " de la vista.";
+  $("undo").hidden = false;
+  startUndoTimer(UNDO_MS);
+}
+// El aviso "Deshacer" se pausa mientras el cursor o el foco están en él; al salir, reanuda con el tiempo que le quedaba (mínimo 1 s).
+function pauseUndo() { if (undoTimer) { clearTimeout(undoTimer); undoTimer = 0; undoLeft = Math.max(1000, undoLeft - (Date.now() - undoAt)); } }
+function resumeUndo() { if (!$("undo").hidden && !undoTimer && !$("undo").matches(":hover") && !$("undo").contains(document.activeElement)) startUndoTimer(undoLeft); }
+$("undo-btn").addEventListener("click", undoHide);
+$("undo").addEventListener("mouseenter", pauseUndo);
+$("undo").addEventListener("focusin", pauseUndo);
+$("undo").addEventListener("mouseleave", resumeUndo);
+$("undo").addEventListener("focusout", () => setTimeout(resumeUndo, 0));
+
+const wide = window.matchMedia("(min-width: 1180px)");
+function setCollapsed(on) {
+  collapsed = on;
+  saveCollapsed(on);
+  $("shell").classList.toggle("collapsed", on);
+  const b = $("repos-collapse");
+  b.setAttribute("aria-expanded", on ? "false" : "true");
+  b.textContent = on ? "»" : "«";
+  b.setAttribute("aria-label", on ? "Expandir la lista de repos" : "Colapsar la lista de repos");
+  refreshRepos();
+}
+function openDrawer() {
+  drawerOpen = true;
+  $("repos").classList.add("open");
+  $("scrim").hidden = false;
+  $("repos-open").setAttribute("aria-expanded", "true");
+  const f = $("repo-list").querySelector(".pick") || $("hidden-toggle");
+  if (f && !f.hidden) f.focus();
+}
+function closeDrawer(back) {
+  if (!drawerOpen) return;
+  drawerOpen = false;
+  $("repos").classList.remove("open");
+  $("scrim").hidden = true;
+  $("repos-open").setAttribute("aria-expanded", "false");
+  if (back !== false) $("repos-open").focus();
+}
+$("repos-open").addEventListener("click", () => (drawerOpen ? closeDrawer() : openDrawer()));
+$("repos-close").addEventListener("click", () => closeDrawer());
+$("scrim").addEventListener("click", () => closeDrawer());
+$("repos-collapse").addEventListener("click", () => setCollapsed(!collapsed));
+$("hidden-toggle").addEventListener("click", () => { hiddenOpen = !hiddenOpen; refreshRepos(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && drawerOpen) closeDrawer(); });
+wide.addEventListener("change", () => { if (wide.matches) closeDrawer(false); });
+$("shell").classList.toggle("collapsed", collapsed);
+$("repos-collapse").setAttribute("aria-expanded", collapsed ? "false" : "true");
+if (collapsed) { $("repos-collapse").textContent = "»"; $("repos-collapse").setAttribute("aria-label", "Expandir la lista de repos"); }
+
+function renderRepos() {
+  const nw = state.network || [], side = $("repos"), list = $("repo-list");
+  const all = allRepos();
+  side.hidden = all.length < 2;
+  $("repos-open").hidden = all.length < 2;
+  if (all.length < 2) { $("shell").classList.remove("collapsed"); return; }
+  $("shell").classList.toggle("collapsed", collapsed);
+  const live = new Set(all.map((x) => x.r.key));
+  const hiddenNow = all.filter((x) => hidden.has(x.r.key)), hiddenN = hiddenNow.length;
+  if (!changed("repos", { nw, key: state.key, others: state.others, h: [...hidden], collapsed, hiddenOpen })) return;
+  const focused = document.activeElement && document.activeElement.closest ? document.activeElement.closest("[data-key]") : null;
+  const focusedKey = focused ? focused.dataset.key : "", focusedCls = focused && document.activeElement.className;
+  list.replaceChildren();
+  const profiles = new Set(all.map((x) => x.profile)).size;
+  const stateOf = (r) => (r.task ? (repoRank(r) === 0 ? "TÚ" : "AGENTE") : "vía libre");
+  sortRepos(all.filter((x) => !hidden.has(x.r.key))).forEach(({ r, profile }) => {
+    const cur = r.key === state.key, others = cur && state.others ? state.others : [], rank = repoRank(r);
+    const li = el("li", "repo" + (rank === 0 ? " wait" : "") + (rank === 2 ? " idle" : ""));
+    li.dataset.key = r.key;
+    const b = el("button", "pick");
     b.type = "button";
-    b.dataset.key = r.key;
     if (cur) b.setAttribute("aria-current", "true");
     let bd;
     if (r.task) bd = badge(r.task.lane);
     else { bd = el("span", "badge frame idle"); bd.setAttribute("aria-hidden", "true"); bd.append(pixSVG(IDLE)); }
     b.append(bd, el("span", "rn", r.name));
-    if (r.task) b.append(el("span", "rw " + (r.task.now && r.task.now.human ? "human-c" : "agent-c"), r.task.now ? (r.task.waiting ? "TE TOCA" : r.task.now.human ? "TÚ" : "AGENTE") : ""));
-    else b.append(el("span", "rw", r.open ? r.open + " abierta(s)" : "vía libre"));
+    if (profiles > 1 && profile) b.append(el("span", "rp", profile));
+    b.append(el("span", "rw " + (rank === 0 ? "human-c" : rank === 1 ? "agent-c" : ""), stateOf(r)));
     if (others.length) b.append(el("span", "more", "+" + others.length));
     if (r.error) b.append(el("span", "err", r.error));
-    b.title = (profile ? profile + " / " : "") + r.name + (r.task ? " · " + r.task.id + " · " + r.task.phase : "") +
+    b.title = (profile ? profile + " / " : "") + r.name + " · " + stateOf(r) + (!r.task && r.open ? " · " + r.open + " abierta(s)" : "") +
+      (r.task ? " · " + r.task.id + " · " + r.task.phase : "") +
       (others.length ? "\n" + others.map((x) => x.id + " · " + x.phase + " · " + x.next).join("\n") : "");
-    b.addEventListener("click", () => { location.hash = "r=" + r.key; });
-    nav.append(b);
+    if (collapsed) b.setAttribute("aria-label", r.name + " · " + stateOf(r));
+    b.addEventListener("click", () => { location.hash = "r=" + r.key; if (drawerOpen) closeDrawer(false); });
+    const d = el("button", "drop", "Quitar");
+    d.type = "button";
+    d.setAttribute("aria-label", "Quitar " + r.name + " de la vista");
+    d.addEventListener("click", () => hideRepo(r.key, r.name));
+    li.append(b, d);
+    list.append(li);
   });
-  if (focused) { const f = nav.querySelector('[data-key="' + CSS.escape(focused) + '"]'); if (f) f.focus(); }
+  const tog = $("hidden-toggle"), hl = $("hidden-list");
+  tog.hidden = hiddenN === 0;
+  setText(tog, "Ocultos (" + hiddenN + ")");
+  tog.classList.toggle("wait", hiddenNow.some((x) => repoRank(x.r) === 0));
+  tog.setAttribute("aria-expanded", hiddenOpen && hiddenN ? "true" : "false");
+  hl.hidden = !(hiddenOpen && hiddenN);
+  hl.replaceChildren();
+  sortRepos(hiddenNow).forEach(({ r }) => {
+    const li = el("li", "");
+    li.dataset.key = r.key;
+    const s = el("button", "show", "Mostrar");
+    s.type = "button";
+    s.setAttribute("aria-label", "Mostrar " + r.name);
+    s.addEventListener("click", () => showRepo(r.key));
+    li.append(el("span", "rn", r.name), el("span", "rw " + (repoRank(r) === 0 ? "human-c" : ""), stateOf(r)), s);
+    hl.append(li);
+  });
+  const ro = $("repos-open");
+  ro.classList.toggle("wait", all.some((x) => repoRank(x.r) === 0));
+  if (focusedKey && live.has(focusedKey)) {
+    const sel = focusedCls === "drop" ? ".drop" : focusedCls === "show" ? ".show" : ".pick";
+    const f = side.querySelector('[data-key="' + CSS.escape(focusedKey) + '"] ' + sel);
+    if (f) f.focus();
+  }
 }
 
 function render() {
@@ -1050,6 +1273,7 @@ function render() {
   renderBoard();
   renderLine();
   renderRepos();
+  ensureVisibleSelection();
   renderGauges();
   renderTokens();
   fitLog();
