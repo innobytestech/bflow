@@ -76,7 +76,7 @@ Es el predeterminado: las tareas son archivos en el repo, sin cuenta ni token. `
 
 ### Plane
 
-`tracker.adapter: plane` con la URL y el workspace (del perfil o de `bflow.yaml`). Las fases se traducen a los estados del proyecto con nombres literales; `bflow tracker states` los muestra y `bflow tracker setup` crea los que falten.
+`tracker.adapter: plane` con la URL y el workspace (del perfil o de `bflow.yaml`). Las fases se traducen a los estados del proyecto con nombres literales; `bflow tracker states` los muestra y `bflow tracker setup` crea los que falten. Las tareas nuevas nacen en el estado de la fase backlog; si el proyecto no lo tiene, `bflow tracker setup` lo crea.
 
 ### GitHub Issues y Projects
 

@@ -450,7 +450,7 @@ func (c *Client) List(ctx context.Context, f tracker.Filter) ([]tracker.Task, er
 	return out, nil
 }
 
-// Create crea un work item en el estado por defecto del proyecto.
+// Create crea un work item en el estado de la fase backlog (no en el por defecto del proyecto).
 func (c *Client) Create(ctx context.Context, title, description string) (tracker.Task, error) {
 	p, err := c.proj(ctx)
 	if err != nil {
@@ -460,8 +460,13 @@ func (c *Client) Create(ctx context.Context, title, description string) (tracker
 	if err != nil {
 		return tracker.Task{}, err
 	}
+	st, ok := c.writeState(sts, flow.Backlog)
+	if !ok {
+		return tracker.Task{}, fmt.Errorf("plane: el proyecto %s no tiene estado para la fase %s (%s); corre bflow tracker setup o ajusta tracker.states",
+			c.Project, flow.Backlog, strings.Join(c.States[flow.Backlog].Names, " / "))
+	}
 	var w workItem
-	body := map[string]string{"name": title, "description_html": markdown.ToHTML(description)}
+	body := map[string]any{"name": title, "description_html": markdown.ToHTML(description), "state": st.ID}
 	if err := c.do(ctx, "POST", p+"/work-items/", body, &w); err != nil {
 		return tracker.Task{}, err
 	}
