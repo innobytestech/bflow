@@ -417,27 +417,66 @@ func runGuardPost(c *Ctx, cfg *config.Config, acts []guard.Action) output.Envelo
 	if bash == nil || c.Build == nil {
 		return allowed
 	}
+	if r := restoreFrozenPost(c, cfg); !r.Empty() {
+		reason := engine.FrozenRestoreReason(r)
+		fmt.Fprintln(c.Stderr, "bflow guard: "+reason)
+		logGuard(c, cfg.Root, "frozen_test", *bash)
+		env := output.Rejected("frozen_test", reason)
+		env.Quiet = !c.JSON
+		return env
+	}
+	// Con pruebas restauradas gana ese aviso ([N5]); si no, la sugerencia (GH-17).
+	if len(cfg.Check.Quick) == 0 {
+		return allowed
+	}
+	advice := guard.Advise(*bash)
+	if advice == "" || !markAdvice(cfg, bash.Session) {
+		return allowed
+	}
+	fmt.Fprintln(c.Stderr, "bflow guard: "+advice)
+	env := output.OK("advice", map[string]any{"reason": advice}, nil)
+	env.Quiet = !c.JSON
+	return env.WithExit(output.ExitRejected)
+}
+
+// restoreFrozenPost restaura las pruebas congeladas que el Bash cambió; vacío si
+// no hay tarea activa, la fase no congela o no hubo cambios.
+func restoreFrozenPost(c *Ctx, cfg *config.Config) engine.FrozenRestore {
+	if c.Build == nil {
+		return engine.FrozenRestore{}
+	}
 	e, err := c.Build(cfg.Root)
 	if err != nil {
-		return allowed
+		return engine.FrozenRestore{}
 	}
 	id, err := e.Active(context.Background())
 	if err != nil {
-		return allowed
+		return engine.FrozenRestore{}
 	}
 	if v, err := e.Status(context.Background(), id); err != nil || !guard.FrozenPhase(v.Phase) {
-		return allowed
+		return engine.FrozenRestore{}
 	}
-	r := e.RestoreFrozen(id)
-	if r.Empty() {
-		return allowed
+	return e.RestoreFrozen(id)
+}
+
+// markAdvice dice si toca avisar: una vez por sesión, con una marca vacía en
+// .bflow/cache/advice. Sin sesión avisa siempre; si la marca no se puede
+// escribir no avisa (el guard es abierto).
+func markAdvice(cfg *config.Config, session string) bool {
+	if session == "" {
+		return true
 	}
-	reason := engine.FrozenRestoreReason(r)
-	fmt.Fprintln(c.Stderr, "bflow guard: "+reason)
-	logGuard(c, cfg.Root, "frozen_test", *bash)
-	env := output.Rejected("frozen_test", reason)
-	env.Quiet = !c.JSON
-	return env
+	dir := filepath.Join(cfg.Root, ".bflow", "cache", "advice")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return false
+	}
+	sum := sha256.Sum256([]byte(session))
+	path := filepath.Join(dir, hex.EncodeToString(sum[:])[:16])
+	if _, err := os.Stat(path); err == nil {
+		return false
+	}
+	pruneLoopFiles(dir, path)
+	return os.WriteFile(path, nil, 0o644) == nil
 }
 
 // needsTask dice si la regla necesita la fase y las pruebas congeladas (cuesta
