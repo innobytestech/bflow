@@ -2,6 +2,12 @@
 
 Los cambios de bflow que ve quien lo usa. Las versiones siguen [semver](https://semver.org/lang/es/) desde la v0.1.0; antes de la 1.0, la API de comandos puede cambiar entre versiones menores.
 
+## v0.2.0
+
+### Agregado
+
+- **Presupuesto de tokens por fase y detección de ciclos (GH-16).** `flow.budget` en `bflow.yaml` fija presupuesto de tokens nuevos por fase (sintaxis: `implementing: 200k`, `quality: 1.5M` o valor entero); `flow.loop_repeats` detecta ciclos (N-ésima repetición idéntica de Bash, Read, Edit, Write rechazada). Cuando una fase supera su presupuesto, `bflow watch` marca la línea en rojo y el siguiente step es un gate `budget` ("¿Seguir?"); "Sí" continúa, "No" bloquea. Un Edit o Write reinicia la cuenta de Bash y Read (no frena relanzamientos de pruebas). Ciclos detectados aparecen en el panel (`ciclo: <herramienta> repetida N veces`) y en el log de eventos. Hacer falta correr `bflow render` para regenerar los agentes.
+
 ## v0.1.0
 
 ### Documentación

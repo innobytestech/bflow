@@ -133,6 +133,27 @@ flow:
 
 Una entrada que termina en `/` cubre la carpeta; las demás se comparan con `path.Match` (un patrón sin `/` también contra el nombre base); `!` al inicio excluye. Deben ser rutas del repo: sin `..`, absolutas ni `.bflow/`. Para eximir una tarea: `bflow unblock <ID> --no-changelog --note "motivo"`.
 
+### Presupuesto de tokens y detección de ciclos
+
+`flow.budget` fija un presupuesto de tokens nuevos por fase. Cuando una fase lo supera, `bflow watch` lo marca en rojo y el siguiente comando (`next`, `report`, etc.) es una pregunta al gate `budget`: "¿Seguir?", "Sí" continúa, "No" bloquea con una nota que el implementer verá. No corta el trabajo, solo pide confirmación.
+
+```yaml
+flow:
+  budget:
+    implementing: 200k          # 200,000 tokens nuevos
+    quality: 1.5M               # 1,500,000 tokens nuevos
+    # La cifra puede ser un entero (200000) o con sufijo k/K (×1e3) o m/M (×1e6).
+```
+
+Una fase sin presupuesto en `flow.budget` no genera pregunta. Hasta 1×, 2×, 3× el presupuesto no aparece el gate. Después de responder "No" en un múltiplo, el siguiente múltiplo sí pregunta de nuevo.
+
+`flow.loop_repeats` detecta cuando un subagente repite la misma acción (Bash, Read, Edit, Write con la misma entrada). A la N-ésima repetición idéntica, el guard la rechaza y `bflow watch` muestra el ciclo detectado. Un Edit o Write permitido reinicia la cuenta de Bash y Read (para no frenar relanzamientos de pruebas tras un cambio). `0` apaga la detección; `2` frena a la segunda repetición.
+
+```yaml
+flow:
+  loop_repeats: 2              # Frena a la segunda repetición idéntica (0 = apagado).
+```
+
 ## Claude Code y OpenCode
 
 ### Claude Code

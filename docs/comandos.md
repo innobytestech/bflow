@@ -9,8 +9,8 @@
 | `status [ID] [--brief]` | Estado y siguiente paso. |
 | `new --lane full\|light\|hotfix --title "t" [--file idea.md] [--slug s]` | Crea una tarea y la arranca. |
 | `start <ID> --lane full\|light\|hotfix [--slug s] [--fixes ID]` | Empieza una tarea en un carril; `--fixes` liga un hotfix a la feature que corrige. |
-| `approve [ID] [--gate g] [--choice n] [--note t] [--file f \| --stdin]` | Aprueba el gate pendiente. `--stdin` (solo gate discovery) recibe el discovery completo por stdin, hasta 64 KiB; bflow lo escribe en `## Discovery` de la spec. `--file` sigue funcionando. |
-| `reject [ID] --note "motivo" [--gate g] [--to fase]` | Rechaza el gate pendiente. En `quality` y `documenting`, sin gate pendiente, regresa la tarea a `implementing` (`--note` obligatorio). |
+| `approve [ID] [--gate g] [--choice n] [--note t] [--file f \| --stdin]` | Aprueba el gate pendiente. Con `--gate budget`, "Sí" sigue la fase. `--stdin` (solo gate discovery) recibe el discovery completo por stdin, hasta 64 KiB; bflow lo escribe en `## Discovery` de la spec. `--file` sigue funcionando. |
+| `reject [ID] --note "motivo" [--gate g] [--to fase]` | Rechaza el gate pendiente. Con `--gate budget`, "No" bloquea la tarea con la nota y no avanza la fase. En `quality` y `documenting`, sin gate pendiente, regresa la tarea a `implementing` (`--note` obligatorio). |
 | `report [ID] --agent a --verdict V [--note] [--file] [--option o]... [--stdin]` | Un agente reporta su veredicto (`--stdin`: reporte del scout). |
 | `block [ID] --reason "motivo"` | Bloquea la tarea. |
 | `unblock [ID] [--note t] [--no-changelog]` | Desbloquea la tarea y vuelve a su fase. Con `--no-changelog` (exige `--note`) exime al documenter del changelog cuando el diff toca `flow.public_paths`; el motivo queda en la bitácora. Solo una persona. |
