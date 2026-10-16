@@ -71,6 +71,12 @@ Cada comando imprime el siguiente paso; con `--json`, ese paso llega en `next`. 
 
 Lo que vive en el CLI se cumple con cualquier herramienta (el estado y las gates los maneja bflow, `DONE` exige un check verde, las pruebas del contrato no cambian). Lo que depende de hooks, solo donde hay hooks (Claude Code y OpenCode): bloquear `git reset --hard`, push forzado, `.env` y `.bflow/`. bflow no garantiza la calidad del código ni contiene a un agente malintencionado. La tabla completa: [Conceptos](docs/conceptos.md#qué-garantiza-y-qué-no).
 
+## Cifras reales
+
+bflow se usa para construir bflow. En las 58 tareas terminadas con corte al 2026-10-16, la tarea típica (mediana) tardó 33m de reloj: 14m de agente y 15m esperando a una persona, con 221.4k tokens nuevos y 4.4M releídos de caché. 10 tareas tuvieron al menos un rechazo en una gate.
+
+No hay comparación con/sin bflow: son cifras de un solo repo, no una promesa de ahorro. Para medir el tuyo: `bflow stats`. Tabla por tarea y cómo reproducirla: [Cifras](docs/cifras.md).
+
 ## Rumbo
 
 Hoy: v0.1.0-rc.9. Previsto: v0.1.0 (primera release anunciada); Fase 1, legible para el mundo (inglés); Fase 2, que exista para alguien; Fase 3, adopción en equipo (Linear, Codex); Fase 4, medir y decidir; y la 1.0 con la API de comandos estable. Cada fase y su criterio de salida: [Por qué y rumbo](docs/por-que-y-rumbo.md#rumbo).
@@ -86,6 +92,7 @@ Hoy: v0.1.0-rc.9. Previsto: v0.1.0 (primera release anunciada); Fase 1, legible 
 | [Configuración](docs/configuracion.md) | `bflow.yaml`, perfiles, trackers, agentes, check, Claude Code y OpenCode. |
 | [Comandos](docs/comandos.md) | Referencia de todos los comandos. |
 | [Marcas de sesión](docs/marcas-sesion.md) | Cómo se reparten los tokens entre tareas. |
+| [Cifras](docs/cifras.md) | Tiempo, tokens, rechazos y rondas por tarea de bflow en su propio repo. |
 | [Cómo probar y reportar](docs/como-probar-y-reportar.md) | Qué esperamos de quien prueba, cómo reportar y problemas conocidos. |
 
 ## Desarrollo
