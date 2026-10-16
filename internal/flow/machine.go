@@ -180,8 +180,46 @@ func (t *tx) pendingGate(ev Event) (*PendingGate, error) {
 	return s.Gate, nil
 }
 
+// approveBudget registra que la persona vio la pregunta de presupuesto y
+// sigue: no toca la fase ni el gate pendiente (R7, R11).
+func (t *tx) approveBudget(ev Event) error {
+	s := &t.s
+	if ev.Choice < 1 || ev.Choice <= s.BudgetAck[s.Phase] {
+		return reject("no_budget_gate", "no hay pregunta de presupuesto vigente en %s", s.Phase)
+	}
+	if s.BudgetAck == nil {
+		s.BudgetAck = map[Phase]int{}
+	}
+	s.BudgetAck[s.Phase] = ev.Choice
+	return nil
+}
+
+// rejectBudget bloquea la tarea con el motivo que el engine ya armó (gasto +
+// nota) y marca el múltiplo como respondido (R9, R10).
+func (t *tx) rejectBudget(ev Event) error {
+	s := &t.s
+	if ev.Choice < 1 || ev.Choice <= s.BudgetAck[s.Phase] {
+		return reject("no_budget_gate", "no hay pregunta de presupuesto vigente en %s", s.Phase)
+	}
+	if ev.To != "" {
+		return reject("bad_target", "un rechazo de presupuesto no admite --to")
+	}
+	note := strings.TrimSpace(ev.Note)
+	if note == "" {
+		return reject("note_required", "un rechazo de presupuesto necesita --note con el motivo")
+	}
+	if s.BudgetAck == nil {
+		s.BudgetAck = map[Phase]int{}
+	}
+	s.BudgetAck[s.Phase] = ev.Choice
+	return t.block(note)
+}
+
 func (t *tx) approve(ev Event) error {
 	s := &t.s
+	if ev.Gate == GateBudget {
+		return t.approveBudget(ev)
+	}
 	g, err := t.pendingGate(ev)
 	if err != nil {
 		return err
@@ -290,6 +328,9 @@ func decisionTargets(cfg Config, lane Lane, phase Phase) []Phase {
 
 func (t *tx) reject(ev Event) error {
 	s := &t.s
+	if ev.Gate == GateBudget {
+		return t.rejectBudget(ev)
+	}
 	if s.Gate == nil && ev.Gate == "" && len(backTargets[s.Phase]) > 0 {
 		return t.back(ev)
 	}
@@ -567,6 +608,9 @@ func clone(s State) State {
 	if s.Block != nil {
 		b := *s.Block
 		c.Block = &b
+	}
+	if s.BudgetAck != nil {
+		c.BudgetAck = maps.Clone(s.BudgetAck)
 	}
 	return c
 }
