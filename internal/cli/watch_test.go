@@ -160,3 +160,28 @@ func TestStartupCheck(t *testing.T) {
 		t.Errorf("nota: %s %s", st, d)
 	}
 }
+
+// R14: con presupuesto configurado, watch muestra el gasto contra el
+// presupuesto por fase, en orden del carril.
+func TestWatchBudgetLine(t *testing.T) {
+	now := time.Date(2026, 9, 28, 17, 42, 0, 0, time.Local)
+	since := now.Add(-5 * time.Minute)
+	v := engine.View{ID: "API-7", Lane: flow.Light, Phase: flow.Implementing, Since: &since,
+		Phases: flow.DefaultLanes()[flow.Light], Next: output.Next{Action: output.ActionSpawn, Agents: []output.AgentCall{{Agent: "implementer"}}}}
+	d := watchData{Repo: "api", Active: &v, Budget: map[flow.Phase]int64{flow.Implementing: 200_000, flow.Quality: 50_000},
+		Stats: metrics.TaskStats{TokensAvailable: true, Tokens: metrics.Usage{Input: 412_000},
+			Phases: []metrics.PhaseStats{{Phase: flow.Implementing, Tokens: metrics.Usage{Input: 412_000}}, {Phase: flow.Quality}}}}
+	out := renderWatch(bannerPlain, "dev", d, now, 0)
+	if !strings.Contains(out, "presupuesto") || !strings.Contains(out, "implementing 412.0k / 200.0k nuevos") {
+		t.Errorf("falta la línea de presupuesto en:\n%s", out)
+	}
+}
+
+// R20: un evento guard con regla loop se describe como ciclo en watch.
+func TestWatchLoopEvent(t *testing.T) {
+	e := store.Entry{Event: "guard", Agent: "implementer", Data: map[string]any{"rule": "loop", "tool": "bash", "repeats": 3}}
+	got := describeEvent(e)
+	if !strings.Contains(got, "ciclo") || !strings.Contains(got, "implementer") || !strings.Contains(got, "bash") || !strings.Contains(got, "3") {
+		t.Errorf("describeEvent(loop) = %q", got)
+	}
+}

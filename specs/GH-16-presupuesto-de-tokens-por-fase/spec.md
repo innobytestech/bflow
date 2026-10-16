@@ -121,15 +121,15 @@ Ciclos
 
 ## Tasks
 
-- [ ] T1 Contrato (R1-R22): tipos y firmas de Design sin lógica (`TokenCount`, `Flow.Budget`, `Flow.LoopRepeats`, `flow.GateBudget`, `State.BudgetAck`, `Config.Budget`, `BudgetPhases`, `BudgetMultiple`, `BudgetDue`, `Engine.next`, `budgetNext`, `Engine.Budgets`, `Action.Fingerprint`, `LoopState.Observe`, `checkLoop`) y estas pruebas, que fallan:
+- [x] T1 Contrato (R1-R22): tipos y firmas de Design sin lógica (`TokenCount`, `Flow.Budget`, `Flow.LoopRepeats`, `flow.GateBudget`, `State.BudgetAck`, `Config.Budget`, `BudgetPhases`, `BudgetMultiple`, `BudgetDue`, `Engine.next`, `budgetNext`, `Engine.Budgets`, `Action.Fingerprint`, `LoopState.Observe`, `checkLoop`) y estas pruebas, que fallan:
   - config: `TestTokenCountParse`, `TestBudgetUnknownPhase`, `TestLoopRepeatsInvalid`, `TestBudgetEmptyByDefault`
   - flow: `TestBudgetDue`, `TestApproveBudgetKeepsGate`, `TestRejectBudgetBlocks`, `TestBudgetGateWithoutDue`
   - engine: `TestNextAsksBudgetFirst`, `TestBudgetAsksAgainAtNextMultiple`, `TestBudgetRejectUnblockNoReask`, `TestBudgetDecisionsLine`, `TestBudgetEntryGate`, `TestNoBudgetNoLogRead`
   - guard y adaptadores: `TestLoopObserveDeniesAtN`, `TestLoopEditResetsBash`, `TestClaudeFingerprint`, `TestOpenCodeFingerprint`
   - cli: `TestGuardLoopDeniesSubagent`, `TestGuardLoopIgnoresMain`, `TestGuardLoopOff`, `TestWatchBudgetLine`, `TestWatchLoopEvent`
-- [ ] T2 Config: `TokenCount`, `budget` y `loop_repeats` con validación y `Core()` (R1, R2, R3, R16).
-- [ ] T3 Flow: `GateBudget`, `BudgetAck`, `BudgetDue` y approve/reject de budget en la máquina (R5, R7, R8, R10, R11).
-- [ ] T4 Engine: gasto por fase, `e.next` en `fill` y `Status`, approve/reject con decisions.md y `entry()` (R4, R5, R6, R9, R12, R13, R15).
-- [ ] T5 Huella en los adaptadores Claude y OpenCode, y `LoopState.Observe` (R17, R18, R19).
-- [ ] T6 Guard: `checkLoop` en `runGuard` con archivo por corrida, poda, falla abierta y registro (R17, R18, R20, R21, R22).
-- [ ] T7 Watch: línea `presupuesto` con color de aviso y descripción del evento de ciclo (R14, R20).
+- [x] T2 Config: `TokenCount`, `budget` y `loop_repeats` con validación y `Core()` (R1, R2, R3, R16).
+- [x] T3 Flow: `GateBudget`, `BudgetAck`, `BudgetDue` y approve/reject de budget en la máquina (R5, R7, R8, R10, R11).
+- [x] T4 Engine: gasto por fase, `e.next` en `fill` y `Status`, approve/reject con decisions.md y `entry()` (R4, R5, R6, R9, R12, R13, R15).
+- [x] T5 Huella en los adaptadores Claude y OpenCode, y `LoopState.Observe` (R17, R18, R19).
+- [x] T6 Guard: `checkLoop` en `runGuard` con archivo por corrida, poda, falla abierta y registro (R17, R18, R20, R21, R22).
+- [x] T7 Watch: línea `presupuesto` con color de aviso y descripción del evento de ciclo (R14, R20).
