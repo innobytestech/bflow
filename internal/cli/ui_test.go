@@ -116,8 +116,7 @@ func TestUIPageHiddenRepos(t *testing.T) {
 // R12: todo acceso a localStorage va en try/catch, incluidas las claves nuevas.
 func TestUIPageStorageGuarded(t *testing.T) {
 	var hidden, collapsed bool
-	for _, line := range strings.Split(string(uiPage), "
-") {
+	for _, line := range strings.Split(string(uiPage), "\n") {
 		if !strings.Contains(line, "localStorage.") {
 			continue
 		}
