@@ -50,7 +50,9 @@ func modelsOfStart(e store.Entry) (ModelSet, bool) {
 	return out, true
 }
 
-// TaskModels da los modelos de la tarea y su origen: "start" | "tokens" | "".
+// TaskModels da los modelos de la tarea y su origen: "start" | "tokens" | "start+tokens" | "".
+// Por agente, el modelo que más aparece en sus eventos tokens (en empate, el último) pisa
+// el de data.models del start; los agentes sin tokens conservan el del start.
 func TaskModels(id string, entries []store.Entry) (ModelSet, string) {
 	var fromStart ModelSet
 	type tally struct {
