@@ -236,3 +236,73 @@ func TestNeedsTaskMayWrite(t *testing.T) {
 		t.Errorf("cat se permite: %d %q", code, errOut)
 	}
 }
+
+// adviceIn es el PostToolUse de Claude para un Bash con sesión.
+func adviceIn(env *Env, cmd, session string) string {
+	b, _ := json.Marshal(map[string]any{"hook_event_name": "PostToolUse", "cwd": env.Dir, "session_id": session,
+		"tool_name": "Bash", "tool_input": map[string]any{"command": cmd}, "tool_response": map[string]any{}})
+	return string(b)
+}
+
+func withQuick(t *testing.T, env *Env) {
+	t.Helper()
+	p := filepath.Join(env.Dir, "bflow.yaml")
+	b, _ := os.ReadFile(p)
+	if err := os.WriteFile(p, append(b, []byte("\ncheck:\n  quick: [\"go test {pkg}\"]\n")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// GH-17: go test directo con check.quick → sale 2 con el aviso, en Claude y OpenCode.
+func TestGuardPostAdvice(t *testing.T) {
+	env, _, _, _ := tokensEnv(t, false)
+	withQuick(t, env)
+	code, _, errOut := hookRun(t, env, adviceIn(env, "go test ./...", "s1"), "guard", "--post")
+	if code != 2 || !strings.Contains(errOut, "bflow guard:") || !strings.Contains(errOut, "bflow check --quick <paquete>") || !strings.Contains(errOut, "sí corrió") {
+		t.Fatalf("claude: %d %q", code, errOut)
+	}
+	code, _, errOut = hookRun(t, env, guardIn(env, "bash", map[string]any{"command": "npm test"}, false, ""), "guard", "--tool", "opencode", "--post")
+	if code != 2 || !strings.Contains(errOut, "bflow check --quick") {
+		t.Fatalf("opencode: %d %q", code, errOut)
+	}
+	if code, out, errOut := hookRun(t, env, adviceIn(env, "echo go test", "s9"), "guard", "--post"); code != 0 || out != "" || errOut != "" {
+		t.Errorf("echo no avisa: %d %q %q", code, out, errOut)
+	}
+}
+
+func TestGuardPostAdviceOncePerSession(t *testing.T) {
+	env, _, _, _ := tokensEnv(t, false)
+	withQuick(t, env)
+	if code, _, _ := hookRun(t, env, adviceIn(env, "go test ./a", "s1"), "guard", "--post"); code != 2 {
+		t.Fatalf("la primera avisa: %d", code)
+	}
+	if code, out, errOut := hookRun(t, env, adviceIn(env, "go test ./b", "s1"), "guard", "--post"); code != 0 || out != "" || errOut != "" {
+		t.Errorf("la segunda de la misma sesión calla: %d %q %q", code, out, errOut)
+	}
+	if code, _, _ := hookRun(t, env, adviceIn(env, "go test ./b", "s2"), "guard", "--post"); code != 2 {
+		t.Errorf("otra sesión avisa: %d", code)
+	}
+	for i := 0; i < 2; i++ {
+		if code, _, _ := hookRun(t, env, adviceIn(env, "go test ./b", ""), "guard", "--post"); code != 2 {
+			t.Errorf("sin sesión avisa cada vez (%d): %d", i, code)
+		}
+	}
+}
+
+func TestGuardPostAdviceNoQuick(t *testing.T) {
+	env, _, _, _ := tokensEnv(t, false)
+	if code, out, errOut := hookRun(t, env, adviceIn(env, "go test ./...", "s1"), "guard", "--post"); code != 0 || out != "" || errOut != "" {
+		t.Errorf("sin check.quick: %d %q %q", code, out, errOut)
+	}
+}
+
+// GH-17 [N5]: si el mismo Bash restauró pruebas congeladas, solo sale ese aviso.
+func TestGuardPostFrozenWins(t *testing.T) {
+	env, _, _ := frozenTask(t, flow.Implementing)
+	withQuick(t, env)
+	writeFrozenFile(t, env, []byte("cambiada\n"))
+	code, _, errOut := hookRun(t, env, adviceIn(env, "go test ./...", "s1"), "guard", "--post")
+	if code != 2 || !strings.Contains(errOut, frozenRel) || strings.Contains(errOut, "check --quick") {
+		t.Fatalf("gana el aviso congelado: %d %q", code, errOut)
+	}
+}
