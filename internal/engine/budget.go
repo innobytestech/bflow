@@ -42,7 +42,7 @@ func budgetNext(id string, p flow.Phase, used, budget int64) output.Next {
 		Question: fmt.Sprintf("La fase %s pasó su presupuesto de tokens. ¿Sigue?", p),
 		Options: []output.Option{
 			{ID: "continue", Label: "Sigue", Command: fmt.Sprintf("bflow approve %s --gate budget", id)},
-			{ID: "pause", Label: "Pausa", NeedsNote: true, Command: fmt.Sprintf("bflow reject %s --gate budget --note \"<motivo>\"", id)},
+			{ID: "block", Label: "Bloquear", NeedsNote: true, Command: fmt.Sprintf("bflow reject %s --gate budget --note \"<motivo>\"", id)},
 		},
 	}
 }
@@ -141,7 +141,7 @@ func (e *Engine) rejectBudget(id, note string) (Outcome, error) {
 	if err != nil {
 		return out, err
 	}
-	if derr := e.budgetDecisionLine(id, rec.Flow.Phase, used, budget, "pausa", motivo); derr != nil {
+	if derr := e.budgetDecisionLine(id, rec.Flow.Phase, used, budget, "bloquea", motivo); derr != nil {
 		out.Warnings = append(out.Warnings, "no se pudo guardar decisions.md: "+derr.Error())
 	}
 	return out, nil
