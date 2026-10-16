@@ -64,4 +64,16 @@
 
 ### Prueba manual
 
-Pendiente: el implementador no tiene credenciales de una instancia real de Plane; la hace un humano antes de mergear (pasos 1-7 de T2).
+Plane self-hosted (no se leyó la versión), proyecto desechable con `tracker setup` aplicado, el estado de backlog renombrado y Todo como estado por defecto. Binario de la rama comparado con el de main.
+
+1. `task add`: ok. Main deja el item en Todo (el estado por defecto); la rama lo deja en el estado de backlog. Plane respeta `state` en el POST, así que no hace falta el PATCH.
+2. `bflow new`: ok. Crea el item y lo pasa a Spec pendiente.
+3. `bflow start` (light): ok. Pasa a Spec pendiente.
+4. Transiciones: ok hasta Walkthrough (Spec pendiente, In Progress, En revisión, Documentando, Walkthrough). PR abierto y Done no se probaron: el sandbox no tiene remoto ni PR.
+5. Bloquear y desbloquear: ok. Pasa a Bloqueado y vuelve a In Progress.
+6. Cierre a Done: no probado, por el mismo motivo que el paso 4.
+7. Sin estado de backlog: ok. Falla con `no tiene estado para la fase backlog (...); corre bflow tracker setup o ajusta tracker.states` y no crea el item.
+
+Hallazgos fuera de alcance:
+- `task add` sin `--description` falla con 400 "Invalid HTML passed", también en main: #143.
+- Mientras exista un estado llamado "Backlog", `tracker.states.backlog` no lo reemplaza, porque `StateTable.Write` prueba primero el nombre literal de la fase. Es el comportamiento documentado; se anota porque sorprende.
