@@ -85,13 +85,16 @@ func TaskModels(id string, entries []store.Entry) (ModelSet, string) {
 			t.last[m] = i
 		}
 	}
-	if fromStart != nil {
-		return fromStart, "start"
-	}
 	if len(toks) == 0 {
+		if fromStart != nil {
+			return fromStart, "start"
+		}
 		return nil, ""
 	}
 	out := ModelSet{}
+	for a, m := range fromStart {
+		out[a] = m
+	}
 	for a, t := range toks {
 		best := ""
 		for m, n := range t.n {
@@ -100,6 +103,9 @@ func TaskModels(id string, entries []store.Entry) (ModelSet, string) {
 			}
 		}
 		out[a] = best
+	}
+	if fromStart != nil {
+		return out, "start+tokens"
 	}
 	return out, "tokens"
 }
@@ -177,6 +183,7 @@ func CompareModels(entries []store.Entry, now time.Time) ModelVerdict {
 	var order []string
 	fixes := map[string]int{}
 	var cur ModelSet
+	var curID string
 	var curTS time.Time
 	for _, e := range entries {
 		if _, seen := byID[e.ID]; !seen {
@@ -190,12 +197,13 @@ func CompareModels(entries []store.Entry, now time.Time) ModelVerdict {
 			fixes[f]++
 		}
 		if ms, ok := modelsOfStart(e); ok && (cur == nil || !e.TS.Before(curTS)) {
-			cur, curTS = ms, e.TS
+			cur, curID, curTS = ms, e.ID, e.TS
 		}
 	}
 	if cur == nil {
 		return ModelVerdict{Verdict: "sin_datos"}
 	}
+	cur, _ = TaskModels(curID, byID[curID])
 
 	var tasks []modelTask
 	for i, id := range order {
