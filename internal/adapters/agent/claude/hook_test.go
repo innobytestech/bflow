@@ -24,6 +24,7 @@ func TestParsePreToolUse(t *testing.T) {
 	}
 	for _, c := range cases {
 		a, cwd, ok := ParsePreToolUse([]byte(c.in))
+		a.Fingerprint = ""
 		if ok != c.ok || a != c.want {
 			t.Errorf("%s\n got %+v ok=%v, want %+v ok=%v", c.in, a, ok, c.want, c.ok)
 		}
@@ -48,11 +49,15 @@ func TestParsePreToolUseAgent(t *testing.T) {
 func TestParsePreToolUseRead(t *testing.T) {
 	a, cwd, ok := ParsePreToolUse([]byte(`{"hook_event_name":"PreToolUse","cwd":"C:\\repo","tool_name":"Read","tool_input":{"file_path":"C:\\repo\\internal\\a.go","offset":10,"limit":50},"agent_type":"bflow-reviewer","agent_id":"abc"}`))
 	want := guard.Action{Tool: guard.Read, Path: `C:\repo\internal\a.go`, Subagent: true, Agent: "bflow-reviewer", Partial: true}
-	if !ok || a != want || cwd != `C:\repo` {
+	got := a
+	got.Fingerprint = ""
+	if !ok || got != want || cwd != `C:\repo` {
 		t.Errorf("reviewer: %+v cwd=%q ok=%v, quiero %+v", a, cwd, ok, want)
 	}
 	a, _, ok = ParsePreToolUse([]byte(`{"tool_name":"Read","tool_input":{"file_path":"x.go"}}`))
-	if !ok || a != (guard.Action{Tool: guard.Read, Path: "x.go"}) {
+	got = a
+	got.Fingerprint = ""
+	if !ok || got != (guard.Action{Tool: guard.Read, Path: "x.go"}) {
 		t.Errorf("sesión principal: %+v ok=%v", a, ok)
 	}
 	if d := guard.Evaluate(a, guard.Context{}); !d.Allow {
@@ -99,11 +104,30 @@ func TestParsePreToolUseSpawn(t *testing.T) {
 		in := `{"session_id":"s1","tool_name":"` + tool + `","tool_input":{"subagent_type":"bflow-reviewer","prompt":"{\"id\":\"GH-3\"}","description":"x"}}`
 		a, _, ok := ParsePreToolUse([]byte(in))
 		want := guard.Action{Tool: guard.Spawn, Target: "bflow-reviewer", Command: `{"id":"GH-3"}`, Session: "s1"}
-		if !ok || a != want {
+		got := a
+		got.Fingerprint = ""
+		if !ok || got != want {
 			t.Errorf("%s: got %+v ok=%v, want %+v", tool, a, ok, want)
 		}
 		if d := guard.Evaluate(a, guard.Context{}); !d.Allow {
 			t.Errorf("%s: un lanzamiento siempre se permite: %+v", tool, d)
 		}
+	}
+}
+
+// GH-16 R17/R18: la huella depende de la herramienta original y de su entrada
+// cruda; dos llamadas iguales dan la misma huella, y una distinta, otra.
+func TestClaudeFingerprint(t *testing.T) {
+	a1, _, ok := ParsePreToolUse([]byte(`{"tool_name":"Bash","tool_input":{"command":"go test ./..."},"agent_type":"implementer"}`))
+	if !ok || a1.Fingerprint == "" {
+		t.Fatalf("esperaba una huella no vacía: %+v ok=%v", a1, ok)
+	}
+	a2, _, _ := ParsePreToolUse([]byte(`{"tool_name":"Bash","tool_input":{"command":"go test ./..."},"agent_type":"implementer"}`))
+	if a2.Fingerprint != a1.Fingerprint {
+		t.Errorf("la misma herramienta y entrada debía dar la misma huella: %q != %q", a1.Fingerprint, a2.Fingerprint)
+	}
+	a3, _, _ := ParsePreToolUse([]byte(`{"tool_name":"Bash","tool_input":{"command":"go vet ./..."},"agent_type":"implementer"}`))
+	if a3.Fingerprint == a1.Fingerprint {
+		t.Errorf("entradas distintas debían dar huellas distintas")
 	}
 }

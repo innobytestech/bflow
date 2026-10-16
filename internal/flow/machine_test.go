@@ -789,3 +789,97 @@ func TestRejectWithoutGateElsewhereIsNoGate(t *testing.T) {
 	}
 	check(row{lane: Full, from: Documenting}, Event{Kind: EvReject, Gate: GateWalkthrough, Note: "x"})
 }
+
+// R5, R8: BudgetDue solo da ok cuando la fase está presupuestada, no es
+// terminal, k ≥ 1 y k > el último múltiplo respondido.
+func TestBudgetDue(t *testing.T) {
+	cfg := testConfig()
+	cfg.Budget = map[Phase]int64{Implementing: 200_000}
+	s := stateFor(row{lane: Full, from: Implementing})
+
+	if k, ok := BudgetDue(cfg, s, 150_000); ok {
+		t.Errorf("sin pasar el presupuesto no debía tocar: k=%d", k)
+	}
+	k, ok := BudgetDue(cfg, s, 412_000)
+	if !ok || k != 2 {
+		t.Errorf("412k/200k debía dar k=2 ok=true: k=%d ok=%v", k, ok)
+	}
+	s.BudgetAck = map[Phase]int{Implementing: 2}
+	if _, ok := BudgetDue(cfg, s, 412_000); ok {
+		t.Error("k ya respondido no debía volver a preguntar")
+	}
+	if k, ok := BudgetDue(cfg, s, 650_000); !ok || k != 3 {
+		t.Errorf("al llegar a 3x debía preguntar otra vez: k=%d ok=%v", k, ok)
+	}
+	// Fase sin presupuesto, o terminal (Blocked): nunca toca.
+	s2 := stateFor(row{lane: Full, from: Quality})
+	if _, ok := BudgetDue(cfg, s2, 999_000); ok {
+		t.Error("quality no está presupuestada")
+	}
+	blocked := stateFor(row{lane: Full, from: Implementing})
+	blocked.Phase = Blocked
+	if _, ok := BudgetDue(cfg, blocked, 999_000); ok {
+		t.Error("una tarea bloqueada no pregunta por presupuesto")
+	}
+}
+
+// R7, R11: approve --gate budget marca el múltiplo como respondido y no
+// cambia ni la fase ni el gate pendiente.
+func TestApproveBudgetKeepsGate(t *testing.T) {
+	cfg := testConfig()
+	s := stateFor(row{lane: Full, from: Implementing})
+	s.BudgetAck = map[Phase]int{Implementing: 1}
+
+	res, err := Apply(cfg, s, Event{Kind: EvApprove, Gate: GateBudget, Choice: 2})
+	if err != nil {
+		t.Fatalf("approve budget: %v", err)
+	}
+	if res.State.Phase != Implementing || res.State.Gate != nil {
+		t.Errorf("approve budget no debía mover la tarea: %+v", res.State)
+	}
+	if res.State.BudgetAck[Implementing] != 2 {
+		t.Errorf("BudgetAck no se actualizó: %v", res.State.BudgetAck)
+	}
+
+	// R11: sin pregunta vigente (choice ≤ BudgetAck) se rechaza.
+	_, err = Apply(cfg, res.State, Event{Kind: EvApprove, Gate: GateBudget, Choice: 2})
+	var rj *Rejection
+	if !errors.As(err, &rj) || rj.Code != "no_budget_gate" {
+		t.Errorf("approve budget repetido debía rechazarse: %v", err)
+	}
+}
+
+// R9, R10: reject --gate budget bloquea la tarea y marca el múltiplo como
+// respondido (no se vuelve a preguntar hasta el siguiente múltiplo).
+func TestRejectBudgetBlocks(t *testing.T) {
+	cfg := testConfig()
+	s := stateFor(row{lane: Full, from: Implementing})
+
+	res, err := Apply(cfg, s, Event{Kind: EvReject, Gate: GateBudget, Choice: 2, Note: "presupuesto de implementing superado (412k / 200k nuevos): a revisar"})
+	if err != nil {
+		t.Fatalf("reject budget: %v", err)
+	}
+	if res.State.Phase != Blocked || res.State.Block == nil {
+		t.Errorf("reject budget debía bloquear: %+v", res.State)
+	}
+	if res.State.BudgetAck[Implementing] != 2 {
+		t.Errorf("BudgetAck no se actualizó al rechazar: %v", res.State.BudgetAck)
+	}
+}
+
+// R11: approve/reject --gate budget sin pregunta vigente (choice < 1 o ya
+// respondido) se rechaza con no_budget_gate.
+func TestBudgetGateWithoutDue(t *testing.T) {
+	cfg := testConfig()
+	s := stateFor(row{lane: Full, from: Implementing})
+
+	_, err := Apply(cfg, s, Event{Kind: EvApprove, Gate: GateBudget, Choice: 0})
+	var rj *Rejection
+	if !errors.As(err, &rj) || rj.Code != "no_budget_gate" {
+		t.Errorf("choice=0 debía rechazarse: %v", err)
+	}
+	_, err = Apply(cfg, s, Event{Kind: EvReject, Gate: GateBudget, Choice: 0, Note: "x"})
+	if !errors.As(err, &rj) || rj.Code != "no_budget_gate" {
+		t.Errorf("choice=0 en reject debía rechazarse: %v", err)
+	}
+}

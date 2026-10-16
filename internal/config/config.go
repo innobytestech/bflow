@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -138,6 +139,44 @@ type Flow struct {
 	// si el diff las toca, el documenter debe cambiar el changelog. "dir/" = carpeta,
 	// "!patrón" excluye.
 	PublicPaths []string `yaml:"public_paths,omitempty"`
+	// Budget es el presupuesto de tokens nuevos por fase (GH-16). Fase ausente
+	// o mapa vacío: sin presupuesto, sin aviso.
+	Budget map[string]TokenCount `yaml:"budget,omitempty"`
+	// LoopRepeats: a la N-ésima repetición idéntica de un subagente (Bash,
+	// Read, Edit, Write en la misma corrida) el guard la rechaza. 0 = apagado.
+	LoopRepeats int `yaml:"loop_repeats,omitempty"`
+}
+
+// TokenCount es una cifra de tokens en bflow.yaml: entero (200000) o con
+// sufijo k/K (×1e3) o m/M (×1e6), con decimal opcional (1.5M).
+type TokenCount int64
+
+var tokenCountRe = regexp.MustCompile(`^([0-9]*\.?[0-9]+)([kKmM]?)$`)
+
+// UnmarshalYAML acepta 200000, 200k o 1.5M; cualquier otra cosa, o una cifra
+// ≤ 0, es un error (lo ve bflow doctor vía Config.Validate).
+func (t *TokenCount) UnmarshalYAML(n *yaml.Node) error {
+	raw := strings.TrimSpace(n.Value)
+	m := tokenCountRe.FindStringSubmatch(raw)
+	if m == nil {
+		return fmt.Errorf("flow.budget: cifra inválida %q", raw)
+	}
+	f, err := strconv.ParseFloat(m[1], 64)
+	if err != nil {
+		return fmt.Errorf("flow.budget: cifra inválida %q", raw)
+	}
+	switch m[2] {
+	case "k", "K":
+		f *= 1e3
+	case "m", "M":
+		f *= 1e6
+	}
+	v := int64(f)
+	if v <= 0 {
+		return fmt.Errorf("flow.budget: cifra inválida %q", raw)
+	}
+	*t = TokenCount(v)
+	return nil
 }
 
 type Step struct {
@@ -599,6 +638,18 @@ func (c *Config) Validate() error {
 			add("flow.public_paths: %q debe ser una ruta del repo (sin .., absoluta ni .bflow/)", p)
 		}
 	}
+	for _, phase := range sortedKeys(c.Flow.Budget) {
+		if !slices.Contains(flow.BudgetPhases, flow.Phase(phase)) {
+			names := make([]string, len(flow.BudgetPhases))
+			for i, p := range flow.BudgetPhases {
+				names[i] = string(p)
+			}
+			add("flow.budget: fase desconocida %q (válidas: %s)", phase, strings.Join(names, ", "))
+		}
+	}
+	if c.Flow.LoopRepeats < 0 || c.Flow.LoopRepeats == 1 {
+		add("flow.loop_repeats debe ser 0 (apagado) o ≥ 2 (es %d)", c.Flow.LoopRepeats)
+	}
 	if c.Check.DBTestPattern != "" {
 		if _, err := regexp.Compile(c.Check.DBTestPattern); err != nil {
 			add("check.db_test_pattern no es una regex válida: %v", err)
@@ -664,6 +715,12 @@ func (f Flow) Core() flow.Config {
 	}
 	core.Changelog = f.ConsumerChangelog
 	core.PublicPaths = f.PublicPaths
+	if len(f.Budget) > 0 {
+		core.Budget = make(map[flow.Phase]int64, len(f.Budget))
+		for phase, n := range f.Budget {
+			core.Budget[flow.Phase(phase)] = int64(n)
+		}
+	}
 	if f.Scout == nil || *f.Scout {
 		core.Scout = flow.ScoutAgent
 	}

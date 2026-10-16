@@ -5,6 +5,8 @@
 package guard
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -34,6 +36,22 @@ type Action struct {
 	Partial  bool   `json:"partial,omitempty"` // Read con offset o limit; solo la llenan los parsers
 	Session  string `json:"session,omitempty"` // llave de sesión (R4); la llenan los parsers
 	Target   string `json:"target,omitempty"`  // Spawn: tipo de subagente lanzado
+	// Fingerprint identifica una acción exacta (misma herramienta, misma
+	// entrada cruda) para detectar ciclos de un subagente (GH-16). La llenan
+	// los adaptadores con Fingerprint(tool, rawInput).
+	Fingerprint string `json:"fingerprint,omitempty"`
+}
+
+// Fingerprint es la huella sha256 hex de una acción: la herramienta original
+// (antes de traducirla a Bash/Edit/Write/Read) más su entrada cruda, separadas
+// por un byte nulo. Dos llamadas con exactamente la misma herramienta y
+// entrada dan la misma huella.
+func Fingerprint(tool string, raw []byte) string {
+	h := sha256.New()
+	h.Write([]byte(tool))
+	h.Write([]byte{0})
+	h.Write(raw)
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 // Context es lo que el guard sabe del repo y de la tarea activa.

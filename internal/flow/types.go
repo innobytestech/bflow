@@ -57,6 +57,9 @@ const (
 	GateRounds      Gate = "rounds"      // cortacircuito de rondas de calidad
 	GateQuestions   Gate = "questions"   // preguntas de producto, antes de ver el código
 	GateWalkthrough Gate = "walkthrough" // aprobar el PR
+	// GateBudget no es un gate pendiente normal: no pasa por pendingGate ni
+	// pisa el gate que ya estuviera abierto (GH-16).
+	GateBudget Gate = "budget"
 )
 
 // Verdict es lo que un agente reporta.
@@ -137,6 +140,10 @@ type State struct {
 	Resume        bool   `json:"resume,omitempty"`  // el próximo spawn reanuda al mismo agente
 	Note          string `json:"note,omitempty"`    // último comentario humano para el agente
 	Decision      string `json:"decision,omitempty"`
+	// BudgetAck es el último múltiplo de presupuesto respondido por fase
+	// (GH-16): aprobar o rechazar la pregunta de presupuesto no pregunta otra
+	// vez hasta el siguiente múltiplo.
+	BudgetAck map[Phase]int `json:"budget_ack,omitempty"`
 }
 
 // New crea el estado inicial de una tarea.

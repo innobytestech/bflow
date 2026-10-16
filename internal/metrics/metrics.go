@@ -150,7 +150,7 @@ func Compute(id string, entries []store.Entry, now time.Time) TaskStats {
 		}
 		switch e.Event {
 		case "tokens":
-			u := usageOf(e.Data)
+			u := UsageOf(e.Data)
 			ps := get(flow.Phase(fmt.Sprint(e.Data["phase"])))
 			ps.Tokens.Add(u)
 			addTo(&ps.Agents, e.Agent, u)
@@ -344,7 +344,8 @@ func Allot(entries []store.Entry, id, agent string, samples []Sample) []Share {
 	return out
 }
 
-func usageOf(d map[string]any) Usage {
+// UsageOf lee el uso de un evento tokens de log.jsonl (e.Data).
+func UsageOf(d map[string]any) Usage {
 	return Usage{Input: num(d["input"]), Output: num(d["output"]), CacheRead: num(d["cache_read"]), CacheWrite: num(d["cache_write"]),
 		Calls: num(d["calls"]), MaxContext: num(d["max_context"]), LastContext: num(d["last_context"])}
 }

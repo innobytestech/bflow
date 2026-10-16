@@ -49,6 +49,8 @@ type watchData struct {
 	Calls     []metrics.Run
 	CallsFile bool
 	Stale     bool // el binario instalado cambió desde que arrancó este panel
+	// Budget es el presupuesto por fase configurado (GH-16); vacío = no mostrar la línea.
+	Budget map[flow.Phase]int64
 }
 
 func runWatch(c *Ctx) output.Envelope {
@@ -122,7 +124,7 @@ func readWatch(c *Ctx) (watchData, error) {
 // readWatchIn lee el panel del repo de e.
 func readWatchIn(e *engine.Engine) (watchData, error) {
 	ctx := context.Background()
-	d := watchData{Repo: filepath.Base(e.Cfg.Root), Unassigned: metrics.UnassignedUsage(e.Store.Dir())}
+	d := watchData{Repo: filepath.Base(e.Cfg.Root), Unassigned: metrics.UnassignedUsage(e.Store.Dir()), Budget: e.Budgets()}
 	views, err := e.Views(ctx)
 	if err != nil {
 		return d, err
@@ -388,6 +390,15 @@ func renderWatch(m bannerMode, version string, d watchData, now time.Time, rows 
 				label("", fmt.Sprintf("%-18s %s", agentName(a), metrics.Detail(u)))
 			}
 		}
+		if len(d.Budget) > 0 {
+			for i, l := range budgetLines(m, v, d.Budget, st) {
+				lbl := "presupuesto"
+				if i > 0 {
+					lbl = ""
+				}
+				label(lbl, l)
+			}
+		}
 		if n := st.Refused + st.Guarded + st.Nudged; n > 0 {
 			label("fricción", fmt.Sprintf("%d rechazo(s) del flujo · %d bloqueo(s) de guard · %d fin(es) sin reporte", st.Refused, st.Guarded, st.Nudged))
 		}
@@ -428,6 +439,31 @@ func renderWatch(m bannerMode, version string, d watchData, now time.Time, rows 
 	out = strings.TrimRight(out+tail.String(), "\n")
 	if all := strings.Split(out, "\n"); rows > 0 && len(all) > rows { // último recurso
 		out = strings.Join(all[:rows], "\n")
+	}
+	return out
+}
+
+// budgetLines arma, en orden del carril, una línea "<fase> <gasto> / <presupuesto>
+// nuevos" por cada fase presupuestada (R14); la fase que ya pasó su
+// presupuesto se pinta en ámbar (cHuman), igual que el resto de avisos a la
+// persona.
+func budgetLines(m bannerMode, v engine.View, budget map[flow.Phase]int64, stats metrics.TaskStats) []string {
+	used := map[flow.Phase]int64{}
+	for _, ps := range stats.Phases {
+		used[ps.Phase] = ps.Tokens.New()
+	}
+	var out []string
+	for _, p := range v.Phases {
+		b, ok := budget[p]
+		if !ok || b <= 0 {
+			continue
+		}
+		u := used[p]
+		line := fmt.Sprintf("%s %s / %s nuevos", p, metrics.Human(u), metrics.Human(b))
+		if u > b {
+			line = paint(m, cHuman, line)
+		}
+		out = append(out, line)
 	}
 	return out
 }
@@ -506,6 +542,9 @@ func describeEvent(e store.Entry) string {
 		who := ""
 		if e.Agent != "" {
 			who = " a " + e.Agent
+		}
+		if e.Data["rule"] == "loop" {
+			return fmt.Sprintf("ciclo: %s repitió %v %v veces", e.Agent, e.Data["tool"], e.Data["repeats"])
 		}
 		return fmt.Sprintf("guard bloqueó%s: %v", who, e.Data["rule"])
 	case "refused":

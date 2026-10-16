@@ -236,7 +236,7 @@ func (e *Engine) fill(out *Outcome, rec store.Record) {
 	if rec.Flow.Gate != nil {
 		out.Gate = string(rec.Flow.Gate.Name)
 	}
-	out.Next = e.withDisplay(context.Background(), rec, flow.NextFor(e.flowCfg(), rec.Flow))
+	out.Next = e.withDisplay(context.Background(), rec, e.next(rec))
 	r := rec
 	out.Record = &r
 }
@@ -245,7 +245,10 @@ func (e *Engine) entry(id string, ev flow.Event, before, after flow.State) store
 	en := store.Entry{TS: e.now(), ID: id, Event: string(ev.Kind), From: before.Phase, To: after.Phase,
 		Agent: ev.Agent, Verdict: string(ev.Verdict), Round: after.Round, Note: ev.Note, By: e.User}
 	if ev.Kind == flow.EvApprove || ev.Kind == flow.EvReject {
-		if before.Gate != nil {
+		switch {
+		case ev.Gate == flow.GateBudget:
+			en.Gate = string(flow.GateBudget)
+		case before.Gate != nil:
 			en.Gate = string(before.Gate.Name)
 		}
 	}

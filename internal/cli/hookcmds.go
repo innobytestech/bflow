@@ -3,6 +3,8 @@ package cli
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -11,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -113,6 +116,14 @@ func runGuard(c *Ctx) output.Envelope {
 	}
 	if post {
 		return runGuardPost(c, cfg, acts)
+	}
+	if cfg.Flow.LoopRepeats >= 2 {
+		if d, deny := checkLoop(c, cfg, acts); deny {
+			fmt.Fprintln(c.Stderr, "bflow guard: "+d.Reason)
+			env := output.Rejected(d.Rule, d.Reason)
+			env.Quiet = !c.JSON
+			return env
+		}
 	}
 	if allReads(acts) {
 		recordReads(c, cfg, acts, cwd, str(c.Flags, "reads") == "true") // un Read no se evalúa (R9)
@@ -298,8 +309,9 @@ func guardContext(cfg *config.Config) guard.Context {
 }
 
 // logGuard registra el bloqueo en la tarea activa para medir la fricción. Solo
-// corre al bloquear; sin tarea activa no hay a quién atribuirlo.
-func logGuard(c *Ctx, root, rule string, a guard.Action) {
+// corre al bloquear; sin tarea activa no hay a quién atribuirlo. extra son
+// campos adicionales de Data (p. ej. tool y repeats de un rechazo por ciclo).
+func logGuard(c *Ctx, root, rule string, a guard.Action, extra ...map[string]any) {
 	if c.Build == nil {
 		return
 	}
@@ -308,8 +320,86 @@ func logGuard(c *Ctx, root, rule string, a guard.Action) {
 		return
 	}
 	if id, err := e.Active(context.Background()); err == nil {
-		_ = e.Store.Append(store.Entry{TS: time.Now(), ID: id, Event: "guard", By: e.User, Agent: a.Agent,
-			Data: map[string]any{"rule": rule, "command": truncateCmd(a.Command)}})
+		data := map[string]any{"rule": rule, "command": truncateCmd(a.Command)}
+		for _, m := range extra {
+			for k, v := range m {
+				data[k] = v
+			}
+		}
+		_ = e.Store.Append(store.Entry{TS: time.Now(), ID: id, Event: "guard", By: e.User, Agent: a.Agent, Data: data})
+	}
+}
+
+// checkLoop detecta que un subagente repite la misma acción (Bash, Read, Edit,
+// Write, misma huella) N veces o más en su corrida (loop_repeats ≥ 2; R16-R22).
+// Toma la primera acción con Subagent, Session no vacía y Fingerprint no
+// vacía; cualquier error leyendo o escribiendo la cuenta deja pasar (abierto).
+func checkLoop(c *Ctx, cfg *config.Config, acts []guard.Action) (guard.Decision, bool) {
+	var a *guard.Action
+	for i := range acts {
+		if acts[i].Subagent && acts[i].Session != "" && acts[i].Fingerprint != "" &&
+			slices.Contains([]string{guard.Bash, guard.Read, guard.Edit, guard.Write}, acts[i].Tool) {
+			a = &acts[i]
+			break
+		}
+	}
+	if a == nil {
+		return guard.Decision{}, false
+	}
+	dir := filepath.Join(cfg.Root, ".bflow", "cache", "loops")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return guard.Decision{}, false
+	}
+	sum := sha256.Sum256([]byte(a.Session))
+	path := filepath.Join(dir, hex.EncodeToString(sum[:])[:16]+".json")
+	unlock, err := store.LockFile(path+".lock", 2*time.Second, time.Minute)
+	if err != nil {
+		return guard.Decision{}, false
+	}
+	defer unlock()
+	pruneLoopFiles(dir, path)
+	var st guard.LoopState
+	if b, err := os.ReadFile(path); err == nil {
+		if json.Unmarshal(b, &st) != nil {
+			return guard.Decision{}, false
+		}
+	}
+	n, deny := st.Observe(*a, cfg.Flow.LoopRepeats)
+	if b, err := json.Marshal(st); err == nil {
+		_ = store.WriteAtomic(path, b)
+	}
+	if !deny {
+		return guard.Decision{}, false
+	}
+	d := deny2("loop", "repetiste la misma acción (%s) %d veces en esta corrida: estás en un ciclo. Cambia de enfoque o reporta BLOCKED con lo que te falta.", a.Tool, n)
+	logGuard(c, cfg.Root, "loop", *a, map[string]any{"tool": a.Tool, "repeats": n})
+	return d, true
+}
+
+// deny2 arma un guard.Decision de rechazo (guard.deny no se exporta).
+func deny2(rule, format string, args ...any) guard.Decision {
+	return guard.Decision{Allow: false, Rule: rule, Reason: fmt.Sprintf(format, args...)}
+}
+
+// pruneLoopFiles borra, al crear uno nuevo, los archivos de ciclos de más de 7
+// días (except el propio path que se va a usar).
+func pruneLoopFiles(dir, path string) {
+	if _, err := os.Stat(path); err == nil {
+		return // ya existía: no es "crear uno nuevo"
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	cutoff := time.Now().Add(-7 * 24 * time.Hour)
+	for _, en := range entries {
+		if en.IsDir() || strings.HasSuffix(en.Name(), ".lock") {
+			continue
+		}
+		p := filepath.Join(dir, en.Name())
+		if info, err := en.Info(); err == nil && info.ModTime().Before(cutoff) {
+			_ = os.Remove(p)
+		}
 	}
 }
 

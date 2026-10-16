@@ -27,6 +27,39 @@ type Config struct {
 	PublicPaths []string
 	// Scout: nombre del agente scout; vacío = apagado.
 	Scout string
+	// Budget: tokens nuevos presupuestados por fase (GH-16); fase ausente =
+	// sin presupuesto.
+	Budget map[Phase]int64
+}
+
+// BudgetPhases son las fases que aceptan flow.budget en bflow.yaml.
+var BudgetPhases = []Phase{Discovery, Spec, Contract, Implementing, Paused, Quality, Documenting, Walkthrough}
+
+// BudgetMultiple es el múltiplo del presupuesto ya gastado: floor(used/budget),
+// 0 si budget no es positivo.
+func BudgetMultiple(budget, used int64) int {
+	if budget <= 0 {
+		return 0
+	}
+	return int(used / budget)
+}
+
+// budgetTerminal son las fases en las que no se pregunta por presupuesto.
+var budgetTerminal = []Phase{Done, Dropped, InReview, Blocked, Backlog}
+
+// BudgetDue dice si, en el estado s, toca preguntar por presupuesto: la fase
+// está en cfg.Budget, no es una fase terminal, k ≥ 1 y k es mayor que el
+// último múltiplo respondido en esa fase (s.BudgetAck).
+func BudgetDue(cfg Config, s State, used int64) (k int, ok bool) {
+	budget, has := cfg.Budget[s.Phase]
+	if !has || slices.Contains(budgetTerminal, s.Phase) {
+		return 0, false
+	}
+	k = BudgetMultiple(budget, used)
+	if k < 1 || k <= s.BudgetAck[s.Phase] {
+		return 0, false
+	}
+	return k, true
 }
 
 // ChangelogPath es la ruta, versionada, del único changelog para consumidores
