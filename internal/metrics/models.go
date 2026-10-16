@@ -179,7 +179,8 @@ type modelTask struct {
 	hotfixes   int
 }
 
-// CompareModels aplica R8-R14 sobre el log.
+// CompareModels aplica R8-R14 sobre el log. La configuración vigente es el conjunto
+// efectivo de la tarea del start más reciente (TaskModels: start más tokens), no solo data.models.
 func CompareModels(entries []store.Entry, now time.Time) ModelVerdict {
 	byID := map[string][]store.Entry{}
 	var order []string
