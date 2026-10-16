@@ -2,12 +2,6 @@
 
 Los cambios de bflow que ve quien lo usa. Las versiones siguen [semver](https://semver.org/lang/es/) desde la v0.1.0; antes de la 1.0, la API de comandos puede cambiar entre versiones menores.
 
-## v0.2.0
-
-### Agregado
-
-- **Presupuesto de tokens por fase y detección de ciclos (GH-16).** `flow.budget` en `bflow.yaml` fija presupuesto de tokens nuevos por fase (sintaxis: `implementing: 200k`, `quality: 1.5M` o valor entero); `flow.loop_repeats` detecta ciclos (N-ésima repetición idéntica de Bash, Read, Edit, Write rechazada). Cuando una fase supera su presupuesto, `bflow watch` marca la línea en rojo y el siguiente step es un gate `budget` ("¿Seguir?"); "Sí" continúa, "No" bloquea. Un Edit o Write reinicia la cuenta de Bash y Read (no frena relanzamientos de pruebas). Ciclos detectados aparecen en el panel (`ciclo: <herramienta> repetida N veces`) y en el log de eventos. Hacer falta correr `bflow render` para regenerar los agentes.
-
 ## v0.1.0
 
 ### Documentación
@@ -25,6 +19,7 @@ Los cambios de bflow que ve quien lo usa. Las versiones siguen [semver](https://
 
 ### Agregado
 
+- **Presupuesto de tokens por fase y detección de ciclos (GH-16).** `flow.budget` en `bflow.yaml` fija presupuesto de tokens nuevos por fase (sintaxis: `implementing: 200k`, `quality: 1.5M` o valor entero); `flow.loop_repeats` detecta ciclos (N-ésima repetición idéntica de Bash, Read, Edit, Write rechazada). Cuando una fase supera su presupuesto, `bflow watch` marca la línea en ámbar y el siguiente paso es un gate `budget` ("¿Sigue?"); "Sigue" continúa, "Pausa" bloquea con una nota. Un Edit o Write reinicia la cuenta de Bash y Read (no frena relanzamientos de pruebas). Ciclos detectados aparecen en el panel (`ciclo: <herramienta> repetida N veces`) y en el log de eventos. Hace falta correr `bflow render` para regenerar los agentes.
 - **El discovery vive en la spec.** `approve --gate discovery --stdin` recibe el discovery completo por stdin (hasta 64 KiB; más de eso da `discovery_too_long`) y bflow lo escribe en `## Discovery` de `spec.md`. Ya no hace falta un archivo suelto ni se crea `.bflow/tasks/<ID>/discovery.md`. `show <ID> discovery` lee la sección y, si está vacía, el `discovery.md` de tareas anteriores. `--file` sigue funcionando.
 - **El documenter ya no puede omitir el changelog cuando cambia la salida pública.** Nueva clave `flow.public_paths` en `bflow.yaml`: rutas del repo que ve quien usa el producto (`carpeta/` cubre la carpeta, los demás son patrones `path.Match`, `!patrón` excluye). Si el diff las toca y el changelog para consumidores no cambió, `report DONE` del documenter se rechaza con `changelog_required` y lista las rutas. Una persona puede eximirlo con `bflow unblock <ID> --no-changelog --note "motivo"`; queda en la bitácora. Sin `public_paths` el gate no actúa. Hace falta correr `bflow render` para regenerar el oficio del documenter.
 - **`bflow reject --note` regresa a implementing desde quality o documenting sin gate pendiente.** Antes daba `no_gate`. El motivo queda en la bitácora y en el tracker, y el implementer retoma con él; la ronda de calidad no cambia.

@@ -133,6 +133,9 @@ func (e *Engine) rejectBudget(id, note string) (Outcome, error) {
 		return Outcome{ID: id}, &flow.Rejection{Code: "no_budget_gate", Reason: "no hay pregunta de presupuesto vigente"}
 	}
 	motivo := strings.TrimSpace(note)
+	if motivo == "" {
+		return Outcome{ID: id}, &flow.Rejection{Code: "note_required", Reason: "un rechazo de presupuesto necesita --note con el motivo"}
+	}
 	nota := fmt.Sprintf("presupuesto de %s superado (%s / %s nuevos): %s", rec.Flow.Phase, metrics.Human(used), metrics.Human(budget), motivo)
 	out, err := e.apply(context.Background(), id, flow.Event{Kind: flow.EvReject, Gate: flow.GateBudget, Choice: k, Note: nota}, "")
 	if err != nil {

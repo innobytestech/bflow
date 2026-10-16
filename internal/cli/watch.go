@@ -163,8 +163,6 @@ const (
 	cDone  = "32"
 	cDim   = "2"
 	cBold  = "1"
-	// cWarn marca lo que pasó su presupuesto de tokens (GH-16).
-	cWarn = "1;31"
 )
 
 func paint(m bannerMode, code, s string) string {
@@ -446,8 +444,9 @@ func renderWatch(m bannerMode, version string, d watchData, now time.Time, rows 
 }
 
 // budgetLines arma, en orden del carril, una línea "<fase> <gasto> / <presupuesto>
-// nuevos" por cada fase presupuestada (R14); el llamador pinta en cWarn las
-// que ya pasaron su presupuesto.
+// nuevos" por cada fase presupuestada (R14); la fase que ya pasó su
+// presupuesto se pinta en ámbar (cHuman), igual que el resto de avisos a la
+// persona.
 func budgetLines(m bannerMode, v engine.View, budget map[flow.Phase]int64, stats metrics.TaskStats) []string {
 	used := map[flow.Phase]int64{}
 	for _, ps := range stats.Phases {
@@ -462,7 +461,7 @@ func budgetLines(m bannerMode, v engine.View, budget map[flow.Phase]int64, stats
 		u := used[p]
 		line := fmt.Sprintf("%s %s / %s nuevos", p, metrics.Human(u), metrics.Human(b))
 		if u > b {
-			line = paint(m, cWarn, line)
+			line = paint(m, cHuman, line)
 		}
 		out = append(out, line)
 	}
