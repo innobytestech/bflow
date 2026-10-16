@@ -160,12 +160,12 @@ Fila oculta (`#hidden-list > li`): `<span class="rn">` + `<span class="rw">` + `
 
 ## Tasks
 
-- [ ] T1 Contrato. Escribir las pruebas en `internal/cli/ui_test.go` (fallan hasta T2-T4) y fijar en `index.html` los ids y nombres del Design.
+- [x] T1 Contrato. Escribir las pruebas en `internal/cli/ui_test.go` (fallan hasta T2-T4) y fijar en `index.html` los ids y nombres del Design.
   - `TestUIPageSidebar`: la página tiene `<aside class="side`, `id="repos"`, `id="repo-list"`, `id="repos-collapse"`, `id="repos-open"`, `id="repos-close"`, `bflow.sidebar-collapsed`, `position: sticky` y `(hover: none)`. No tiene `<nav class="repos"` ni `class="chip`. (R1, R15, R16, R17, R19)
   - `TestUIPageHiddenRepos`: tiene `bflow.hidden-repos`, `id="hidden-toggle"` con `aria-expanded`, `id="hidden-list"`, `id="undo"` con `role="status"`, `Deshacer`, `Mostrar`, `Quitar`, `UNDO_MS = 6000`, `id="all-hidden"` y las funciones `loadHidden`, `saveHidden`, `repoRank`, `sortRepos`, `ensureVisibleSelection`. (R7-R14)
   - `TestUIPageStorageGuarded`: toda línea de la página con `localStorage.` contiene `try {`. (R12)
   - `TestUIPageOneScreen`: se conserva y además exige `id="shell"`. (R18)
-- [ ] T2 Sidebar y orden. Mover la lista a `<aside id="repos">` dentro de `.shell`, con filas `li.repo` (botón `pick`), `repoRank` y `sortRepos`, etiquetas TÚ / AGENTE / vía libre, ámbar, borde `--full`, atenuado, perfil discreto, sticky con scroll propio, una sola pantalla a 1180x720, y sin sidebar con menos de 2 repos. (R1-R6, R17, R18)
-- [ ] T3 Quitar, Deshacer y Ocultos. `HIDDEN_KEY`, `loadHidden`, `saveHidden`, botón `drop`, aviso `#undo` con pausa, `#hidden-toggle` y `#hidden-list` con "Mostrar", ámbar en Ocultos, `ensureVisibleSelection`, estado `all-hidden`, foco tras Quitar, y notificaciones sin filtrar ocultos. (R7-R14, R19, R20)
-- [ ] T4 Colapsar y panel angosto. `setCollapsed` con `COLLAPSED_KEY`, `openDrawer` y `closeDrawer` con Escape, scrim y foco, botón "Repos" en la franja con ámbar, y `prefers-reduced-motion`. (R15, R16, R19)
-- [ ] T5 Documentación. Cambiar en `docs/guia.md` (línea ~126) la franja de chips por el sidebar, Quitar/Ocultos y el panel angosto, y agregar en `CHANGELOG.md` una entrada en "Cambiado" (la lista de repos ahora es un sidebar; se pueden ocultar repos sin perder avisos). (R21)
+- [x] T2 Sidebar y orden. Mover la lista a `<aside id="repos">` dentro de `.shell`, con filas `li.repo` (botón `pick`), `repoRank` y `sortRepos`, etiquetas TÚ / AGENTE / vía libre, ámbar, borde `--full`, atenuado, perfil discreto, sticky con scroll propio, una sola pantalla a 1180x720, y sin sidebar con menos de 2 repos. (R1-R6, R17, R18)
+- [x] T3 Quitar, Deshacer y Ocultos. `HIDDEN_KEY`, `loadHidden`, `saveHidden`, botón `drop`, aviso `#undo` con pausa, `#hidden-toggle` y `#hidden-list` con "Mostrar", ámbar en Ocultos, `ensureVisibleSelection`, estado `all-hidden`, foco tras Quitar, y notificaciones sin filtrar ocultos. (R7-R14, R19, R20)
+- [x] T4 Colapsar y panel angosto. `setCollapsed` con `COLLAPSED_KEY`, `openDrawer` y `closeDrawer` con Escape, scrim y foco, botón "Repos" en la franja con ámbar, y `prefers-reduced-motion`. (R15, R16, R19)
+- [x] T5 Documentación. Cambiar en `docs/guia.md` (línea ~126) la franja de chips por el sidebar, Quitar/Ocultos y el panel angosto, y agregar en `CHANGELOG.md` una entrada en "Cambiado" (la lista de repos ahora es un sidebar; se pueden ocultar repos sin perder avisos). (R21)
