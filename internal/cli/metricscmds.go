@@ -524,3 +524,8 @@ func addTokens(e *engine.Engine, id, tool, run string, samples []metrics.Sample,
 	e.AddTokens(id, u.New(), u.CacheRead)
 	return u, name, nil
 }
+
+// renderModelVerdict da la línea (y las de vuelta) del veredicto de modelos.
+func renderModelVerdict(v metrics.ModelVerdict, color bool) string {
+	return "" // stub del contrato (GH-18 T4)
+}

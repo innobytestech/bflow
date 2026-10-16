@@ -334,3 +334,9 @@ type SettingsResult struct {
 // Area: agente|log|proveedor; Level: ok|warn. Vive aquí para que los
 // adaptadores no importen cli.
 type LogFinding struct{ Area, Level, Msg string }
+
+// Models da el modelo configurado de cada agente del flujo (con el scout): el de
+// agents.<nombre>.model o el del catálogo; "" si ninguno lo fija.
+func Models(fc flow.Config, conf map[string]config.AgentConf) map[string]string {
+	return nil // stub del contrato (GH-18 T2)
+}

@@ -275,3 +275,38 @@ func TestReviewerCraftCorreccion(t *testing.T) {
 		}
 	}
 }
+
+func TestCatalogDefaultModels(t *testing.T) {
+	fc := flow.DefaultConfig()
+	fc.Scout = flow.ScoutAgent
+	got := Models(fc, nil)
+	want := map[string]string{"spec-author": "opus", "reviewer": "opus", "implementer": "sonnet", "documenter": "haiku", "scout": "haiku"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Models por defecto = %v, quiero %v", got, want)
+	}
+	specs, err := Build(fc, nil, testutil.TempDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range specs {
+		if s.Model != want[s.Name] {
+			t.Errorf("Build %s: model %q, Models dice %q", s.Name, s.Model, want[s.Name])
+		}
+	}
+}
+
+func TestModelsRespectsRepoOverride(t *testing.T) {
+	fc := flow.DefaultConfig()
+	fc.Scout = flow.ScoutAgent
+	got := Models(fc, map[string]config.AgentConf{
+		"spec-author": {Model: "sonnet"},
+		"scout":       {Model: "opus"},
+	})
+	if got["spec-author"] != "sonnet" || got["scout"] != "opus" || got["reviewer"] != "opus" || got["implementer"] != "sonnet" {
+		t.Errorf("agents.<nombre>.model manda sobre el catálogo: %v", got)
+	}
+	fc.Scout = ""
+	if _, ok := Models(fc, nil)["scout"]; ok {
+		t.Error("sin scout en el flujo no aparece")
+	}
+}
