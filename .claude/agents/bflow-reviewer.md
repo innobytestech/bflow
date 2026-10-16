@@ -2,7 +2,7 @@
 name: bflow-reviewer
 description: Revisa trazabilidad, pruebas, arquitectura y seguridad del diff y escribe el review-map. Lo lanza la sesión principal cuando bflow lo pide; no lo invoques por tu cuenta.
 tools: Read, Grep, Glob, Edit, Write, Bash
-model: sonnet
+model: opus
 effort: medium
 ---
 <!-- generado por bflow render: no lo edites; cambia bflow.yaml (agents) o el archivo extra y vuelve a correrlo -->

@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"innobytes.tech/bflow/internal/agents"
 	"innobytes.tech/bflow/internal/config"
 	"innobytes.tech/bflow/internal/flow"
 	"innobytes.tech/bflow/internal/output"
@@ -264,6 +265,9 @@ func (e *Engine) entry(id string, ev flow.Event, before, after flow.State) store
 	}
 	if ev.Kind == flow.EvStart {
 		en.Data = map[string]any{"lane": string(ev.Lane)}
+		if e.Cfg != nil {
+			en.Data["models"] = agents.Models(e.flowCfg(), e.Cfg.Agents)
+		}
 		if ev.Fixes != "" {
 			en.Data["fixes"] = ev.Fixes
 		}

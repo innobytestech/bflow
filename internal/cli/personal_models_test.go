@@ -109,8 +109,8 @@ func TestRenderSyncsPersonalModels(t *testing.T) {
 		t.Fatalf("render: %s", raw)
 	}
 	got := userModels(t, oc)
-	if len(got) != 2 || got["bflow-documenter"] != "g/haiku" || got["bflow-scout"] != "g/haiku" {
-		t.Errorf("solo los agentes de haiku (el repo define sonnet; opus no lo usa nadie): %v", got)
+	if len(got) != 4 || got["bflow-documenter"] != "g/haiku" || got["bflow-scout"] != "g/haiku" || got["bflow-reviewer"] != "g/opus" || got["bflow-spec-author"] != "g/opus" {
+		t.Errorf("solo los agentes de haiku (el repo define sonnet) y de opus (reviewer y spec-author): %v", got)
 	}
 	pm, _ := dataOf(out)["personal_models"].(map[string]any)
 	if pm == nil || pm["path"] != oc || pm["changed"] != true || pm["error"] != nil && pm["error"] != "" {
@@ -283,7 +283,7 @@ func TestInstallOpenCodeSyncsModels(t *testing.T) {
 		t.Fatalf("install opencode: %d %s", code, raw)
 	}
 	got := userModels(t, oc)
-	if len(got) != 2 || got["bflow-documenter"] != "g/haiku" || got["bflow-scout"] != "g/haiku" {
+	if len(got) != 4 || got["bflow-documenter"] != "g/haiku" || got["bflow-scout"] != "g/haiku" || got["bflow-reviewer"] != "g/opus" || got["bflow-spec-author"] != "g/opus" {
 		t.Errorf("install deja los overrides personales: %v", got)
 	}
 	if pm, _ := dataOf(out)["personal_models"].(map[string]any); pm == nil || pm["path"] != oc {
@@ -372,7 +372,7 @@ func TestDoctorOpenCodeModels(t *testing.T) {
 func TestDoctorOpenCodeModelosRegion(t *testing.T) {
 	data := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", data)
-	env, oc := personalEnv(t, "agent: [claude, opencode]\n", "models:\n  opencode: { haiku: opencode-go/deepseek-v4.1-flash, sonnet: opencode-go/deepseek-v4-pro }\n")
+	env, oc := personalEnv(t, "agent: [claude, opencode]\n", "models:\n  opencode: { haiku: opencode-go/deepseek-v4.1-flash, sonnet: opencode-go/deepseek-v4-pro, opus: opencode-go/deepseek-v4-pro }\n")
 	if code, _, raw := runJSON(t, env, "render"); code != 0 {
 		t.Fatalf("render: %s", raw)
 	}

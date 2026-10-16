@@ -60,8 +60,12 @@ func runStats(c *Ctx) output.Envelope {
 		}
 		runs, _ := readCalls(e, id)
 		st.Prefix = metrics.PrefixByAgent(runs)
+		st.ModelSet, st.ModelSource = metrics.TaskModels(id, log)
 		data := map[string]any{"stats": st}
 		text := renderStats(st)
+		if st.ModelSource != "" {
+			text += fmt.Sprintf("\n  modelos (%s): %s", st.ModelSource, st.ModelSet)
+		}
 		if wantCalls || wantReads {
 			text = statsLine(st)
 		}
@@ -94,6 +98,11 @@ func runStats(c *Ctx) output.Envelope {
 		fmt.Fprintf(&b, "%s\n", statsLine(st))
 	}
 	data := map[string]any{"tasks": all}
+	mv := metrics.CompareModels(log, now)
+	data["models"] = mv
+	if mv.Verdict != "sin_datos" {
+		fmt.Fprintf(&b, "%s\n", renderModelVerdict(mv, bannerFor(c) == bannerColor))
+	}
 	un := metrics.UnassignedUsage(e.Store.Dir())
 	if un.Total() > 0 {
 		data["unassigned"] = un
@@ -523,4 +532,46 @@ func addTokens(e *engine.Engine, id, tool, run string, samples []metrics.Sample,
 	}
 	e.AddTokens(id, u.New(), u.CacheRead)
 	return u, name, nil
+}
+
+// modelVerdictLine es la línea sin color del veredicto de modelos (stats y doctor).
+func modelVerdictLine(v metrics.ModelVerdict) string {
+	switch v.Verdict {
+	case "sin_datos":
+		return "sin datos de modelos todavía"
+	case "sube":
+		return "sube · " + strings.Join(v.Rose, " · ") + " · " + modelCounts(v)
+	case "sin_regresion":
+		return "sin regresión · " + modelCounts(v)
+	}
+	return "sin veredicto · " + modelCounts(v)
+}
+
+func modelCounts(v metrics.ModelVerdict) string {
+	before := 0
+	if v.Previous != nil {
+		before = len(v.Previous.Tasks)
+	}
+	return fmt.Sprintf("después %d/%d · antes %d/%d", len(v.Current.Tasks), metrics.ModelWindow, before, metrics.ModelWindow)
+}
+
+// renderModelVerdict da la línea (y las de vuelta) del veredicto de modelos. El
+// rojo solo va en "sube" y en las líneas de vuelta, y solo con color.
+func renderModelVerdict(v metrics.ModelVerdict, color bool) string {
+	red := func(s string) string {
+		if color {
+			return "\x1b[31m" + s + "\x1b[0m"
+		}
+		return s
+	}
+	if v.Verdict != "sube" {
+		return "modelos: " + modelVerdictLine(v)
+	}
+	var b strings.Builder
+	b.WriteString("modelos: " + red("sube · "+strings.Join(v.Rose, " · ")) + " · " + modelCounts(v))
+	for _, ch := range v.Changes {
+		b.WriteString("\n" + red(fmt.Sprintf("  %s: %s → volver a %s", ch.Agent, ch.To, ch.From)))
+	}
+	b.WriteString("\n  cambia bflow.yaml (agents) y corre bflow render")
+	return b.String()
 }

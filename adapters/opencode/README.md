@@ -10,14 +10,19 @@
 
 ## Modelos
 
-OpenCode exige `proveedor/modelo`. Los agentes de bflow traen alias (`sonnet`, `haiku`) que se traducen con `models.opencode`. En `bflow.yaml` (equipo) el modelo va al `model:` de los agentes versionados. En el nivel superior de la config global (solo tú) va a `agent.bflow-<agente>.model` de tu `opencode.json`, nunca al repo; los `models` de un perfil se ignoran:
+OpenCode exige `proveedor/modelo`. Los agentes de bflow traen alias (`opus`, `sonnet`, `haiku`) que se traducen con `models.opencode`. Los defaults: `opus` en spec-author y reviewer, `sonnet` en implementer, security-auditor y ux-auditor, `haiku` en scout y documenter; `agents.<nombre>.model` en `bflow.yaml` los cambia. En `bflow.yaml` (equipo) el modelo va al `model:` de los agentes versionados. En el nivel superior de la config global (solo tú) va a `agent.bflow-<agente>.model` de tu `opencode.json`, nunca al repo; los `models` de un perfil se ignoran:
 
 ```yaml
 models:
   opencode:
+    opus: anthropic/claude-opus-4
     sonnet: anthropic/claude-sonnet-4
     haiku: anthropic/claude-haiku-4
 ```
+
+Para mapear `opus`, `sonnet` y `haiku` solo para ti, ponlo en el `models:` del nivel superior de tu config global (`config.yaml`, el mismo formato; este repo no lo versiona).
+
+`bflow stats` y `bflow doctor` (ítem `veredicto-modelos`) comparan las últimas 3 tareas con la configuración de modelos vigente contra las 3 anteriores; si rondas, rechazos o hotfixes suben, avisan a qué modelo volver. Nunca revierten solos.
 
 Un valor con `/` se usa tal cual. Un alias sin equivalente deja al agente sin `model:` y `bflow render` y `bflow doctor` lo avisan. Si el repo define el alias, no se escribe override. `bflow render` e `install opencode` conservan el resto de tu `opencode.json`; con solo `opencode.jsonc` o un JSON ilegible no lo editan y te dan el bloque a pegar.
 

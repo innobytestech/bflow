@@ -117,6 +117,10 @@ type TaskStats struct {
 	Agents map[string]Usage `json:"agents,omitempty"`
 	// Review es la última cobertura del reviewer (evento review_coverage).
 	Review *review.Coverage `json:"review,omitempty"`
+	// ModelSet y ModelSource son los modelos de la tarea y su origen ("start" |
+	// "tokens"). Los llena stats, no Compute.
+	ModelSet    ModelSet `json:"model_set,omitempty"`
+	ModelSource string   `json:"model_source,omitempty"`
 }
 
 func addTo(m *map[string]Usage, k string, u Usage) {
