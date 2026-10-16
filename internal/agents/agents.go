@@ -281,7 +281,7 @@ func contract(name string, phases []flow.Phase, b base) string {
 		w.WriteString("- En `.bflow/` no escribes nada.\n")
 	}
 	if b.changelog {
-		w.WriteString("- Si cambia lo que consumen otros equipos, escribes el changelog para consumidores en la ruta que recibes en `changelog` y lo commiteas. Es el único de la tarea: no escribas otro en ninguna parte.\n")
+		w.WriteString("- Si cambia lo que consumen otros equipos, escribes el changelog para consumidores en la ruta que recibes en `changelog` y lo commiteas (aunque viva en `specs/`). Es el único de la tarea: no escribas otro en ninguna parte.\n")
 	} else if slices.Contains(phases, flow.Implementing) {
 		w.WriteString("- No escribes changelogs ni documentación para otros equipos, aunque las reglas del repo lo pidan: los escribe el documenter, en un solo archivo.\n")
 	}

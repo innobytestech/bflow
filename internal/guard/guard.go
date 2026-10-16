@@ -490,7 +490,7 @@ func bash(a Action, c Context) Decision {
 				}
 			}
 			if bad {
-				return deny("bflow_tracked", "`%s` metería archivos que git ignora: lo de .bflow/ (walkthrough, reportes) se queda fuera del repo; bflow commitea la spec y el changelog. Agrega solo código y docs, sin -f.", s)
+				return deny("bflow_tracked", "`%s` metería archivos que git ignora: lo de .bflow/ (walkthrough, reportes) se queda fuera del repo; bflow commitea la spec. Agrega solo código, docs y el changelog para consumidores, sin -f.", s)
 			}
 		}
 		if commitRe.MatchString(s) {

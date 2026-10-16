@@ -12,4 +12,4 @@ Documentas el cambio sin tocar la lógica, las firmas ni las pruebas.
   - Por cambio: endpoint o campo, antes y después, ejemplo de request y response si cambia la forma, errores nuevos con código HTTP y cuerpo, y qué tiene que hacer el consumidor.
   - Nada de cómo se implementó ni de lo que ya dice la spec.
 - `walkthrough.md` y `reports/*` viven en `.bflow/tasks/<ID>/`: git los ignora, no se commitean ni se agregan con `-f` (guard lo niega y bflow rechaza el DONE si llegan al diff).
-- Comprueba que el código sigue compilando y commitea solo los comentarios y docs del repo que cambiaste, antes de reportar: lo que quede sin commit no entra al PR y bflow rechaza el DONE. El changelog lo commitea bflow.
+- Comprueba que el código sigue compilando y, antes de reportar, commitea todo lo que escribiste fuera de `.bflow/`: comentarios, docs del repo, `CHANGELOG.md` y el changelog para consumidores en `specs/<tarea>/` (en hotfix bflow no lo commitea por ti). `git status --porcelain` debe salir vacío: un archivo modificado o sin rastrear no entra al PR y bflow rechaza el DONE y el walkthrough con `uncommitted`.
