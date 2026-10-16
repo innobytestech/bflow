@@ -28,7 +28,10 @@ type fakeGit struct {
 	// onlyFor: si no está vacío, Dirty solo devuelve dirty cuando se le pregunta
 	// exactamente por esa ruta (la consulta del gate del changelog).
 	onlyFor string
-	head    string // HeadSHA; vacío: "abc"
+	// byPath: Dirty filtra dirty por las rutas que se le piden, como git
+	// status (sin rutas, todo el árbol).
+	byPath bool
+	head   string // HeadSHA; vacío: "abc"
 }
 
 func (g *fakeGit) CurrentBranch(context.Context) (string, error) { return g.branch, nil }
@@ -41,7 +44,19 @@ func (g *fakeGit) Dirty(_ context.Context, p []string) ([]string, error) {
 	if g.onlyFor != "" && (len(p) != 1 || p[0] != g.onlyFor) {
 		return nil, nil
 	}
-	return g.dirty, nil
+	if !g.byPath || len(p) == 0 {
+		return g.dirty, nil
+	}
+	var out []string
+	for _, f := range g.dirty {
+		for _, q := range p {
+			if f == q || strings.HasPrefix(f, strings.TrimSuffix(q, "/")+"/") {
+				out = append(out, f)
+				break
+			}
+		}
+	}
+	return out, nil
 }
 func (g *fakeGit) HeadSHA(context.Context) (string, error) {
 	if g.head != "" {
@@ -230,6 +245,47 @@ func TestPROpenedOnWalkthroughAndIdempotent(t *testing.T) {
 	}
 	if _, err := v.e.PR(ctx, v.task(t, "sin empezar")); err == nil {
 		t.Error("pr en una tarea que no está en in_review debe fallar")
+	}
+}
+
+// GH-150: en hotfix bflow no commitea el changelog para consumidores; si el
+// documenter lo deja sin rastrear en specs/ (fuera de check.code_paths), el
+// DONE y el walkthrough se rechazan en lugar de abrir el PR sin él.
+func TestUncommittedOutsideCodePathsBlocksDocsAndPR(t *testing.T) {
+	v := newEnv(t, "stack: go\nvcs: { base_branch: dev }\n")
+	g, h := &fakeGit{branch: "dev", byPath: true}, newHost()
+	v.e.Git, v.e.Host = g, h
+	ctx := context.Background()
+	m := mustT(t)
+	id := v.task(t, "Demo")
+	m(v.e.Start(ctx, id, flow.Hotfix, "", ""))
+	m(v.e.Report(ctx, id, ReportOpts{Agent: "implementer", Verdict: flow.DoneV}))
+	m(v.e.Report(ctx, id, ReportOpts{Agent: "reviewer", Verdict: flow.Approved}))
+	cl := changelogOf(t, v, id)
+	if !strings.HasPrefix(cl, "specs/") {
+		t.Fatalf("ruta del changelog inesperada: %s", cl)
+	}
+
+	g.dirty = []string{cl, "CHANGELOG.md", ".bflow/tasks/" + id + "/walkthrough.md"}
+	rj := rejection(t, docsDone(v, id), "uncommitted")
+	if !strings.Contains(rj.Reason, cl) || !strings.Contains(rj.Reason, "CHANGELOG.md") || strings.Contains(rj.Reason, ".bflow/") {
+		t.Errorf("el rechazo lista lo que no entraría al PR, sin .bflow/:\n%s", rj.Reason)
+	}
+	g.dirty = nil
+	m(v.e.Report(ctx, id, ReportOpts{Agent: "documenter", Verdict: flow.DoneV}))
+	m(v.e.Approve(ctx, id, ApproveOpts{Gate: "questions"}))
+
+	g.dirty = []string{cl}
+	rj = rejection(t, func() error { _, err := v.e.Approve(ctx, id, ApproveOpts{}); return err }(), "uncommitted")
+	if !strings.Contains(rj.Reason, cl) {
+		t.Errorf("el walkthrough nombra el archivo sin rastrear:\n%s", rj.Reason)
+	}
+	if phaseOf(t, v, id) != flow.Walkthrough || h.opened != 0 || strings.Contains(strings.Join(g.calls, ";"), "push") {
+		t.Fatalf("con el árbol sucio no hay push ni PR: fase=%s abiertos=%d %v", phaseOf(t, v, id), h.opened, g.calls)
+	}
+	g.dirty = nil
+	if o := m(v.e.Approve(ctx, id, ApproveOpts{})); o.PR == nil || h.opened != 1 {
+		t.Fatalf("con el árbol limpio abre el PR: %+v", o)
 	}
 }
 

@@ -140,14 +140,16 @@ func (e *Engine) degradePR(rec *store.Record, base string, cause error) []string
 	return []string{fmt.Sprintf("%v: crea el PR aquí: %s (descripción lista en .bflow/tasks/%s/pr-body.md; bflow connect github para abrirlo solo)", cause, url, rec.Flow.ID)}
 }
 
-// uncommitted son los cambios de código sin commitear: no entrarían al PR.
-// No cuentan .bflow/ (git la ignora) ni, en los carriles con spec, la spec y
-// el changelog: bflow los commitea solo.
+// uncommitted son los cambios sin commitear o sin rastrear en todo el árbol,
+// no solo en check.code_paths: no entrarían al PR (GH-150: el changelog para
+// consumidores de un hotfix quedó sin rastrear en specs/). No cuentan .bflow/
+// (git la ignora) ni, en los carriles con spec, la spec y el changelog: bflow
+// los commitea solo.
 func (e *Engine) uncommitted(ctx context.Context, s flow.State) []string {
 	if e.Git == nil {
 		return nil
 	}
-	dirty, err := e.Git.Dirty(ctx, e.Cfg.Check.CodePaths)
+	dirty, err := e.Git.Dirty(ctx, nil)
 	if err != nil {
 		return nil
 	}
@@ -190,6 +192,6 @@ func bflowInDiffRejection(files []string, when string) *flow.Rejection {
 }
 
 func uncommittedRejection(files []string, when string) *flow.Rejection {
-	return &flow.Rejection{Code: "uncommitted", Reason: "hay cambios de código sin commitear que no entrarían al PR:\n" + strings.Join(files, "\n") +
+	return &flow.Rejection{Code: "uncommitted", Reason: "hay cambios sin commitear o sin rastrear que no entrarían al PR:\n" + strings.Join(files, "\n") +
 		"\nCommitéalos (o descarta los que no van) y " + when + "."}
 }
