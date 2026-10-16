@@ -124,6 +124,11 @@ func (f *fakePlane) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		var in map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&in)
+		if h, ok := in["description_html"].(string); ok && h == "" { // como Plane real
+			w.WriteHeader(400)
+			fmt.Fprint(w, `{"non_field_errors":["Invalid HTML passed"]}`)
+			return
+		}
 		state := "st-todo"
 		if v, ok := in["state"].(string); ok {
 			state = v
@@ -242,6 +247,18 @@ func TestCreate(t *testing.T) {
 	got, err := c.Get(context.Background(), "API-200")
 	if err != nil || got.Title != "Idea nueva" {
 		t.Errorf("la tarea creada se puede leer: %+v, %v", got, err)
+	}
+}
+
+func TestCreateWithoutDescription(t *testing.T) {
+	f := newFake(t)
+	c := newClient(t, f)
+	task, err := c.Create(context.Background(), "Sin descripción", "")
+	if err != nil {
+		t.Fatalf("Plane rechaza description_html vacío: %v", err)
+	}
+	if task.Title != "Sin descripción" {
+		t.Errorf("tarea creada = %+v", task)
 	}
 }
 

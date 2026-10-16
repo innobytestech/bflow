@@ -451,6 +451,8 @@ func (c *Client) List(ctx context.Context, f tracker.Filter) ([]tracker.Task, er
 }
 
 // Create crea un work item en el estado de la fase backlog (no en el por defecto del proyecto).
+// Si la descripción queda vacía tras convertir el markdown a HTML, no envía description_html,
+// porque Plane responde 400 a un campo vacío.
 func (c *Client) Create(ctx context.Context, title, description string) (tracker.Task, error) {
 	p, err := c.proj(ctx)
 	if err != nil {
@@ -466,7 +468,10 @@ func (c *Client) Create(ctx context.Context, title, description string) (tracker
 			c.Project, flow.Backlog, strings.Join(c.States[flow.Backlog].Names, " / "))
 	}
 	var w workItem
-	body := map[string]any{"name": title, "description_html": markdown.ToHTML(description), "state": st.ID}
+	body := map[string]any{"name": title, "state": st.ID}
+	if h := markdown.ToHTML(description); strings.TrimSpace(h) != "" { // Plane rechaza description_html vacío con 400
+		body["description_html"] = h
+	}
 	if err := c.do(ctx, "POST", p+"/work-items/", body, &w); err != nil {
 		return tracker.Task{}, err
 	}
