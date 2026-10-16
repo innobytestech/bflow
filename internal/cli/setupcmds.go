@@ -513,6 +513,17 @@ func runDoctor(c *Ctx) output.Envelope {
 		add("git", "ok", "remoto %s · base %s", r, orDash(cfg.VCS.BaseBranch))
 	}
 
+	if log, err := e.Store.Log(""); err != nil {
+		add("veredicto-modelos", "warn", "no se pudo leer el log: %v", err)
+	} else {
+		v := metrics.CompareModels(log, time.Now())
+		status := "ok"
+		if v.Verdict == "sube" {
+			status = "warn"
+		}
+		add("veredicto-modelos", status, "%s", modelVerdictLine(v))
+	}
+
 	var missing, optional []string
 	seen := map[string]bool{}
 	for _, s := range cfg.Check.Steps {

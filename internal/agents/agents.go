@@ -95,10 +95,10 @@ type base struct {
 
 // catalog son los agentes que bflow trae con un oficio por defecto.
 var catalog = map[string]base{
-	"spec-author":      {"Escribe la spec de la tarea (brief, requirements, design, tasks) a partir de la descripción y el discovery.", "", "medium", nil, true, false},
+	"spec-author":      {"Escribe la spec de la tarea (brief, requirements, design, tasks) a partir de la descripción y el discovery.", "opus", "medium", nil, true, false},
 	"ui-designer":      {"Diseña el UI blueprint de la spec anclado a las pantallas hermanas del repo.", "", "medium", nil, true, false},
 	"implementer":      {"Escribe el contrato (pruebas y firmas) y después implementa las tareas de la spec.", "sonnet", "medium", []string{"contract.md", "reports/impl.md"}, false, false},
-	"reviewer":         {"Revisa trazabilidad, pruebas, arquitectura y seguridad del diff y escribe el review-map.", "sonnet", "medium", []string{"reports/review-map.md"}, false, false},
+	"reviewer":         {"Revisa trazabilidad, pruebas, arquitectura y seguridad del diff y escribe el review-map.", "opus", "medium", []string{"reports/review-map.md"}, false, false},
 	"security-auditor": {"Audita seguridad, resiliencia y rendimiento del código nuevo de la rama.", "sonnet", "medium", []string{"reports/security.md"}, false, false},
 	"ux-auditor":       {"Audita la interfaz nueva contra el UI blueprint y las guías del repo.", "sonnet", "medium", []string{"reports/ux.md"}, false, false},
 	"scout":            {"Lee el repo y resume lo que toca la tarea antes del discovery o la spec.", "haiku", "low", nil, false, false},
@@ -338,5 +338,13 @@ type LogFinding struct{ Area, Level, Msg string }
 // Models da el modelo configurado de cada agente del flujo (con el scout): el de
 // agents.<nombre>.model o el del catálogo; "" si ninguno lo fija.
 func Models(fc flow.Config, conf map[string]config.AgentConf) map[string]string {
-	return nil // stub del contrato (GH-18 T2)
+	out := map[string]string{}
+	names := fc.AgentNames()
+	if fc.Scout != "" {
+		names = append(names, fc.Scout)
+	}
+	for _, name := range names {
+		out[name] = pick(conf[name].Model, catalog[name].model)
+	}
+	return out
 }

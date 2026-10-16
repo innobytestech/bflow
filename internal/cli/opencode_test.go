@@ -67,7 +67,7 @@ func stringsOf(v any) []string {
 
 func TestRenderMultiTool(t *testing.T) {
 	setHome(t)
-	env := toolsEnv(t, "agent: [claude, opencode]\nmodels:\n  opencode: { sonnet: anthropic/claude-sonnet-4, haiku: anthropic/claude-haiku-4 }\n")
+	env := toolsEnv(t, "agent: [claude, opencode]\nmodels:\n  opencode: { sonnet: anthropic/claude-sonnet-4, haiku: anthropic/claude-haiku-4, opus: anthropic/claude-opus-4 }\n")
 
 	code, out, raw := runJSON(t, env, "render")
 	d := dataOf(out)
@@ -93,8 +93,8 @@ func TestRenderMultiTool(t *testing.T) {
 	if sc := rendered(t, env, ".opencode/agents/bflow-scout.md"); !strings.Contains(sc, "bash: allow") || strings.Contains(sc, "edit: allow") {
 		t.Errorf("el scout de OpenCode lee y corre bash, sin edit (R23):%s", sc)
 	}
-	if sa := rendered(t, env, ".opencode/agents/bflow-spec-author.md"); strings.Contains(sa, "model:") {
-		t.Errorf("un agente sin modelo no lleva model:\n%s", sa)
+	if sa := rendered(t, env, ".opencode/agents/bflow-spec-author.md"); !strings.Contains(sa, "model: anthropic/claude-opus-4") {
+		t.Errorf("el alias opus del spec-author se traduce:\n%s", sa)
 	}
 
 	code, out, raw = runJSON(t, env, "render", "--check")
@@ -173,11 +173,12 @@ func TestRenderUnresolved(t *testing.T) {
 		Tool, Alias string
 		Agents      []string
 	}
-	if err := json.Unmarshal(b, &un); err != nil || len(un) != 2 {
+	if err := json.Unmarshal(b, &un); err != nil || len(un) != 3 {
 		t.Fatalf("data.unresolved: %s", b)
 	}
 	if un[0].Tool != "opencode" || un[0].Alias != "haiku" || !slices.Equal(un[0].Agents, []string{"bflow-documenter", "bflow-scout"}) ||
-		un[1].Tool != "opencode" || un[1].Alias != "sonnet" || !slices.Equal(un[1].Agents, []string{"bflow-implementer", "bflow-reviewer"}) {
+		un[1].Tool != "opencode" || un[1].Alias != "opus" || !slices.Equal(un[1].Agents, []string{"bflow-reviewer", "bflow-spec-author"}) ||
+		un[2].Tool != "opencode" || un[2].Alias != "sonnet" || !slices.Equal(un[2].Agents, []string{"bflow-implementer"}) {
 		t.Errorf("por herramienta, ordenado por alias, con sus agentes ordenados: %+v", un)
 	}
 	if oc := rendered(t, env, ".opencode/agents/bflow-implementer.md"); strings.Contains(oc, "model:") {
@@ -556,7 +557,7 @@ func TestDoctorOpenCode(t *testing.T) {
 		t.Errorf("comando distinto: %v", cmd)
 	}
 
-	full := toolsEnv(t, "agent: [claude, opencode]\nmodels:\n  opencode: { sonnet: a/s, haiku: a/h }\n")
+	full := toolsEnv(t, "agent: [claude, opencode]\nmodels:\n  opencode: { sonnet: a/s, haiku: a/h, opus: a/o }\n")
 	for _, it := range doctorChecks(t, full)["modelos"] {
 		if it["status"] == "warn" {
 			t.Errorf("con la tabla completa no hay aviso de modelos: %v", it)
