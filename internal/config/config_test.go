@@ -539,3 +539,55 @@ func TestPublicPathsValidated(t *testing.T) {
 		t.Errorf("no llegó a flow.Config: %v", c.Flow.Core().PublicPaths)
 	}
 }
+
+// R1: flow.budget acepta enteros y cifras con sufijo k/K/M (decimal incluido).
+func TestTokenCountParse(t *testing.T) {
+	c, err := Load(fixture(t, "", "flow:\n  budget: { implementing: 200000, contract: 200k, quality: 1.5M }\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	core := c.Flow.Core()
+	want := map[flow.Phase]int64{flow.Implementing: 200000, flow.Contract: 200_000, flow.Quality: 1_500_000}
+	for p, n := range want {
+		if core.Budget[p] != n {
+			t.Errorf("budget[%s] = %d, want %d (core=%v)", p, core.Budget[p], n, core.Budget)
+		}
+	}
+}
+
+// R2: una fase fuera de flow.BudgetPhases, o una cifra ilegible/≤0, falla al cargar.
+func TestBudgetUnknownPhase(t *testing.T) {
+	if _, err := Load(fixture(t, "", "flow:\n  budget: { coding: 200k }\n")); err == nil || !strings.Contains(err.Error(), "flow.budget") || !strings.Contains(err.Error(), "coding") {
+		t.Errorf("fase desconocida debía rechazarse: %v", err)
+	}
+	if _, err := Load(fixture(t, "", "flow:\n  budget: { implementing: 0 }\n")); err == nil || !strings.Contains(err.Error(), "flow.budget") {
+		t.Errorf("cifra ≤ 0 debía rechazarse: %v", err)
+	}
+	if _, err := Load(fixture(t, "", "flow:\n  budget: { implementing: abc }\n")); err == nil || !strings.Contains(err.Error(), "flow.budget") {
+		t.Errorf("cifra ilegible debía rechazarse: %v", err)
+	}
+}
+
+// R16: loop_repeats solo admite 0 (apagado) o ≥ 2.
+func TestLoopRepeatsInvalid(t *testing.T) {
+	for _, bad := range []string{"-1", "1"} {
+		if _, err := Load(fixture(t, "", "flow:\n  loop_repeats: "+bad+"\n")); err == nil || !strings.Contains(err.Error(), "flow.loop_repeats") {
+			t.Errorf("loop_repeats %s debía rechazarse: %v", bad, err)
+		}
+	}
+	c, err := Load(fixture(t, "", "flow:\n  loop_repeats: 3\n"))
+	if err != nil || c.Flow.LoopRepeats != 3 {
+		t.Errorf("loop_repeats 3 debía aceptarse: c=%+v err=%v", c.Flow.LoopRepeats, err)
+	}
+}
+
+// R3: sin flow.budget, el núcleo no trae presupuesto (ni pregunta ni línea en watch).
+func TestBudgetEmptyByDefault(t *testing.T) {
+	c, err := Load(fixture(t, "", "stack: go\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.Flow.Core().Budget) != 0 {
+		t.Errorf("sin flow.budget, core.Budget debía quedar vacío: %v", c.Flow.Core().Budget)
+	}
+}
