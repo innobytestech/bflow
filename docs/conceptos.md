@@ -115,7 +115,7 @@ Lo que vive en el CLI se cumple con cualquier herramienta. Lo que depende de hoo
 | El estado, las fases y las gates los maneja bflow, no el modelo | Sí | Sí | Sí |
 | `DONE` exige un check verde sobre el commit actual | Sí | Sí | Sí |
 | Las pruebas del contrato no cambian después de aprobarlo | Sí, se bloquea la edición y se revisa al reportar | Sí, se bloquea la edición y se revisa al reportar | Sí, se revisa al reportar |
-| `git reset --hard`, push forzado o a ramas protegidas, `.env`, `.bflow/` | Sí, se bloquea antes de que ocurra | Sí, se bloquea antes de que ocurra (si `bflow` no está en el PATH el guard no actúa y el plugin avisa) | No |
+| `git reset --hard`, push forzado (`--force`, `-f` o refspec con `+`) o a ramas protegidas, `.env`, `.bflow/` (con Edit/Write y en Bash) | Sí, se bloquea antes de que ocurra | Sí, se bloquea antes de que ocurra (si `bflow` no está en el PATH el guard no actúa y el plugin avisa) | No |
 | Ramas y PR solo los crea bflow mientras hay una tarea en curso | Sí | Sí | No |
 | Un agente que termina sin reportar sigue trabajando (2 avisos, luego decide una persona) | Sí | No: OpenCode no tiene evento de fin de subagente; lo cubren `bflow report`, `bflow check --verify` y el bloque de AGENTS.md | No |
 | El reviewer abrió los archivos de las viñetas rojas (decisiones) del diff antes de aprobar (si no, `review_incomplete`) | Sí, mide `Read` y Bash del reviewer en quality | Sí, el plugin manda `read` solo de la subsesión `bflow-reviewer` | No se mide y no se exige |
@@ -125,6 +125,7 @@ Lo que vive en el CLI se cumple con cualquier herramienta. Lo que depende de hoo
 
 - **La calidad del código.** La revisan los agentes de calidad y tú en el walkthrough; bflow asegura que esos pasos ocurran, no que acierten.
 - **Que el agente siga su oficio.** Cómo programa o revisa está en prosa; bflow hace cumplir el contrato (qué reporta, qué archivos toca, cuándo puede decir DONE), no el estilo.
+- **Escrituras desde Bash fuera de lo que reconoce `guard`.** En Bash cubre las opciones globales de git (`-c`, `-C`, `--git-dir`, `--work-tree`), las redirecciones (`>`, `>>`), `tee`, `rm`, `mv` y `cp` con destino en `.env*` o `.bflow/`. No cubre `eval`, `base64 | sh`, intérpretes (`python -c`, `node -e`) ni variables que armen la ruta; ahí `.env` y `.bflow/` no tienen protección.
 - **Contención ante un agente malintencionado.** `guard` es una barandilla contra errores comunes, no un sandbox: revisa comandos y rutas conocidos, y un comando rebuscado puede pasar.
 
 Siguiente: [configuración](configuracion.md) · [comandos](comandos.md).

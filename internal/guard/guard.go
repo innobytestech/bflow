@@ -445,6 +445,10 @@ func TaskScoped(cmd string) bool {
 
 func bash(a Action, c Context) Decision {
 	for _, s := range Segments(a.Command) {
+		s = stripGitGlobals(s)
+		if d := protectedWrite(s, c); !d.Allow {
+			return d
+		}
 		sub := BflowSubcommand(s)
 		switch {
 		case resetHard.MatchString(s), cleanForce.MatchString(s), checkoutDash.MatchString(s), stashDrop.MatchString(s):
@@ -462,11 +466,11 @@ func bash(a Action, c Context) Decision {
 		}
 		if m := pushRe.FindStringSubmatch(s); m != nil {
 			args := m[2]
-			if forceRe.MatchString(args) {
+			if forceRe.MatchString(args) || plusRefspec(args) {
 				return deny("force_push", "push forzado prohibido: reescribe historia compartida.")
 			}
 			for _, f := range strings.Fields(args) {
-				target := f[strings.LastIndex(f, ":")+1:]
+				target := strings.TrimPrefix(f[strings.LastIndex(f, ":")+1:], "+")
 				if slices.Contains(c.Protected, target) {
 					return deny("protected_branch", "no se empuja a %s: los cambios llegan por PR (bflow pr).", target)
 				}
@@ -623,4 +627,97 @@ func quotedFields(s string) []string {
 		out = append(out, s[start:])
 	}
 	return out
+}
+
+// gitGlobalWithArg son las opciones globales de git que llevan un valor aparte.
+var gitGlobalWithArg = []string{"-c", "-C", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--super-prefix", "--config-env"}
+
+// stripGitGlobals quita las opciones globales de git (-c k=v, -C dir,
+// --git-dir, --work-tree...) para que las reglas vean el subcomando. Si el
+// segmento no es git, lo devuelve igual.
+func stripGitGlobals(seg string) string {
+	f := quotedFields(seg)
+	i := 0
+	for i < len(f) && strings.Contains(f[i], "=") && !strings.HasPrefix(f[i], "-") {
+		i++
+	}
+	if i >= len(f) || exeName(f[i]) != "git" {
+		return seg
+	}
+	out := append([]string{}, f[:i+1]...)
+	j := i + 1
+	for j < len(f) && strings.HasPrefix(f[j], "-") {
+		name, _, hasVal := strings.Cut(f[j], "=")
+		switch {
+		case slices.Contains(gitGlobalWithArg, f[j]):
+			j += 2
+		case hasVal && slices.Contains(gitGlobalWithArg, name),
+			strings.HasPrefix(f[j], "-c") && len(f[j]) > 2 && f[j][1] == 'c',
+			strings.HasPrefix(f[j], "-C") && len(f[j]) > 2:
+			j++
+		case strings.HasPrefix(f[j], "--") || len(f[j]) == 2:
+			j++ // --no-pager, --bare, -p...
+		default:
+			return seg
+		}
+	}
+	if j > len(f) {
+		j = len(f)
+	}
+	return strings.Join(append(out, f[j:]...), " ")
+}
+
+// plusRefspec dice si algún refspec de push empieza con + (push forzado).
+func plusRefspec(args string) bool {
+	for _, f := range strings.Fields(args) {
+		if strings.HasPrefix(strings.Trim(f, `"'`), "+") {
+			return true
+		}
+	}
+	return false
+}
+
+// protectedWrite trata como escritura a .env*, .bflow/ las redirecciones, tee,
+// rm, mv y cp de Bash, con la misma regla que Edit/Write.
+func protectedWrite(s string, c Context) Decision {
+	raw := quotedFields(s)
+	var targets []string
+	for i, w := range raw {
+		k := strings.Index(w, ">")
+		if k < 0 || strings.HasPrefix(w, `"`) || strings.HasPrefix(w, "'") {
+			continue
+		}
+		dst := strings.Trim(strings.TrimLeft(w[k:], ">|"), `"'`)
+		if dst == "" && i+1 < len(raw) {
+			dst = strings.Trim(raw[i+1], `"'`)
+		}
+		if dst != "" && !strings.HasPrefix(dst, "&") {
+			targets = append(targets, dst)
+		}
+	}
+	if t := skipPrefix(slices.Clone(raw)); len(t) > 0 {
+		name, args := cmdName(t[0]), t[1:]
+		if name == "git" && len(args) > 0 && (args[0] == "rm" || args[0] == "mv") {
+			name, args = args[0], args[1:]
+		}
+		nf := nonFlags(args)
+		switch name {
+		case "tee", "rm", "del", "mv":
+			targets = append(targets, nf...)
+		case "cp", "install":
+			if len(nf) > 0 {
+				targets = append(targets, nf[len(nf)-1])
+			}
+		}
+	}
+	for _, t := range targets {
+		p := rel(c.Root, t)
+		if b := filepath.Base(p); strings.HasPrefix(b, ".env") && strings.ContainsAny(b, "*?[") {
+			return deny("env_file", "%s puede tener secretos: no se edita desde un agente.", p)
+		}
+		if d := edit(Action{Tool: Write, Path: t, Subagent: true}, Context{Root: c.Root}); !d.Allow {
+			return d
+		}
+	}
+	return allow
 }
