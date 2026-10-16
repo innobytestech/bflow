@@ -74,6 +74,9 @@ type ApproveOpts struct {
 
 // Approve aprueba el gate pendiente.
 func (e *Engine) Approve(ctx context.Context, id string, o ApproveOpts) (Outcome, error) {
+	if o.Gate == string(flow.GateBudget) {
+		return e.approveBudget(id)
+	}
 	var pending *flow.PendingGate
 	if rec, err := e.Store.Load(id); err == nil {
 		pending = rec.Flow.Gate
@@ -132,6 +135,9 @@ type RejectOpts struct {
 
 // Reject rechaza el gate pendiente.
 func (e *Engine) Reject(ctx context.Context, id string, o RejectOpts) (Outcome, error) {
+	if o.Gate == string(flow.GateBudget) {
+		return e.rejectBudget(id, o.Note)
+	}
 	return e.apply(ctx, id, flow.Event{Kind: flow.EvReject, Gate: flow.Gate(o.Gate), To: flow.Phase(o.To), Note: o.Note}, "")
 }
 
@@ -259,7 +265,7 @@ func (e *Engine) Status(ctx context.Context, id string) (View, error) {
 		}
 		s := flow.New(id, Slug(task.Title))
 		return View{ID: id, Title: task.Title, URL: task.URL, Phase: flow.Backlog, TrackerState: task.State, TrackerPhase: task.Phase,
-			Next: flow.NextFor(e.flowCfg(), s)}, nil
+			Next: e.next(store.Record{Flow: s})}, nil
 	}
 	if err != nil {
 		return View{}, err
@@ -272,7 +278,7 @@ func (e *Engine) Status(ctx context.Context, id string) (View, error) {
 func (e *Engine) view(rec store.Record) View {
 	v := View{ID: rec.Flow.ID, Title: rec.Title, URL: rec.URL, Lane: rec.Flow.Lane, Phase: rec.Flow.Phase, Round: rec.Flow.Round,
 		Since: &rec.Since, Branch: rec.Branch, PR: rec.PR, Pending: len(rec.Pending), Started: true,
-		Next: flow.NextFor(e.flowCfg(), rec.Flow), Upcoming: flow.Upcoming(e.flowCfg(), rec.Flow), GateSince: rec.GateSince,
+		Next: e.next(rec), Upcoming: flow.Upcoming(e.flowCfg(), rec.Flow), GateSince: rec.GateSince,
 		Phases: e.flowCfg().Lanes[rec.Flow.Lane]}
 	for _, a := range slices.Sorted(maps.Keys(rec.Flow.Reports)) {
 		v.Reported = append(v.Reported, a)
