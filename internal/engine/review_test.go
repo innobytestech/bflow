@@ -683,7 +683,7 @@ func TestDoneAllowsWhyComment(t *testing.T) {
 func TestDocumenterDoneRejectsNarrativeComment(t *testing.T) {
 	v, id, g := publicToDocumenting(t, []string{"internal/x/b.go"}, nil)
 	g.added = []vcs.AddedLine{{Path: "internal/x/b.go", Line: 1, Text: "// walkthrough de la tarea"}}
-	rejection(t, docsDone(v, id), "narrative_comment")
+	_ = rejection(t, docsDone(v, id), "narrative_comment")
 }
 
 func TestDoneNarrativeCommentsDisabled(t *testing.T) {

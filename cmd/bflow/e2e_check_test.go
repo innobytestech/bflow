@@ -84,7 +84,7 @@ func TestVerifyFailsOnNarrativeComment(t *testing.T) {
 	id := r.ok("task", "add", "Demo").Data["id"].(string)
 	r.ok("start", id, "--lane", "hotfix")
 
-	os.WriteFile(filepath.Join(r.dir, "internal", "c.go"), []byte("package a\n\n"+"// el proveedor corta a 50 ids por llamada\nvar C = 1\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(r.dir, "internal", "c.go"), []byte("package a\n\n"+"// el proveedor corta a 50 ids por llamada\nvar C = 1\n"), 0o644)
 	git(t, r.dir, "add", ".")
 	git(t, r.dir, "commit", "-m", "por que")
 	r.ok("check")
@@ -92,7 +92,7 @@ func TestVerifyFailsOnNarrativeComment(t *testing.T) {
 		t.Fatalf("un comentario del por qué pasa: %v", v.Data)
 	}
 
-	os.WriteFile(filepath.Join(r.dir, "internal", "d.go"), []byte("package a\n\n"+"// T3: según R4\nvar D = 1\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(r.dir, "internal", "d.go"), []byte("package a\n\n"+"// T3: según R4\nvar D = 1\n"), 0o644)
 	git(t, r.dir, "add", ".")
 	git(t, r.dir, "commit", "-m", "narra")
 	r.ok("check")
