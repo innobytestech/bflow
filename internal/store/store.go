@@ -393,6 +393,9 @@ func (s *Store) Log(id string) ([]Entry, error) {
 
 func (s *Store) lock(path string) (func(), error) { return LockFile(path, s.LockTimeout, s.StaleAfter) }
 
+// removeFile se inyecta en pruebas para simular fallos de borrado.
+var removeFile = os.Remove
+
 // LockFile crea path en exclusiva. Si ya existe, espera hasta timeout; si es
 // más viejo que stale, lo considera de un proceso muerto y lo rompe.
 func LockFile(path string, timeout, stale time.Duration) (func(), error) {
@@ -402,7 +405,14 @@ func LockFile(path string, timeout, stale time.Duration) (func(), error) {
 		if err == nil {
 			fmt.Fprintf(f, "pid %d %s\n", os.Getpid(), time.Now().Format(time.RFC3339Nano))
 			f.Close()
-			return func() { _ = os.Remove(path) }, nil
+			return func() {
+				for i := 0; i < 50; i++ {
+					if err := removeFile(path); err == nil || errors.Is(err, os.ErrNotExist) {
+						return
+					}
+					time.Sleep(time.Duration(2+i) * time.Millisecond)
+				}
+			}, nil
 		}
 		if info, statErr := os.Stat(path); statErr == nil && time.Since(info.ModTime()) > stale {
 			// Renombrar antes de borrar: si dos procesos ven el mismo lock

@@ -10,6 +10,7 @@
 - Rechazo `narrative_comment` en `report DONE` del implementer y del documenter, y el mismo fallo en `bflow check --verify` (sale `not_verified`, igual que las pruebas congeladas).
 - Config: `flow.comment_patterns` (reemplaza los patrones fijos) y `flow.narrative_comments: false` (apaga la regla).
 - Docs: `docs/guia.md`, `docs/configuracion.md` y `CHANGELOG.md`.
+- Arreglo de `TestConcurrentCreateUniqueIDs` (`internal/adapters/tracker/local`), que falla en Windows bajo la carga de `bflow check`: 12 de 30 `Create` salen con `la tarea está bloqueada por otro proceso de bflow` a los 10 s. Sin esto el check no queda en verde.
 
 **No entra**
 - Walkthrough y gate del PR: el diff ya pasó por el DONE.
@@ -22,13 +23,15 @@
 - [N] Se apaga con un booleano aparte, `flow.narrative_comments: false`, igual que `flow.scout`. `comment_patterns` reemplaza los patrones fijos. El ID de la tarea se busca siempre. Descartada: apagarla con `comment_patterns: []`. Una lista vacía y una clave ausente se confunden al combinar las capas de config.
 - [N] `check --verify` falla con `not_verified` y el detalle `comentarios narrativos: …`. Descartada: un código nuevo. El reviewer y el CI ya leen `not_verified` como "el check no vale".
 - [N] También aplica al DONE del documenter, que agrega comentarios de documentación. Descartada: aplicarla solo al implementer. El documenter podría narrar sin que nada lo detenga.
+- [N] El unlock de `store.LockFile` reintenta `os.Remove`, como ya lo hace `WriteAtomic` con el rename, y el tracker local serializa en memoria los `Create` y `modify` del mismo proceso sobre la misma carpeta. Descartada: subir el timeout de 10 s. Si el lock se queda pegado, solo retrasa el fallo.
 
 **Riesgos**
 - Falsos positivos: `# T1` en un YAML dentro de `code_paths`, o un `spec` legítimo ("spec de OpenAPI"). Se resuelven con `comment_patterns` o apagando la regla, y el rechazo dice cómo.
 - En este repo, una prueba con un fixture multilínea cuya línea empieza con `// T3` hace que se rechace su propio DONE. Los fixtures se arman con `"\n"`, no con raw strings multilínea.
+- La causa del lock no se reproduce aislada (pasa con `-race -count=15`). La hipótesis es que en Windows el antivirus abre el `.seq.lock` recién creado, el `os.Remove` del unlock falla en silencio y el lock queda vivo hasta que se vuelve viejo (2 min).
 - `\b` de Go solo reconoce ASCII: los patrones de `según` y `decisión` no llevan `\b` al final.
 
-**Tamaño:** M. Un método nuevo en `vcs.Git`, un escáner puro en `internal/review`, dos llamadas (engine y CLI), config, dos oficios, docs y pruebas.
+**Tamaño:** M. Un método nuevo en `vcs.Git`, un escáner puro en `internal/review`, dos llamadas (engine y CLI), config, dos oficios, docs y pruebas, más el arreglo del lock (`internal/store`, `internal/adapters/tracker/local`).
 
 ## Discovery
 
@@ -72,3 +75,10 @@
   - Se corre `bflow render` para regenerar `.claude/agents/` y `.opencode/agents/`. `internal/agents/agents_test.go` pasa.
   - `docs/guia.md`: en "Ajustar a los agentes", qué comentarios se esperan y por qué; en "Cuando algo se atora", qué hacer con `narrative_comment`. `docs/configuracion.md`: `flow.comment_patterns` y `flow.narrative_comments`, con un ejemplo. Una entrada en `CHANGELOG.md`.
   - `bflow check` pasa.
+- [x] T6 Arreglo de `TestConcurrentCreateUniqueIDs`.
+  - En `internal/store/store.go`, el unlock que devuelve `LockFile` DEBE reintentar `os.Remove(path)` mientras el error no sea `os.ErrNotExist`, hasta 50 veces con espera de `2+i` ms (lo mismo que `WriteAtomic`). Se agrega `var removeFile = os.Remove` en el paquete para que la prueba inyecte fallos. La firma de `LockFile` no cambia.
+  - CUANDO `os.Remove` falla las primeras 3 veces y la cuarta pasa, el sistema DEBE dejar el lock borrado, y un `LockFile` posterior sobre la misma ruta DEBE obtenerlo sin esperar.
+  - En `internal/adapters/tracker/local/local.go`, `Create` y `modify` toman primero un `*sync.Mutex` del proceso, guardado en `var dirLocks sync.Map` con clave `filepath.Clean(t.Dir)` (para `Create`) o `filepath.Clean(t.Dir)+"/"+id` (para `modify`), y después el lock de archivo de siempre, que sigue cubriendo a otros procesos.
+  - CUANDO 30 goroutines llaman a `Create` sobre la misma carpeta con instancias distintas de `Tracker`, el sistema DEBE devolver 30 IDs distintos y ningún `ErrLocked`.
+  - Pruebas: `TestLockFileUnlockRetriesRemove` en `internal/store`. `TestConcurrentCreateUniqueIDs` no cambia y DEBE pasar dentro de `bflow check` (`go test -count=1 -race ./...`).
+  - `bflow check` pasa en verde.

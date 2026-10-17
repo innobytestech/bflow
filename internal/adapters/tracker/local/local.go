@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"innobytes.tech/bflow/internal/flow"
@@ -91,8 +92,20 @@ func (t *Tracker) write(f file) error {
 	return store.WriteAtomic(p, append(b, '\n'))
 }
 
+// dirLocks serializa dentro del proceso: en Windows el borrado del lock de
+// archivo puede fallar un instante y los demás hilos verían ErrLocked.
+var dirLocks sync.Map
+
+func dirLock(key string) *sync.Mutex {
+	m, _ := dirLocks.LoadOrStore(key, &sync.Mutex{})
+	return m.(*sync.Mutex)
+}
+
 // modify lee, cambia y escribe una tarea bajo lock.
 func (t *Tracker) modify(id string, fn func(f *file)) error {
+	mu := dirLock(filepath.Clean(t.Dir) + "/" + id)
+	mu.Lock()
+	defer mu.Unlock()
 	unlock, err := store.LockFile(filepath.Join(t.Dir, "."+id+".lock"), 10*time.Second, 2*time.Minute)
 	if err != nil {
 		return err
@@ -182,6 +195,9 @@ func (t *Tracker) Create(_ context.Context, title, description string) (tracker.
 	if err := os.MkdirAll(t.Dir, 0o755); err != nil {
 		return tracker.Task{}, err
 	}
+	mu := dirLock(filepath.Clean(t.Dir))
+	mu.Lock()
+	defer mu.Unlock()
 	unlock, err := store.LockFile(filepath.Join(t.Dir, ".seq.lock"), 10*time.Second, 2*time.Minute)
 	if err != nil {
 		return tracker.Task{}, err

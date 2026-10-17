@@ -339,3 +339,34 @@ func TestAppendFileStaysInTaskDir(t *testing.T) {
 		t.Error("nada fuera de la carpeta")
 	}
 }
+
+func TestLockFileUnlockRetriesRemove(t *testing.T) {
+	path := filepath.Join(testutil.TempDir(t), "x.lock")
+	orig := removeFile
+	defer func() { removeFile = orig }()
+	calls := 0
+	removeFile = func(p string) error {
+		calls++
+		if calls <= 3 {
+			return errors.New("acceso denegado")
+		}
+		return orig(p)
+	}
+	unlock, err := LockFile(path, time.Second, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unlock()
+	if calls != 4 {
+		t.Fatalf("intentos = %d, quiero 4", calls)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("el lock sigue ahí: %v", err)
+	}
+	start := time.Now()
+	u2, err := LockFile(path, time.Second, time.Minute)
+	if err != nil || time.Since(start) > 100*time.Millisecond {
+		t.Fatalf("segundo lock: %v tras %v", err, time.Since(start))
+	}
+	u2()
+}
