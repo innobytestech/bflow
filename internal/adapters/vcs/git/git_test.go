@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"innobytes.tech/bflow/internal/testutil"
+	"innobytes.tech/bflow/internal/vcs"
 )
 
 // sh corre git en dir y falla la prueba si no funciona.
@@ -285,5 +286,45 @@ func TestDiffKeptSkipsDeleted(t *testing.T) {
 	slices.Sort(got)
 	if err != nil || strings.Join(got, ",") != "README.md,internal/b.go" {
 		t.Errorf("diffKept: %v %v", got, err)
+	}
+}
+
+func TestDiffAdded(t *testing.T) {
+	work, _ := fixture(t)
+	g := New(work)
+	ctx := context.Background()
+	if _, err := g.EnsureBranch(ctx, "feature/X-4", "dev"); err != nil {
+		t.Fatal(err)
+	}
+	write(t, work, "internal/b.go", "package a\nvar x = 1\nvar y = 2\nvar z = 3\n")
+	sh(t, work, "add", ".")
+	sh(t, work, "commit", "-m", "uno")
+	sh(t, work, "push", "origin", "HEAD:refs/heads/dev")
+	sh(t, work, "fetch", "origin")
+
+	// segundo commit: b.go con una línea nueva, una borrada y otra nueva al final; a.go con una línea; un binario
+	write(t, work, "internal/b.go", "package a\n// T3: según R4\nvar x = 1\nvar z = 3\nvar w = 4\n")
+	write(t, work, "internal/a.go", "package a\nvar A = 1\n")
+	write(t, work, "img/logo.png", "\x89PNG\x00\x01\x02\x00")
+	sh(t, work, "add", ".")
+	sh(t, work, "commit", "-m", "dos")
+
+	got, err := g.DiffAdded(ctx, "origin/dev", []string{"internal", "img"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []vcs.AddedLine{
+		{Path: "internal/a.go", Line: 2, Text: "var A = 1"},
+		{Path: "internal/b.go", Line: 2, Text: "// T3: según R4"},
+		{Path: "internal/b.go", Line: 5, Text: "var w = 4"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("DiffAdded = %v\nquiero %v", got, want)
+	}
+	if only, _ := g.DiffAdded(ctx, "origin/dev", []string{"internal/a.go"}); len(only) != 1 {
+		t.Errorf("el filtro de rutas no aplicó: %v", only)
+	}
+	if _, err := g.DiffAdded(ctx, "origin/no-existe", nil); err == nil {
+		t.Error("una base que no existe es un error")
 	}
 }

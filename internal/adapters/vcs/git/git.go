@@ -215,3 +215,47 @@ func (g *Git) DiffBinaries(ctx context.Context, base string) ([]string, error) {
 	}
 	return bins, nil
 }
+
+// DiffAdded devuelve las líneas agregadas de base...HEAD bajo paths. Con
+// --unified=0 cada hunk trae solo cambios, y el número de línea sale de "+c,d".
+func (g *Git) DiffAdded(ctx context.Context, base string, paths []string) ([]vcs.AddedLine, error) {
+	args := []string{"-c", "core.quotepath=off", "diff", "--unified=0", "--no-color", "--no-ext-diff", "--no-renames", base + "...HEAD"}
+	if len(paths) > 0 {
+		args = append(args, "--")
+		args = append(args, paths...)
+	}
+	out, err := g.run(ctx, args...)
+	if err != nil {
+		return nil, err
+	}
+	var res []vcs.AddedLine
+	path, line := "", 0
+	for _, l := range strings.Split(out, "\n") {
+		l = strings.TrimSuffix(l, "\r")
+		switch {
+		case strings.HasPrefix(l, "diff --git "):
+			path = ""
+		case strings.HasPrefix(l, "+++ "):
+			path = ""
+			if p, ok := strings.CutPrefix(l, "+++ b/"); ok {
+				path = p
+			}
+		case strings.HasPrefix(l, "@@"):
+			// @@ -a,b +c,d @@
+			line = 0
+			if i := strings.Index(l, "+"); i >= 0 {
+				num := l[i+1:]
+				if j := strings.IndexAny(num, ", "); j >= 0 {
+					num = num[:j]
+				}
+				line, _ = strconv.Atoi(num)
+			}
+		case strings.HasPrefix(l, "+"):
+			if path != "" {
+				res = append(res, vcs.AddedLine{Path: path, Line: line, Text: l[1:]})
+			}
+			line++
+		}
+	}
+	return res, nil
+}

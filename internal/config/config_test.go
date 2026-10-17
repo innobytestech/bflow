@@ -11,6 +11,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"innobytes.tech/bflow/internal/flow"
+	"innobytes.tech/bflow/internal/review"
 )
 
 // fixture crea un repo y un directorio de config global aislados.
@@ -589,5 +590,34 @@ func TestBudgetEmptyByDefault(t *testing.T) {
 	}
 	if len(c.Flow.Core().Budget) != 0 {
 		t.Errorf("sin flow.budget, core.Budget debía quedar vacío: %v", c.Flow.Core().Budget)
+	}
+}
+
+func TestValidateCommentPatterns(t *testing.T) {
+	_, err := Load(fixture(t, "", "flow:\n  comment_patterns: ['(']\n"))
+	if err == nil || !strings.Contains(err.Error(), "flow.comment_patterns") {
+		t.Errorf("un patrón que no compila debía rechazarse: %v", err)
+	}
+	if _, err := Load(fixture(t, "", "flow:\n  comment_patterns: ['TODO[0-9]+']\n")); err != nil {
+		t.Errorf("un patrón válido no debe fallar: %v", err)
+	}
+}
+
+func TestFlowCommentDefaults(t *testing.T) {
+	c, err := Load(fixture(t, "", ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	core := c.Flow.Core()
+	if !core.NarrativeComments || len(core.CommentPatterns) != len(review.DefaultCommentPatterns) {
+		t.Errorf("por defecto la regla está activa con los patrones fijos: %v %v", core.NarrativeComments, core.CommentPatterns)
+	}
+	c, err = Load(fixture(t, "", "flow:\n  narrative_comments: false\n  comment_patterns: [FOO]\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	core = c.Flow.Core()
+	if core.NarrativeComments || !slices.Equal(core.CommentPatterns, []string{"FOO"}) {
+		t.Errorf("config explícita: %v %v", core.NarrativeComments, core.CommentPatterns)
 	}
 }

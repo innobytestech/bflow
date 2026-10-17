@@ -252,3 +252,39 @@ func (e *Engine) changelogExempt(id string) bool {
 	}
 	return false
 }
+
+// NarrativeComments lista los comentarios agregados en el diff contra la base
+// que narran la tarea. Devuelve nil si la regla está apagada, si no hay git o
+// base, o si git falla (igual que changelogRequired).
+func (e *Engine) NarrativeComments(ctx context.Context, id string) []string {
+	cfg := e.flowCfg()
+	base := e.diffBase()
+	if !cfg.NarrativeComments || e.Git == nil || base == "" {
+		return nil
+	}
+	added, err := e.Git.DiffAdded(ctx, base, e.Cfg.Check.CodePaths)
+	if err != nil {
+		return nil
+	}
+	found, err := review.NarrativeComments(added, id, cfg.CommentPatterns)
+	if err != nil {
+		return nil
+	}
+	return found
+}
+
+// narrativeRejection es el rechazo de DONE con hasta 20 hallazgos.
+func narrativeRejection(found []string) *flow.Rejection {
+	const max = 20
+	shown := found
+	if len(shown) > max {
+		shown = shown[:max]
+	}
+	list := strings.Join(shown, "\n")
+	if n := len(found) - len(shown); n > 0 {
+		list += fmt.Sprintf("\ny %d más", n)
+	}
+	return &flow.Rejection{Code: "narrative_comment", Reason: "hay comentarios agregados que narran la tarea:\n" + list +
+		"\nUn comentario explica el por qué que el código no deja ver; lo de la tarea, la spec o lo validado va en reports/impl.md. " +
+		"Quítalo o reescríbelo, commitea y reporta DONE otra vez. Si el patrón no aplica a este repo, ajusta flow.comment_patterns o apaga flow.narrative_comments."}
+}

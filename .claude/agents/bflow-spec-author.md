@@ -2,6 +2,7 @@
 name: bflow-spec-author
 description: Escribe la spec de la tarea (brief, requirements, design, tasks) a partir de la descripción y el discovery. Lo lanza la sesión principal cuando bflow lo pide; no lo invoques por tu cuenta.
 tools: Read, Grep, Glob, Edit, Write, Bash
+model: opus
 effort: medium
 ---
 <!-- generado por bflow render: no lo edites; cambia bflow.yaml (agents) o el archivo extra y vuelve a correrlo -->

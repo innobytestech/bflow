@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -75,5 +76,31 @@ env:
 	t.Setenv("BFLOW_TEST_DSN", "postgres://localhost:5433/test")
 	if env := r.run("check"); env.Code == "env_not_ready" {
 		t.Errorf("el API caído no debe impedir el check: %v", env.Data)
+	}
+}
+
+func TestVerifyFailsOnNarrativeComment(t *testing.T) {
+	r, _ := gitRepo(t, "stack: go\nvcs: { base_branch: dev }\ncheck:\n  steps:\n    - { name: ok, run: \"go version\" }\n")
+	id := r.ok("task", "add", "Demo").Data["id"].(string)
+	r.ok("start", id, "--lane", "hotfix")
+
+	_ = os.WriteFile(filepath.Join(r.dir, "internal", "c.go"), []byte("package a\n\n"+"// el proveedor corta a 50 ids por llamada\nvar C = 1\n"), 0o644)
+	git(t, r.dir, "add", ".")
+	git(t, r.dir, "commit", "-m", "por que")
+	r.ok("check")
+	if v := r.ok("check", "--verify"); v.Data["ok"] != true {
+		t.Fatalf("un comentario del por qué pasa: %v", v.Data)
+	}
+
+	_ = os.WriteFile(filepath.Join(r.dir, "internal", "d.go"), []byte("package a\n\n"+"// T3: según R4\nvar D = 1\n"), 0o644)
+	git(t, r.dir, "add", ".")
+	git(t, r.dir, "commit", "-m", "narra")
+	r.ok("check")
+	v := r.run("check", "--verify")
+	if v.exit == 0 || v.Code != "not_verified" || !strings.Contains(fmt.Sprint(v.Data["detail"]), "comentarios narrativos: internal/d.go:3") {
+		t.Fatalf("verify con comentario narrativo: %d %s %v", v.exit, v.Code, v.Data)
+	}
+	if env := r.run("report", "--agent", "implementer", "--verdict", "DONE"); env.Code != "narrative_comment" {
+		t.Errorf("DONE: %s %v", env.Code, env.Data)
 	}
 }

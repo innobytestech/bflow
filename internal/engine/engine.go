@@ -122,6 +122,9 @@ func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug s
 			if files := e.bflowInDiff(ctx); len(files) > 0 {
 				return bflowInDiffRejection(files, "reporta DONE otra vez")
 			}
+			if found := e.NarrativeComments(ctx, id); len(found) > 0 {
+				return narrativeRejection(found)
+			}
 			if rej := e.docsPending(ctx, id); rej != nil {
 				return rej
 			}
@@ -155,6 +158,9 @@ func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug s
 			}
 			if files := e.bflowInDiff(ctx); len(files) > 0 {
 				return bflowInDiffRejection(files, "reporta DONE otra vez")
+			}
+			if found := e.NarrativeComments(ctx, id); len(found) > 0 {
+				return narrativeRejection(found)
 			}
 			ev.CheckOK = true
 		}

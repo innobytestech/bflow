@@ -21,10 +21,11 @@ type fakeGit struct {
 	branch string
 	dirty  []string
 	calls  []string
-	diff   []string // DiffNames
-	kept   []string // DiffKept
-	lines  int      // DiffLines
-	binary []string // DiffBinaries
+	diff   []string        // DiffNames
+	kept   []string        // DiffKept
+	lines  int             // DiffLines
+	binary []string        // DiffBinaries
+	added  []vcs.AddedLine // DiffAdded
 	// onlyFor: si no está vacío, Dirty solo devuelve dirty cuando se le pregunta
 	// exactamente por esa ruta (la consulta del gate del changelog).
 	onlyFor string
@@ -67,8 +68,11 @@ func (g *fakeGit) HeadSHA(context.Context) (string, error) {
 func (g *fakeGit) DiffKept(context.Context, string, []string) ([]string, error) {
 	return g.kept, nil
 }
-func (g *fakeGit) DiffNames(context.Context, string) ([]string, error)    { return g.diff, nil }
-func (g *fakeGit) DiffLines(context.Context, string) (int, error)         { return g.lines, nil }
+func (g *fakeGit) DiffNames(context.Context, string) ([]string, error) { return g.diff, nil }
+func (g *fakeGit) DiffLines(context.Context, string) (int, error)      { return g.lines, nil }
+func (g *fakeGit) DiffAdded(context.Context, string, []string) ([]vcs.AddedLine, error) {
+	return g.added, nil
+}
 func (g *fakeGit) DiffBinaries(context.Context, string) ([]string, error) { return g.binary, nil }
 func (g *fakeGit) ChangedSince(context.Context, string, []string) ([]string, error) {
 	return nil, nil

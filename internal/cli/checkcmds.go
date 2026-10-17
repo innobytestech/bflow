@@ -84,6 +84,13 @@ func runCheck(c *Ctx) output.Envelope {
 		if changed := e.FrozenChanged(id); ok && id != "" && len(changed) > 0 {
 			ok, detail = false, "pruebas congeladas modificadas: "+strings.Join(changed, ", ")
 		}
+		if found := e.NarrativeComments(ctx, id); ok && id != "" && len(found) > 0 {
+			places := make([]string, len(found))
+			for i, f := range found {
+				places[i], _, _ = strings.Cut(f, ": ")
+			}
+			ok, detail = false, "comentarios narrativos: "+strings.Join(places, ", ")
+		}
 		env := output.OK("verified", map[string]any{"id": id, "ok": ok, "detail": detail}, nil)
 		env.Text = "VERIFY OK: " + detail
 		if !ok {
