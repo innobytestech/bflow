@@ -14,11 +14,15 @@ var DefaultCommentPatterns = []string{`\bR\d+\b`, `\bT\d+\b`, `(?i)\bspec\b`, `(
 
 // IsComment dice si la línea es un comentario por su prefijo (sin parser por
 // lenguaje) y devuelve solo el texto del comentario. Un "//" final con espacio
-// antes cuenta, y devuelve desde el "//".
+// antes cuenta, y devuelve desde el "//", si queda fuera de comillas dobles,
+// simples y backticks de la misma línea. Una directiva del preprocesador
+// pegada al "#" (#include, #define...) no es comentario "#".
 func IsComment(text string) (comment string, ok bool) {
 	t := strings.TrimSpace(text)
 	switch {
-	case strings.HasPrefix(t, "//"), strings.HasPrefix(t, "#"), strings.HasPrefix(t, "/*"),
+	case strings.HasPrefix(t, "#") && !isDirective(t[1:]):
+		return t, true
+	case strings.HasPrefix(t, "//"), strings.HasPrefix(t, "/*"),
 		strings.HasPrefix(t, "<!--"), strings.HasPrefix(t, "-- "), t == "--":
 		return t, true
 	case strings.HasPrefix(t, "*"):
@@ -28,10 +32,53 @@ func IsComment(text string) (comment string, ok bool) {
 		}
 		return "", false
 	}
-	if i := strings.Index(t, " //"); i >= 0 {
-		return t[i+1:], true
+	if i := trailingSlashes(t); i >= 0 {
+		return t[i:], true
 	}
 	return "", false
+}
+
+var directives = []string{"include_next", "include", "import", "define", "undef", "ifdef", "ifndef", "if",
+	"elifdef", "elifndef", "elif", "else", "endif", "pragma", "error", "warning", "line", "endregion", "region"}
+
+// isDirective dice si rest (lo que sigue al "#") empieza con una directiva
+// completa: la palabra no puede continuar con letra, dígito o "_".
+func isDirective(rest string) bool {
+	for _, d := range directives {
+		if r, ok := strings.CutPrefix(rest, d); ok {
+			if r == "" {
+				return true
+			}
+			c := r[0]
+			if !(c == '_' || c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= 0x80) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// trailingSlashes devuelve el índice del primer "//" fuera de comillas que
+// tenga espacio o tab justo antes, o -1. "\" escapa dentro de " y ', no
+// dentro de backticks.
+func trailingSlashes(t string) int {
+	var q byte
+	for i := 0; i < len(t); i++ {
+		c := t[i]
+		switch {
+		case q != 0:
+			if c == '\\' && q != '`' {
+				i++
+			} else if c == q {
+				q = 0
+			}
+		case c == '"' || c == '\'' || c == '`':
+			q = c
+		case c == '/' && i > 0 && i+1 < len(t) && t[i+1] == '/' && (t[i-1] == ' ' || t[i-1] == '	'):
+			return i
+		}
+	}
+	return -1
 }
 
 // NarrativeComments devuelve "ruta:línea: texto" por cada línea agregada que es

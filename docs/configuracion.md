@@ -135,7 +135,7 @@ Una entrada que termina en `/` cubre la carpeta; las demás se comparan con `pat
 
 ### Comentarios que narran la tarea
 
-`report DONE` del implementer y del documenter, y `bflow check --verify`, miran las líneas de comentario que el diff contra la base agrega dentro de `check.code_paths` (sin los `.md`). Si alguna cita el ID de la tarea, `R<n>`, `T<n>`, `spec`, `según`, `decisión` o `walkthrough`, el DONE sale con código 2 y `narrative_comment`, y `--verify` con `not_verified`. Un comentario es una línea que empieza con `//`, `#`, `/*`, `*`, `-- ` o `<!--`, o que lleva un `//` final. No hay parser por lenguaje.
+`report DONE` del implementer y del documenter, y `bflow check --verify`, miran las líneas de comentario que el diff contra la base agrega dentro de `check.code_paths` (sin los `.md`). Si alguna cita el ID de la tarea, `R<n>`, `T<n>`, `spec`, `según`, `decisión` o `walkthrough`, el DONE sale con código 2 y `narrative_comment`, y `--verify` con `not_verified`. Un comentario es una línea que empieza con `//`, `#`, `/*`, `*`, `-- ` o `<!--`, o que lleva un `//` final fuera de comillas (`"`, `'` y backticks de la misma línea). Las directivas pegadas al `#` (`#include`, `#define`, `#pragma`…) no cuentan. No hay parser por lenguaje.
 
 - `flow.comment_patterns`: lista de expresiones regulares que reemplaza a los patrones fijos. El ID de la tarea se busca siempre.
 - `flow.narrative_comments: false`: apaga la regla. Una lista vacía en `comment_patterns` no la apaga: vuelve a los patrones fijos.

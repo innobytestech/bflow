@@ -230,17 +230,22 @@ func (g *Git) DiffAdded(ctx context.Context, base string, paths []string) ([]vcs
 	}
 	var res []vcs.AddedLine
 	path, line := "", 0
+	// Una línea agregada "++ x" llega como "+++ x": solo es cabecera entre
+	// "diff --git" y el primer "@@".
+	inHeader := false
 	for _, l := range strings.Split(out, "\n") {
 		l = strings.TrimSuffix(l, "\r")
 		switch {
 		case strings.HasPrefix(l, "diff --git "):
 			path = ""
-		case strings.HasPrefix(l, "+++ "):
+			inHeader = true
+		case inHeader && strings.HasPrefix(l, "+++ "):
 			path = ""
 			if p, ok := strings.CutPrefix(l, "+++ b/"); ok {
 				path = p
 			}
 		case strings.HasPrefix(l, "@@"):
+			inHeader = false
 			// @@ -a,b +c,d @@
 			line = 0
 			if i := strings.Index(l, "+"); i >= 0 {

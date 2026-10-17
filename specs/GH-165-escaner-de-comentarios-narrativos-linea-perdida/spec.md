@@ -40,14 +40,14 @@
 
 ## Tasks
 
-- [ ] T1 `DiffAdded` con estado de cabecera.
+- [x] T1 `DiffAdded` con estado de cabecera.
   - CUANDO llega `diff --git `, el escáner DEBE vaciar `path` y entrar en cabecera; CUANDO llega `@@`, DEBE salir de cabecera y fijar `line`.
   - CUANDO una línea empieza con `+++ ` y está en cabecera, DEBE tomarse como ruta (`+++ b/<ruta>`; otra cosa, como `/dev/null`, deja `path` vacío). CUANDO no está en cabecera, DEBE tratarse como línea agregada con texto `l[1:]` (`++ x`) y avanzar `line`.
   - Prueba nueva `TestDiffAddedPlusPlusLine` en `internal/adapters/vcs/git/git_test.go`, repo real como `TestDiffAdded` (fixture, `write`, `sh`): un archivo con `"package a\n++ x\nvar C = 1\n"` y otro archivo después en orden de ruta; espera las tres líneas del primero (`++ x` en su línea) y las del segundo con su ruta. Sin el arreglo pierde `++ x` y `var C = 1`. `TestDiffAdded` no cambia.
-- [ ] T2 `IsComment`: `//` final fuera de strings.
+- [x] T2 `IsComment`: `//` final fuera de strings.
   - CUANDO la línea no empieza con un prefijo de comentario, el sistema DEBE recorrerla con estado de comillas (`"`, `'`, `` ` ``; `\` escapa el siguiente carácter dentro de `"` y `'`, no dentro de backticks) y devolver desde el primer `//` fuera de comillas que tenga un espacio o tab justo antes. Sin ese `//`, no es comentario.
   - Casos nuevos en `TestIsCommentPrefixes`: `s := "a // T3"` → no; `c := 'a // b'` → no; ``r := `a // b` `` → no; `s := "x\" // y"` → no; `s := "a" // b` → `// b`; `s := "a\\" // b` → `// b`. Caso en `TestNarrativeCommentsIgnoresCode`: `s := "a // T3"`. Los casos existentes no cambian.
-- [ ] T3 `IsComment`: directivas del preprocesador.
+- [x] T3 `IsComment`: directivas del preprocesador.
   - CUANDO la línea recortada empieza con `#` seguido sin espacio de una de las directivas del Brief y luego fin de línea o un carácter que no es letra, dígito ni `_`, el sistema NO DEBE tratarla como comentario `#`; DEBE seguir evaluando el `//` final de T2 (`#include "x.h" // T3` → `// T3`).
   - CUANDO es `# include`, `#includes`, `#definir` o `# T1`, DEBE seguir siendo comentario.
   - Casos nuevos en `TestIsCommentPrefixes`: `#include "spec.h"`, `#define SPEC 1`, `#pragma once`, `#if T1`, `#endif` → no; `#include <x.h> // T3` → `// T3`; `# include x` y `#includes` → comentario. Caso en `TestNarrativeCommentsIgnoresCode`: `#include "spec.h"`.

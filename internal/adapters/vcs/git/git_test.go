@@ -328,3 +328,32 @@ func TestDiffAdded(t *testing.T) {
 		t.Error("una base que no existe es un error")
 	}
 }
+
+func TestDiffAddedPlusPlusLine(t *testing.T) {
+	work, _ := fixture(t)
+	g := New(work)
+	ctx := context.Background()
+	if _, err := g.EnsureBranch(ctx, "feature/X-5", "dev"); err != nil {
+		t.Fatal(err)
+	}
+	sh(t, work, "push", "origin", "HEAD:refs/heads/dev")
+	sh(t, work, "fetch", "origin")
+	write(t, work, "internal/a.go", "package a\n++ x\nvar C = 1\n")
+	write(t, work, "internal/b.go", "package b\nvar D = 2\n")
+	sh(t, work, "add", ".")
+	sh(t, work, "commit", "-m", "uno")
+
+	got, err := g.DiffAdded(ctx, "origin/dev", []string{"internal"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []vcs.AddedLine{
+		{Path: "internal/a.go", Line: 2, Text: "++ x"},
+		{Path: "internal/a.go", Line: 3, Text: "var C = 1"},
+		{Path: "internal/b.go", Line: 1, Text: "package b"},
+		{Path: "internal/b.go", Line: 2, Text: "var D = 2"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("DiffAdded = %v\nquiero %v", got, want)
+	}
+}
