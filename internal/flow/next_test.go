@@ -42,6 +42,7 @@ func TestNextByState(t *testing.T) {
 		{name: "rounds hotfix", s: stateFor(row{lane: Hotfix, from: Implementing, gate: GateRounds, round: 2}), action: "ask", gate: "rounds", options: "split,approve"},
 		{name: "walkthrough full", s: stateFor(row{lane: Full, from: Walkthrough, gate: GateWalkthrough}), action: "ask", gate: "walkthrough", skill: "walkthrough", options: "approve,fix,spec", show: "bflow show T-1 review-map"},
 		{name: "walkthrough hotfix", s: stateFor(row{lane: Hotfix, from: Walkthrough, gate: GateWalkthrough}), action: "ask", gate: "walkthrough", options: "approve,fix"},
+		{name: "repro hotfix", s: reproGateState(), action: "ask", gate: "repro", options: "approve,test"},
 		{name: "in_review", s: stateFor(row{lane: Full, from: InReview}), action: "wait"},
 		{name: "done", s: stateFor(row{lane: Full, from: Done}), action: "done"},
 		{name: "blocked", s: stateFor(row{lane: Full, from: Blocked}), action: "ask", gate: "blocked", options: "unblock,keep"},

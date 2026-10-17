@@ -883,3 +883,97 @@ func TestBudgetGateWithoutDue(t *testing.T) {
 		t.Errorf("choice=0 en reject debía rechazarse: %v", err)
 	}
 }
+
+func hotfixDone(noRepro string) Event {
+	ev := rep(imp, DoneV)
+	ev.NoRepro = noRepro
+	return ev
+}
+
+func reproGateState() State {
+	s := stateFor(row{lane: Hotfix, from: Implementing})
+	s.Gate = &PendingGate{Name: GateRepro, Agent: imp, Note: "solo cambia un texto de la guía"}
+	return s
+}
+
+func TestNoReproOpensGate(t *testing.T) {
+	cfg := testConfig()
+	res, err := Apply(cfg, stateFor(row{lane: Hotfix, from: Implementing}), hotfixDone("defecto de docs"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := res.State.Gate
+	if res.State.Phase != Implementing || g == nil || g.Name != GateRepro || g.Agent != imp || g.Note != "defecto de docs" {
+		t.Fatalf("debe abrir el gate repro sin cambiar de fase: fase %s gate %+v", res.State.Phase, g)
+	}
+	if res.State.NoRepro != "" {
+		t.Errorf("el motivo se guarda al aprobar, no al pedirlo: %q", res.State.NoRepro)
+	}
+	if _, err := Apply(cfg, stateFor(row{lane: Hotfix, from: Implementing}), func() Event { e := hotfixDone("x"); e.CheckOK = false; return e }()); err == nil {
+		t.Error("sin check vigente el escape no abre el gate")
+	}
+}
+
+func TestApproveReproAdvances(t *testing.T) {
+	res, err := Apply(testConfig(), reproGateState(), Event{Kind: EvApprove})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.State.Phase != Quality || res.State.Gate != nil {
+		t.Fatalf("aprobar avanza a quality: %s %+v", res.State.Phase, res.State.Gate)
+	}
+	if res.State.NoRepro != "solo cambia un texto de la guía" {
+		t.Errorf("el motivo queda en el estado: %q", res.State.NoRepro)
+	}
+	var body string
+	for _, fx := range res.Effects {
+		if fx.Kind == FxComment {
+			body = fx.Body
+		}
+	}
+	if !strings.Contains(body, "Hotfix sin prueba de reproducción (aprobado):") || !strings.Contains(body, "solo cambia un texto de la guía") {
+		t.Errorf("comentario al tracker: %q", body)
+	}
+	// El motivo sobrevive a las rondas de corrección (enter no lo limpia).
+	back, err := Apply(testConfig(), res.State, Event{Kind: EvReject, Note: "falta X"})
+	if err != nil || back.State.Phase != Implementing || back.State.NoRepro == "" {
+		t.Errorf("la ronda de corrección conserva el motivo: %v %+v", err, back.State)
+	}
+}
+
+func TestRejectReproBackToImplementing(t *testing.T) {
+	res, err := Apply(testConfig(), reproGateState(), Event{Kind: EvReject, Note: "escribe la prueba"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := res.State
+	if s.Phase != Implementing || s.Gate != nil || !s.Resume || s.Note != "escribe la prueba" || s.NoRepro != "" {
+		t.Fatalf("rechazar cierra el gate y reanuda al implementer: %+v", s)
+	}
+	if _, err := Apply(testConfig(), reproGateState(), Event{Kind: EvReject}); err == nil {
+		t.Error("rechazar exige --note")
+	}
+}
+
+func TestNoReproInvalid(t *testing.T) {
+	cfg := testConfig()
+	cases := []struct {
+		name string
+		s    State
+		ev   Event
+	}{
+		{"carril full", stateFor(row{lane: Full, from: Implementing}), hotfixDone("x")},
+		{"carril light", stateFor(row{lane: Light, from: Implementing}), hotfixDone("x")},
+		{"otra fase", stateFor(row{lane: Hotfix, from: Quality}), func() Event { e := rep(rv, Approved); e.NoRepro = "x"; return e }()},
+		{"otro veredicto", stateFor(row{lane: Hotfix, from: Implementing}), func() Event { e := rep(imp, NeedsDecision); e.NoRepro = "x"; return e }()},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, err := Apply(cfg, c.s, c.ev)
+			var rj *Rejection
+			if !errors.As(err, &rj) || rj.Code != "no_repro_invalid" {
+				t.Fatalf("esperaba no_repro_invalid, got %v", err)
+			}
+		})
+	}
+}

@@ -153,6 +153,8 @@ type ReportOpts struct {
 	Options []string
 	// Content es el reporte por stdin (solo el scout); nil = sin --stdin.
 	Content *string
+	// NoRepro apunta al motivo de --no-repro; nil si la bandera no vino.
+	NoRepro *string
 }
 
 // Report registra el veredicto de un agente.

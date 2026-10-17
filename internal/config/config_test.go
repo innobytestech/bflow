@@ -621,3 +621,20 @@ func TestFlowCommentDefaults(t *testing.T) {
 		t.Errorf("config explícita: %v %v", core.NarrativeComments, core.CommentPatterns)
 	}
 }
+
+func TestCheckTestStepDefault(t *testing.T) {
+	c, err := Load(fixture(t, "", "check: { steps: [{ name: test, run: go test ./... }] }\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Check.TestStep != "test" {
+		t.Errorf("test_step por defecto: %q", c.Check.TestStep)
+	}
+	c, err = Load(fixture(t, "", "check: { test_step: unit, steps: [{ name: unit, run: go test ./... }] }\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Check.TestStep != "unit" {
+		t.Errorf("el repo sobrescribe test_step: %q", c.Check.TestStep)
+	}
+}

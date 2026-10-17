@@ -57,6 +57,7 @@ const (
 	GateRounds      Gate = "rounds"      // cortacircuito de rondas de calidad
 	GateQuestions   Gate = "questions"   // preguntas de producto, antes de ver el código
 	GateWalkthrough Gate = "walkthrough" // aprobar el PR
+	GateRepro       Gate = "repro"       // hotfix sin prueba de reproducción
 	// GateBudget no es un gate pendiente normal: no pasa por pendingGate ni
 	// pisa el gate que ya estuviera abierto (GH-16).
 	GateBudget Gate = "budget"
@@ -144,6 +145,8 @@ type State struct {
 	// (GH-16): aprobar o rechazar la pregunta de presupuesto no pregunta otra
 	// vez hasta el siguiente múltiplo.
 	BudgetAck map[Phase]int `json:"budget_ack,omitempty"`
+	// NoRepro es el motivo aprobado para cerrar un hotfix sin prueba de reproducción.
+	NoRepro string `json:"no_repro,omitempty"`
 }
 
 // New crea el estado inicial de una tarea.
@@ -185,6 +188,8 @@ type Event struct {
 	Verdict Verdict  `json:"verdict,omitempty"`
 	Options []string `json:"options,omitempty"`  // report NEEDS_DECISION
 	CheckOK bool     `json:"check_ok,omitempty"` // report DONE en implementing: check verificado en HEAD
+
+	NoRepro string `json:"no_repro,omitempty"` // report DONE en hotfix: motivo para cerrar sin prueba de reproducción
 
 	NoChangelog bool `json:"no_changelog,omitempty"` // unblock: exime del changelog en documenting
 

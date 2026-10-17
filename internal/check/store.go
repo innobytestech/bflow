@@ -50,6 +50,16 @@ func Load(st *store.Store, id string) (*Result, error) {
 	return &r, json.Unmarshal(b, &r)
 }
 
+// LoadAt lee el check guardado de un commit (nil, nil si no hay).
+func LoadAt(st *store.Store, id, sha string) (*Result, error) {
+	return nil, nil
+}
+
+// StepAt dice si hay check guardado para sha y cómo terminó el paso step ("" si el check no lo trae).
+func (v Verifier) StepAt(ctx context.Context, id, sha, step string) (found bool, status string, err error) {
+	return false, "", nil
+}
+
 // Verifier implementa engine.Verifier: DONE solo con un check vigente.
 type Verifier struct {
 	Store     *store.Store

@@ -100,6 +100,8 @@ type TaskStats struct {
 	// ClosedOutside es el motivo ("tracker" | "pr") si la tarea se cerró
 	// porque se terminó fuera de esta copia.
 	ClosedOutside string `json:"closed_outside,omitempty"`
+	// NoRepro es el motivo aprobado para cerrar un hotfix sin prueba de reproducción.
+	NoRepro string `json:"no_repro,omitempty"`
 
 	// Calidad: rechazos humanos por gate y hotfixes que la corrigen (--fixes).
 	RejectionsByGate map[string]int `json:"rejections_by_gate,omitempty"`

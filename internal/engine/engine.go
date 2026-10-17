@@ -24,6 +24,11 @@ import (
 	"innobytes.tech/bflow/internal/vcs"
 )
 
+// CheckHistory lee el check guardado de un commit.
+type CheckHistory interface {
+	StepAt(ctx context.Context, id, sha, step string) (found bool, status string, err error)
+}
+
 // Verifier confirma que el check pasó sobre el código actual.
 type Verifier interface {
 	Verify(ctx context.Context, id string) (ok bool, detail string, err error)
@@ -34,9 +39,10 @@ type Engine struct {
 	Cfg      *config.Config
 	Store    *store.Store
 	Tracker  tracker.Tracker
-	Git      vcs.Git  // nil: sin git (se registra la rama pero no se crea)
-	Host     vcs.Host // nil: sin host remoto (se da la URL de compare si se puede)
-	Verifier Verifier // nil: DONE se acepta sin verificar si no hay pasos de check
+	Git      vcs.Git      // nil: sin git (se registra la rama pero no se crea)
+	Host     vcs.Host     // nil: sin host remoto (se da la URL de compare si se puede)
+	Checks   CheckHistory // nil: hotfix no exige prueba de reproducción
+	Verifier Verifier     // nil: DONE se acepta sin verificar si no hay pasos de check
 	Now      func() time.Time
 	User     string
 }

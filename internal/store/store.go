@@ -53,6 +53,7 @@ type Record struct {
 	Title     string            `json:"title,omitempty"`
 	URL       string            `json:"url,omitempty"` // la tarea en el tracker
 	Branch    string            `json:"branch,omitempty"`
+	StartSHA  string            `json:"start_sha,omitempty"` // HEAD al crear la rama; base del rango de commits si no hay vcs.base_branch
 	PR        *PR               `json:"pr,omitempty"`
 	Adapter   map[string]string `json:"adapter,omitempty"`    // datos propios del adaptador del tracker
 	Split     []SplitChild      `json:"split,omitempty"`      // hijas ya creadas al aprobar el split

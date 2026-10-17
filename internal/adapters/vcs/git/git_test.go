@@ -357,3 +357,54 @@ func TestDiffAddedPlusPlusLine(t *testing.T) {
 		t.Errorf("DiffAdded = %v\nquiero %v", got, want)
 	}
 }
+
+func TestCommitsAndCommitFiles(t *testing.T) {
+	work, _ := fixture(t)
+	g := New(work)
+	ctx := context.Background()
+	sh(t, work, "checkout", "-b", "feature/X-1-demo", "origin/dev")
+	write(t, work, "internal/a_test.go", "package a\n")
+	write(t, work, "docs/nota.md", "x\n")
+	sh(t, work, "add", ".")
+	sh(t, work, "commit", "-m", "prueba")
+	first := sh(t, work, "rev-parse", "HEAD")
+	write(t, work, "internal/a.go", "package a // fix\n")
+	sh(t, work, "commit", "-am", "fix")
+	second := sh(t, work, "rev-parse", "HEAD")
+
+	sh(t, work, "checkout", "-b", "lateral", first)
+	write(t, work, "lateral.txt", "l\n")
+	sh(t, work, "add", ".")
+	sh(t, work, "commit", "-m", "lateral")
+	lateral := sh(t, work, "rev-parse", "HEAD")
+	sh(t, work, "checkout", "feature/X-1-demo")
+	sh(t, work, "merge", "--no-ff", "-m", "merge", "lateral")
+	merge := sh(t, work, "rev-parse", "HEAD")
+
+	got, err := g.Commits(ctx, "origin/dev")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Los dos últimos pueden empatar en segundos: solo se fija que el ancestro va primero.
+	if len(got) != 3 || got[0] != first || !slices.Contains(got, second) || !slices.Contains(got, lateral) {
+		t.Errorf("del más viejo al más nuevo y sin merges: %v, want %v primero y luego %v y %v", got, first, second, lateral)
+	}
+	if slices.Contains(got, merge) {
+		t.Error("un merge no es evidencia")
+	}
+	if none, err := g.Commits(ctx, "HEAD"); err != nil || len(none) != 0 {
+		t.Errorf("rango vacío: %v %v", none, err)
+	}
+
+	files, err := g.CommitFiles(ctx, first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	slices.Sort(files)
+	if want := []string{"docs/nota.md", "internal/a_test.go"}; !slices.Equal(files, want) {
+		t.Errorf("archivos del commit contra su padre: %v, want %v", files, want)
+	}
+	if files, _ := g.CommitFiles(ctx, second); !slices.Equal(files, []string{"internal/a.go"}) {
+		t.Errorf("archivos del fix: %v", files)
+	}
+}

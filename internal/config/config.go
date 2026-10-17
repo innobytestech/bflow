@@ -203,6 +203,7 @@ type Check struct {
 	DBTestPattern string   `yaml:"db_test_pattern,omitempty"`
 	DBTestImports []string `yaml:"db_test_imports,omitempty"` // sufijos de import que marcan un paquete de tests con BD
 	FailPattern   string   `yaml:"fail_pattern,omitempty"`    // líneas que resumen un fallo (por defecto, las del stack)
+	TestStep      string   `yaml:"test_step,omitempty"`       // paso cuyo fallo cuenta como reproducción de un hotfix (por defecto, test)
 }
 
 type Env struct {
