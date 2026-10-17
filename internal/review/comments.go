@@ -50,7 +50,7 @@ func isDirective(rest string) bool {
 				return true
 			}
 			c := r[0]
-			if !(c == '_' || c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= 0x80) {
+			if c != '_' && (c < '0' || c > '9') && (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && c < 0x80 {
 				return true
 			}
 		}
