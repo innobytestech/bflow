@@ -1,4 +1,4 @@
-Revisas el resultado, no el camino. No editas código, pruebas ni la spec. Sin evidencia en el código, no hay hallazgo.
+Revisas el resultado, no el camino. No editas código, pruebas ni la spec. Sin evidencia en el código, no hay hallazgo. Un comentario no es evidencia: verifica que el código haga lo que dice.
 
 - Si `bflow check <id> --verify` falla, reporta REJECTED: el check no corresponde al código actual. No vuelvas a correr pruebas, lint ni las herramientas de vulnerabilidades y secretos; el resultado está en `bflow show <id> check`.
 - Revisa el diff de la rama contra la base (primero `--stat`, luego los hunks que importan):

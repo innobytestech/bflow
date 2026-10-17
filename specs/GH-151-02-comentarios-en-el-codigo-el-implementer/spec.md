@@ -44,29 +44,29 @@
 
 ## Tasks
 
-- [ ] T1 Leer las líneas agregadas del diff.
+- [x] T1 Leer las líneas agregadas del diff.
   - Se agrega a `vcs.Git` (`internal/vcs/vcs.go`) `DiffAdded(ctx context.Context, base string, paths []string) ([]AddedLine, error)`, con `type AddedLine struct { Path string; Line int; Text string }`. `Line` es el número de línea en el archivo nuevo.
   - Se implementa en `internal/adapters/vcs/git/git.go` con `git diff --unified=0 --no-color --no-ext-diff --no-renames <base>...HEAD -- <paths>`. La ruta sale de `+++ b/<ruta>` y la línea se cuenta desde `@@ -a,b +c,d @@`. Se saltan `+++`, `/dev/null` y los binarios.
   - CUANDO el diff agrega `// T3: según R4` en la línea 5 de `a.go`, el sistema DEBE devolver `{a.go, 5, "// T3: según R4"}`. Las rutas usan `/`.
   - `fakeGit` (`internal/engine/vcs_test.go`) gana un campo `added []vcs.AddedLine`.
   - Prueba: `TestDiffAdded` en `internal/adapters/vcs/git`, con un repo real (dos commits, hunks en dos archivos y una línea borrada que no cuenta).
-- [ ] T2 Escáner puro en `internal/review/comments.go`.
+- [x] T2 Escáner puro en `internal/review/comments.go`.
   - `var DefaultCommentPatterns = []string{`\bR\d+\b`, `\bT\d+\b`, `(?i)\bspec\b`, `(?i)\bsegún`, `(?i)\bdecisi[oó]n`, `(?i)\bwalkthrough\b`}`.
   - `func IsComment(text string) (comment string, ok bool)` aplica los prefijos de la decisión [N] y devuelve solo el texto del comentario. Con un `//` final, devuelve desde el `//`.
   - `func NarrativeComments(lines []vcs.AddedLine, taskID string, patterns []string) ([]string, error)` devuelve `ruta:línea: texto` por cada línea que es comentario y cumple algún patrón o contiene el ID de la tarea (sin distinguir mayúsculas). Un patrón inválido es error. Se saltan las rutas que terminan en `.md`.
   - CUANDO la línea es `// T3: según R4`, el sistema DEBE reportarla. CUANDO es `// el proveedor corta a 50 ids por llamada`, NO DEBE. CUANDO es código (`s := "// T3"`, `url := "http://x/T3"`, `*p = T3`), NO DEBE. CUANDO es `x := 1 // GH-151`, DEBE.
   - Pruebas: `TestNarrativeCommentsRejectsTaskNarration`, `TestNarrativeCommentsAllowsWhy`, `TestNarrativeCommentsIgnoresCode`, `TestNarrativeCommentsCustomPatterns` y `TestIsCommentPrefixes` (tabla con `//`, `#`, `/*`, `* `, `-- ` y `<!--`).
-- [ ] T3 Config.
+- [x] T3 Config.
   - En `config.Flow` (`internal/config/config.go`) se agregan `NarrativeComments *bool` (`yaml:"narrative_comments,omitempty"`) y `CommentPatterns []string` (`yaml:"comment_patterns,omitempty"`), cada uno con su comentario de documentación.
   - `Config.Validate` DEBE rechazar un patrón que no compile con `regexp.Compile`: `flow.comment_patterns: %q no es una expresión regular válida`.
   - Pasan a `flow.Config` como `NarrativeComments bool` (true salvo un `false` explícito) y `CommentPatterns []string` (los fijos si la lista viene vacía), igual que `PublicPaths`.
   - Pruebas: `TestValidateCommentPatterns` y `TestFlowCommentDefaults` en `internal/config`.
-- [ ] T4 Rechazo en DONE y en `check --verify`.
+- [x] T4 Rechazo en DONE y en `check --verify`.
   - `func (e *Engine) NarrativeComments(ctx context.Context, id string) []string`, en `internal/engine/review.go`, devuelve nil si la regla está apagada, si no hay git o si no hay base. Si no, llama a `Git.DiffAdded(ctx, e.diffBase(), e.Cfg.Check.CodePaths)` y a `review.NarrativeComments`. Si git falla, devuelve nil, igual que `changelogRequired`.
   - En `engine.go`, en los bloques DONE de `Implementing` (después de `bflowInDiff` y antes de `ev.CheckOK = true`) y de `Documenting` (después de `bflowInDiff`): CUANDO hay hallazgos, el sistema DEBE devolver `flow.Rejection{Code: "narrative_comment"}`. El Reason lista hasta 20 `ruta:línea: texto` (con "y N más" si hay más) y dice: "Un comentario explica el por qué que el código no deja ver; lo de la tarea, la spec o lo validado va en reports/impl.md. Quítalo o reescríbelo, commitea y reporta DONE otra vez. Si el patrón no aplica a este repo, ajusta flow.comment_patterns o apaga flow.narrative_comments."
   - En `internal/cli/checkcmds.go`, con `--verify`: CUANDO `ok` es true, hay `id` y hay hallazgos, el sistema DEBE dejar `ok=false` con el detalle `comentarios narrativos: <ruta:línea>, …`. La salida es `not_verified` con código de error.
   - Pruebas: `TestDoneRejectsNarrativeComment` y `TestDoneAllowsWhyComment` (implementer), `TestDocumenterDoneRejectsNarrativeComment` y `TestDoneNarrativeCommentsDisabled` en `internal/engine`. `TestVerifyFailsOnNarrativeComment`, e2e en `cmd/bflow`, con un commit real que agrega `// T3: según R4`.
-- [ ] T5 Oficios, docs y changelog.
+- [x] T5 Oficios, docs y changelog.
   - `implementer.md` DEBE llevar esta viñeta: "Un comentario explica el por qué que el código no deja ver (invariante, trampa, restricción externa). Nunca narra la tarea, la spec, la decisión tomada ni lo que se validó; eso va en `reports/impl.md` y en el PR. bflow rechaza el DONE con `narrative_comment` si un comentario agregado cita el ID, R<n>, T<n>, la spec o el walkthrough."
   - `reviewer.md`, junto a "Sin evidencia en el código…", DEBE decir: "Un comentario no es evidencia: verifica que el código haga lo que dice."
   - Se corre `bflow render` para regenerar `.claude/agents/` y `.opencode/agents/`. `internal/agents/agents_test.go` pasa.

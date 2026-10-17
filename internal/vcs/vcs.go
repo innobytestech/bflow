@@ -41,6 +41,9 @@ type Git interface {
 	DiffLines(ctx context.Context, base string) (int, error)
 	// DiffBinaries lista los archivos binarios del diff de tres puntos contra base.
 	DiffBinaries(ctx context.Context, base string) ([]string, error)
+	// DiffAdded lista las líneas agregadas (no las borradas) entre base y HEAD
+	// (triple punto) bajo paths.
+	DiffAdded(ctx context.Context, base string, paths []string) ([]AddedLine, error)
 	// Commit hace commit solo de paths con msg, aunque haya otras cosas en
 	// stage. Devuelve false si esos archivos no tenían cambios.
 	Commit(ctx context.Context, paths []string, msg string) (bool, error)
@@ -48,6 +51,13 @@ type Git interface {
 	Push(ctx context.Context, branch string) error
 	// RemoteURL devuelve la URL del remoto.
 	RemoteURL(ctx context.Context) (string, error)
+}
+
+// AddedLine es una línea agregada por el diff; Line es su número en el archivo nuevo.
+type AddedLine struct {
+	Path string
+	Line int
+	Text string
 }
 
 // PRSpec describe un PR a abrir.

@@ -20,6 +20,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"innobytes.tech/bflow/internal/flow"
+	"innobytes.tech/bflow/internal/review"
 )
 
 // RepoFile es el nombre del archivo de configuración del repo.
@@ -139,6 +140,12 @@ type Flow struct {
 	// si el diff las toca, el documenter debe cambiar el changelog. "dir/" = carpeta,
 	// "!patrón" excluye.
 	PublicPaths []string `yaml:"public_paths,omitempty"`
+	// NarrativeComments: false apaga el rechazo narrative_comment del DONE
+	// (comentarios agregados que citan la tarea, la spec o sus criterios).
+	NarrativeComments *bool `yaml:"narrative_comments,omitempty"`
+	// CommentPatterns: expresiones regulares que delatan un comentario
+	// narrativo; reemplazan a los fijos. El ID de la tarea se busca siempre.
+	CommentPatterns []string `yaml:"comment_patterns,omitempty"`
 	// Budget es el presupuesto de tokens nuevos por fase (GH-16). Fase ausente
 	// o mapa vacío: sin presupuesto, sin aviso.
 	Budget map[string]TokenCount `yaml:"budget,omitempty"`
@@ -638,6 +645,11 @@ func (c *Config) Validate() error {
 			add("flow.public_paths: %q debe ser una ruta del repo (sin .., absoluta ni .bflow/)", p)
 		}
 	}
+	for _, p := range c.Flow.CommentPatterns {
+		if _, err := regexp.Compile(p); err != nil {
+			add("flow.comment_patterns: %q no es una expresión regular válida", p)
+		}
+	}
 	for _, phase := range sortedKeys(c.Flow.Budget) {
 		if !slices.Contains(flow.BudgetPhases, flow.Phase(phase)) {
 			names := make([]string, len(flow.BudgetPhases))
@@ -715,6 +727,11 @@ func (f Flow) Core() flow.Config {
 	}
 	core.Changelog = f.ConsumerChangelog
 	core.PublicPaths = f.PublicPaths
+	core.NarrativeComments = f.NarrativeComments == nil || *f.NarrativeComments
+	core.CommentPatterns = f.CommentPatterns
+	if len(core.CommentPatterns) == 0 {
+		core.CommentPatterns = slices.Clone(review.DefaultCommentPatterns)
+	}
 	if len(f.Budget) > 0 {
 		core.Budget = make(map[flow.Phase]int64, len(f.Budget))
 		for phase, n := range f.Budget {

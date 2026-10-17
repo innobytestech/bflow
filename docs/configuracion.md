@@ -133,6 +133,20 @@ flow:
 
 Una entrada que termina en `/` cubre la carpeta; las demás se comparan con `path.Match` (un patrón sin `/` también contra el nombre base); `!` al inicio excluye. Deben ser rutas del repo: sin `..`, absolutas ni `.bflow/`. Para eximir una tarea: `bflow unblock <ID> --no-changelog --note "motivo"`.
 
+### Comentarios que narran la tarea
+
+`report DONE` del implementer y del documenter, y `bflow check --verify`, miran las líneas de comentario que el diff contra la base agrega dentro de `check.code_paths` (sin los `.md`). Si alguna cita el ID de la tarea, `R<n>`, `T<n>`, `spec`, `según`, `decisión` o `walkthrough`, el DONE sale con código 2 y `narrative_comment`, y `--verify` con `not_verified`. Un comentario es una línea que empieza con `//`, `#`, `/*`, `*`, `-- ` o `<!--`, o que lleva un `//` final. No hay parser por lenguaje.
+
+- `flow.comment_patterns`: lista de expresiones regulares que reemplaza a los patrones fijos. El ID de la tarea se busca siempre.
+- `flow.narrative_comments: false`: apaga la regla. Una lista vacía en `comment_patterns` no la apaga: vuelve a los patrones fijos.
+
+```yaml
+# bflow.yaml
+flow:
+  comment_patterns: ['\bR\d+\b', '\bT\d+\b', '(?i)\bwalkthrough\b']  # sin "spec", por los YAML de OpenAPI
+  # narrative_comments: false                                                    # o apaga la regla
+```
+
 ### Presupuesto de tokens y detección de ciclos
 
 `flow.budget` fija un presupuesto de tokens nuevos por fase. Cuando una fase lo supera, `bflow watch` lo marca en ámbar y el siguiente comando (`next`, `report`, etc.) es una pregunta al gate `budget`: "¿Sigue?", "Sigue" continúa, "Bloquear" bloquea con una nota que el implementer verá. No corta el trabajo, solo pide confirmación.

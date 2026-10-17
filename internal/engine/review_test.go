@@ -14,6 +14,7 @@ import (
 	"innobytes.tech/bflow/internal/guard"
 	"innobytes.tech/bflow/internal/review"
 	"innobytes.tech/bflow/internal/store"
+	"innobytes.tech/bflow/internal/vcs"
 )
 
 const mapRed = "# Review-map\n\n## 🔴 Mirar primero\n- `internal/a.go`: lógica nueva\n  - caminos: sin ramas nuevas\n- `internal/b.go`: seguridad\n  - caminos: sin ramas nuevas\n- `gone/x.go`: ya no está\n  - caminos: sin ramas nuevas\n" +
@@ -647,5 +648,47 @@ func TestRejectionNoteReachesImplementerAndDoneNeedsCommit(t *testing.T) {
 	mustT(t)(v.e.Report(ctx, id, ReportOpts{Agent: "implementer", Verdict: flow.DoneV}))
 	if phaseOf(t, v, id) != flow.Quality {
 		t.Errorf("con commit nuevo el DONE avanza a quality")
+	}
+}
+
+func narrativeImpl(t *testing.T, yaml string, added ...vcs.AddedLine) (*env, string) {
+	t.Helper()
+	v := newEnv(t, yaml)
+	v.e.Git = &fakeGit{branch: "dev", added: added}
+	id := v.task(t, "Demo")
+	mustT(t)(v.e.Start(context.Background(), id, flow.Hotfix, "", ""))
+	return v, id
+}
+
+func implDone(v *env, id string) error {
+	_, err := v.e.Report(context.Background(), id, ReportOpts{Agent: "implementer", Verdict: flow.DoneV})
+	return err
+}
+
+func TestDoneRejectsNarrativeComment(t *testing.T) {
+	v, id := narrativeImpl(t, "", vcs.AddedLine{Path: "a.go", Line: 5, Text: "// T3: según R4"})
+	rj := rejection(t, implDone(v, id), "narrative_comment")
+	if !strings.Contains(rj.Reason, "a.go:5: // T3: según R4") || !strings.Contains(rj.Reason, "flow.narrative_comments") {
+		t.Errorf("el motivo debe listar el hallazgo y la salida:\n%s", rj.Reason)
+	}
+}
+
+func TestDoneAllowsWhyComment(t *testing.T) {
+	v, id := narrativeImpl(t, "", vcs.AddedLine{Path: "a.go", Line: 5, Text: "// el proveedor corta a 50 ids por llamada"})
+	if err := implDone(v, id); err != nil {
+		t.Fatalf("un comentario del por qué pasa: %v", err)
+	}
+}
+
+func TestDocumenterDoneRejectsNarrativeComment(t *testing.T) {
+	v, id, g := publicToDocumenting(t, []string{"internal/x/b.go"}, nil)
+	g.added = []vcs.AddedLine{{Path: "internal/x/b.go", Line: 1, Text: "// walkthrough de la tarea"}}
+	rejection(t, docsDone(v, id), "narrative_comment")
+}
+
+func TestDoneNarrativeCommentsDisabled(t *testing.T) {
+	v, id := narrativeImpl(t, "flow: { narrative_comments: false }\n", vcs.AddedLine{Path: "a.go", Line: 5, Text: "// T3: según R4"})
+	if err := implDone(v, id); err != nil {
+		t.Fatalf("apagada la regla, pasa: %v", err)
 	}
 }

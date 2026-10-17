@@ -25,6 +25,10 @@ type Config struct {
 	Changelog string
 	// PublicPaths: ver config.Flow.PublicPaths; vacío = el gate no actúa.
 	PublicPaths []string
+	// NarrativeComments: false apaga el rechazo narrative_comment.
+	NarrativeComments bool
+	// CommentPatterns: ver config.Flow.CommentPatterns.
+	CommentPatterns []string
 	// Scout: nombre del agente scout; vacío = apagado.
 	Scout string
 	// Budget: tokens nuevos presupuestados por fase (GH-16); fase ausente =
