@@ -39,7 +39,7 @@ func TestNarrativeCommentsAllowsWhy(t *testing.T) {
 }
 
 func TestNarrativeCommentsIgnoresCode(t *testing.T) {
-	for _, c := range []string{`s := "// T3"`, `url := "http://x/T3"`, `*p = T3`, `r := R4 + T3`} {
+	for _, c := range []string{`s := "// T3"`, `url := "http://x/T3"`, `*p = T3`, `r := R4 + T3`, `s := "a // T3"`, `#include "spec.h"`} {
 		if got, _ := NarrativeComments(added(c), "GH-1", DefaultCommentPatterns); len(got) != 0 {
 			t.Errorf("%q es código: %v", c, got)
 		}
@@ -75,6 +75,21 @@ func TestIsCommentPrefixes(t *testing.T) {
 		{"*p = 1", "", false},
 		{"--x", "", false},
 		{"url := \"http://x\"", "", false},
+		{`s := "a // T3"`, "", false},
+		{`c := 'a // b'`, "", false},
+		{"r := `a // b`", "", false},
+		{`s := "x\" // y"`, "", false},
+		{`s := "a" // b`, "// b", true},
+		{`s := "a\\" // b`, "// b", true},
+		{`#include "spec.h"`, "", false},
+		{`#define SPEC 1`, "", false},
+		{`#pragma once`, "", false},
+		{`#if T1`, "", false},
+		{`#endif`, "", false},
+		{`#include <x.h> // T3`, "// T3", true},
+		{`# include x`, "# include x", true},
+		{`#includes`, "#includes", true},
+		{`# T1`, "# T1", true},
 	}
 	for _, c := range cases {
 		got, ok := IsComment(c.in)
