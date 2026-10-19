@@ -142,6 +142,9 @@ func statsLine(st metrics.TaskStats) string {
 	if len(it) > 0 {
 		l += " · " + strings.Join(it, ", ")
 	}
+	if st.NoRepro != "" {
+		l += " · sin prueba de reproducción: " + st.NoRepro
+	}
 	if st.TokensAvailable {
 		l += " · " + metrics.Summary(st.Tokens)
 	}

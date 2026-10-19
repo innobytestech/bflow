@@ -144,7 +144,7 @@ Si el commit de prueba ya no es HEAD y le falta el check: `git switch --detach <
 
 ## Tasks
 
-- [ ] **T1 · Contrato** (R1–R15). Stubs que compilan: `Check.TestStep`, `check.LoadAt`, `Verifier.StepAt`, `vcs.Git.Commits/CommitFiles` (adaptador y fake), `Record.StartSHA`, `flow.GateRepro`, `Event.NoRepro`, `State.NoRepro`, `engine.CheckHistory`, `Engine.Checks`, `ReportOpts.NoRepro`, `reproMissing`, `TaskStats.NoRepro`. Pruebas que fallan contra los stubs:
+- [x] **T1 · Contrato** (R1–R15). Stubs que compilan: `Check.TestStep`, `check.LoadAt`, `Verifier.StepAt`, `vcs.Git.Commits/CommitFiles` (adaptador y fake), `Record.StartSHA`, `flow.GateRepro`, `Event.NoRepro`, `State.NoRepro`, `engine.CheckHistory`, `Engine.Checks`, `ReportOpts.NoRepro`, `reproMissing`, `TaskStats.NoRepro`. Pruebas que fallan contra los stubs:
   - `internal/check/store_test.go`: `TestSaveKeepsHistoryBySHA`, `TestSaveSkipsHistoryWhenDirty`, `TestStepAt`.
   - `internal/adapters/vcs/git/git_test.go`: `TestCommitsAndCommitFiles` (excluye merges, orden viejo→nuevo).
   - `internal/config/config_test.go`: `TestCheckTestStepDefault`.
@@ -153,9 +153,9 @@ Si el commit de prueba ya no es HEAD y le falta el check: `git switch --detach <
   - `internal/engine/repro_test.go`: `TestReproMissing` (tabla: sin commits · solo código · prueba sin check · check que pasó · `test_step` inexistente · HEAD de solo pruebas no cuenta · commit vacío · base desde `StartSHA` · sin base ni `StartSHA` · evidencia válida), `TestReproSkippedAfterApproval`, `TestReproOnlyHotfix`.
   - `internal/metrics/metrics_test.go`: `TestComputeNoRepro`.
   - `cmd/bflow/e2e_repro_test.go`: `TestHotfixDoneWithoutReproRejected`, `TestHotfixReproFailThenPassAccepted`, `TestHotfixNoReproOpensHumanGate` (aprobar → quality, decisions.md, `stats`; rechazar → implementing con nota).
-- [ ] **T2 · Historial de check y `test_step`** (R1, R2, R3): `Save` por SHA, `LoadAt`, `StepAt`, default de config.
-- [ ] **T3 · Git y `StartSHA`** (R5, R6): `Commits`, `CommitFiles` en el adaptador; `createBranch` guarda `StartSHA`.
-- [ ] **T4 · Gate `repro` en flow** (R8, R9, R10, R11, R12, R15): tipos, `report`, `case Implementing`, `approve`, `rejectTargets`, `gateNext`.
-- [ ] **T5 · Regla en el engine** (R4–R9, R12, R14): `reproMissing`, enganche en `applyWith`, `ReportOpts`, `Engine.Checks` en `wire.go`, bandera `--no-repro` en la CLI. Adapta `TestDoneRequiresVigentCheck`: tras `start`, un commit que solo toque `a_test.go` con un check que falle en `test`, para que su último DONE siga llegando a quality.
-- [ ] **T6 · Rastro del escape** (R10, R13): línea en `decisions.md`, `data.no_repro` en el log, `TaskStats.NoRepro` y la línea de `stats <ID>`.
-- [ ] **T7 · Oficio y docs** (R16): `internal/agents/craft/implementer.md` (dos corridas de check, `--no-repro` y cuándo usarlo: docs, config, carreras); `bflow render`; `docs/conceptos.md` (hotfix), `docs/configuracion.md` (`check.test_step`), `docs/comandos.md` (`report --no-repro`, gate `repro`), `docs/guia.md` (fila `repro_test_missing` en «Cuando algo se atora»); entrada en `CHANGELOG.md` (Cambiado, con «hace falta correr `bflow render`»).
+- [x] **T2 · Historial de check y `test_step`** (R1, R2, R3): `Save` por SHA, `LoadAt`, `StepAt`, default de config.
+- [x] **T3 · Git y `StartSHA`** (R5, R6): `Commits`, `CommitFiles` en el adaptador; `createBranch` guarda `StartSHA`.
+- [x] **T4 · Gate `repro` en flow** (R8, R9, R10, R11, R12, R15): tipos, `report`, `case Implementing`, `approve`, `rejectTargets`, `gateNext`.
+- [x] **T5 · Regla en el engine** (R4–R9, R12, R14): `reproMissing`, enganche en `applyWith`, `ReportOpts`, `Engine.Checks` en `wire.go`, bandera `--no-repro` en la CLI. Adapta `TestDoneRequiresVigentCheck`: tras `start`, un commit que solo toque `a_test.go` con un check que falle en `test`, para que su último DONE siga llegando a quality.
+- [x] **T6 · Rastro del escape** (R10, R13): línea en `decisions.md`, `data.no_repro` en el log, `TaskStats.NoRepro` y la línea de `stats <ID>`.
+- [x] **T7 · Oficio y docs** (R16): `internal/agents/craft/implementer.md` (dos corridas de check, `--no-repro` y cuándo usarlo: docs, config, carreras); `bflow render`; `docs/conceptos.md` (hotfix), `docs/configuracion.md` (`check.test_step`), `docs/comandos.md` (`report --no-repro`, gate `repro`), `docs/guia.md` (fila `repro_test_missing` en «Cuando algo se atora»); entrada en `CHANGELOG.md` (Cambiado, con «hace falta correr `bflow render`»).

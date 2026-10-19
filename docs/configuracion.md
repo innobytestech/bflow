@@ -54,6 +54,7 @@ La validación junta todos los problemas en un solo mensaje, indica la línea de
 `bflow check [ID]` corre los pasos de `check.steps`, resume los fallos en pocas líneas y liga el resultado a un commit; el detalle completo queda en un archivo (`bflow show <ID> check`).
 
 - `--quick <paquete>`: solo los pasos rápidos sobre un paquete, para iterar. No registra resultado, así que no cuenta para reportar DONE.
+- `check.test_step` (por defecto `test`): el paso cuyo fallo cuenta como reproducción de un hotfix. Cada `bflow check` con ID de tarea guarda su resultado también por commit en `.bflow/tasks/<ID>/checks/<sha>.json` (no con cambios sin commitear).
 - `--verify`: no corre los pasos; comprueba que el último check pasó y corresponde al código actual (y que las pruebas congeladas no cambiaron).
 - Un paso con `needs` depende de una herramienta: si falta y el paso es `optional: true`, se omite con aviso; si no es opcional, falla.
 - Un paso de vulnerabilidades marca como preexistentes las que la tarea no tocó (ver la [guía](guia.md#cuando-algo-se-atora)).

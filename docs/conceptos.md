@@ -69,6 +69,8 @@ Las transiciones marcadas "gate" son humanas. Cualquier fase puede pasar a `bloc
 | `light` | spec, implementing, quality, documenting, walkthrough, in_review, done |
 | `hotfix` | implementing, quality, documenting, walkthrough, in_review, done |
 
+**Hotfix y prueba de reproducción.** En `hotfix`, `report DONE` del implementer exige un commit de solo pruebas (antes de la corrección, no el último) cuyo `bflow check` falló en el paso `check.test_step` (por defecto `test`). El flujo son dos corridas: commit con la prueba y `bflow check` (rojo); commits con la corrección y `bflow check` (verde). Sin ese commit, el DONE sale con `repro_test_missing`. Si de verdad no se puede probar (docs, config, carreras), `report DONE --no-repro "<motivo>"` abre el gate `repro` y una persona decide: aceptar sin prueba (el motivo queda en `decisions.md`, en el tracker y en `bflow stats`) o pedir la prueba.
+
 ## Gates
 
 Una gate es un punto donde el flujo se detiene hasta que una persona decide: carril, discovery, spec, contrato T1, decisiones que un agente no puede tomar, pausa antes de la revisión, rondas, preguntas de producto y walkthrough. Qué ves y qué decides en cada una está en la [guía](guia.md#las-gates-qué-ves-y-qué-decides).

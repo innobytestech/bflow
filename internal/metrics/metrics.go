@@ -238,6 +238,9 @@ func Compute(id string, entries []store.Entry, now time.Time) TaskStats {
 			gateOpen = opened || (e.From == flow.Discovery && e.To == flow.Discovery)
 		case "approve":
 			gateOpen = opened
+			if m, _ := e.Data["no_repro"].(string); m != "" {
+				st.NoRepro = m
+			}
 		case "block":
 			savedGate, gateOpen = gateOpen, false
 		case "unblock":

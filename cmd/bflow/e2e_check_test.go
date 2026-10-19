@@ -17,6 +17,8 @@ func TestDoneRequiresVigentCheck(t *testing.T) {
 	git(t, r.dir, "commit", "-m", "base")
 	id := r.ok("task", "add", "Demo").Data["id"].(string)
 	r.ok("start", id, "--lane", "hotfix")
+	os.WriteFile(filepath.Join(r.dir, "internal", "a_test.go"), []byte("package a\n\nimport \"testing\"\n\nfunc TestX(t *testing.T) { t.Fatal(\"rojo\") } // reproduce\n"), 0o644)
+	git(t, r.dir, "commit", "-am", "test: reproduce")
 
 	env := r.run("report", "--agent", "implementer", "--verdict", "DONE")
 	if env.exit != 2 || env.Code != "check_required" || !strings.Contains(env.Data["reason"].(string), "no hay check") {
