@@ -51,7 +51,7 @@ func TestNextSpawnsFirstCase(t *testing.T) {
 		t.Error("run.json existe y beta no se prepara todavía")
 	}
 
-	// Un caso sin spec no lleva ese arg.
+	// Sin ruta de especificación no se pasa ese argumento.
 	h2 := newHarness(t)
 	h2.validCase("solo", "")
 	if _, ok := h2.next(Opts{}).Spawn.Args["spec"]; ok {

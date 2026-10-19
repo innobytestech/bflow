@@ -12,6 +12,7 @@ import (
 
 	"innobytes.tech/bflow/internal/flow"
 	"innobytes.tech/bflow/internal/store"
+	"innobytes.tech/bflow/internal/vcs"
 )
 
 func TestFrozenHashes(t *testing.T) {
@@ -411,5 +412,29 @@ func TestRestoreFrozenBadHashName(t *testing.T) {
 		if b, _ := os.ReadFile(outside); string(b) != "no me toques\n" {
 			t.Errorf("%q: se escribió fuera de la carpeta", bad)
 		}
+	}
+}
+
+// Un DONE rechazado después del check no gasta el freeze --allow; el aceptado sí.
+func TestRejectedDoneKeepsFreezeAllow(t *testing.T) {
+	v, id := narrativeImpl(t, "", vcs.AddedLine{Path: "a.go", Line: 5, Text: "// T3: según R4"})
+	put(t, v, fa, []byte("uno\n"))
+	if err := v.e.writeFrozen(id, []string{fa}); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.e.AllowFrozen(id, fa); err != nil {
+		t.Fatal(err)
+	}
+	put(t, v, fa, []byte("dos\n"))
+	rejection(t, implDone(v, id), "narrative_comment")
+	if got := v.e.Frozen(id); len(got) != 0 {
+		t.Fatalf("la prueba debe seguir permitida tras un DONE rechazado: %v", got)
+	}
+	v.e.Git = &fakeGit{branch: "dev"}
+	if err := implDone(v, id); err != nil {
+		t.Fatal(err)
+	}
+	if got := v.e.Frozen(id); !slices.Equal(got, []string{fa}) {
+		t.Errorf("el DONE aceptado vuelve a congelar: %v", got)
 	}
 }

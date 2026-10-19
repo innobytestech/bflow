@@ -87,6 +87,7 @@ func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug s
 		out.Warnings = append(out.Warnings, w...)
 	}
 	var entries []store.Entry
+	refreeze := false
 	rec, err := e.Store.Update(id, func(rec *store.Record, exists bool) error {
 		if !exists {
 			if ev.Kind != flow.EvStart {
@@ -154,7 +155,6 @@ func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug s
 					return &flow.Rejection{Code: "no_new_commits", Reason: "la compuerta de calidad rechazó (ronda " + strconv.Itoa(rec.Flow.Round) + ") y HEAD no avanzó: no hay commit con la corrección. Aplica lo que pide la nota del rechazo, haz commit y reporta DONE otra vez."}
 				}
 			}
-			e.refreezeAllowed(id)
 			if open := openTasks(e, *rec); len(open) > 0 {
 				return &flow.Rejection{Code: "tasks_open", Reason: "DONE exige todas las tareas de la spec marcadas [x]; faltan:\n" + strings.Join(open, "\n") +
 					"\nMárcalas al terminarlas; si una ya no aplica, anótalo en Design y márcala con el motivo."}
@@ -174,6 +174,7 @@ func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug s
 				}
 			}
 			ev.CheckOK = true
+			refreeze = true
 		}
 
 		var coverage *store.Entry
@@ -236,6 +237,9 @@ func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug s
 				Data: map[string]any{"code": rej.Code, "event": string(ev.Kind)}})
 		}
 		return out, err
+	}
+	if refreeze { // solo con el DONE aceptado: uno rechazado no gasta el freeze --allow
+		e.refreezeAllowed(id)
 	}
 	if err := e.Store.Append(entries...); err != nil {
 		out.Warnings = append(out.Warnings, "no se pudo escribir log.jsonl: "+err.Error())
