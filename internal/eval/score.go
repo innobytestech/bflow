@@ -10,7 +10,7 @@ import (
 )
 
 // refRe es una referencia ruta:N o ruta:N-M; la ruta lleva extensión.
-var refRe = regexp.MustCompile("(?:^|[\\s(`\"'])((?:[A-Za-z]:)?[\\w./\\\\-]+\\.\\w+):(\\d+)(?:-(\\d+))?")
+var refRe = regexp.MustCompile("(?:^|[\\s(`\"'*\\[>_])((?:[A-Za-z]:)?[\\w./\\\\-]+\\.\\w+):(\\d+)(?:-(\\d+))?")
 
 var driveRe = regexp.MustCompile(`^[A-Za-z]:/`)
 
@@ -95,7 +95,7 @@ func findIn(text, worktree string) []Finding {
 			continue
 		}
 		for _, m := range refRe.FindAllStringSubmatch(line, -1) {
-			file, ok := relToWorktree(m[1], worktree)
+			file, ok := relToWorktree(strings.TrimLeft(m[1], "_"), worktree)
 			if !ok {
 				continue
 			}
@@ -136,6 +136,15 @@ func hits(f Finding, file string, from, to int) bool {
 	return f.File == file && f.From <= to+Tolerance && f.To >= from-Tolerance
 }
 
+// normDefectFile deja la ruta del defecto como la de los hallazgos: relativa y con "/".
+func normDefectFile(p string) string {
+	p = strings.ReplaceAll(p, `\`, "/")
+	for strings.HasPrefix(p, "./") {
+		p = p[2:]
+	}
+	return p
+}
+
 // ScoreCase marca cada defecto como atrapado o no, y lista los hallazgos que
 // no coinciden con ninguno.
 func ScoreCase(defects []Defect, found []Finding) Score {
@@ -146,12 +155,13 @@ func ScoreCase(defects []Defect, found []Finding) Score {
 	}
 	var ranges []rng
 	for _, d := range defects {
+		file := normDefectFile(d.File)
 		from, to, err := ParseLines(d.Lines)
 		caught := false
 		if err == nil {
-			ranges = append(ranges, rng{d.File, from, to})
+			ranges = append(ranges, rng{file, from, to})
 			for _, f := range found {
-				if hits(f, d.File, from, to) {
+				if hits(f, file, from, to) {
 					caught = true
 					break
 				}
