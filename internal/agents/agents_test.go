@@ -310,3 +310,41 @@ func TestModelsRespectsRepoOverride(t *testing.T) {
 		t.Error("sin scout en el flujo no aparece")
 	}
 }
+
+// R18: el agente del eval usa modelo y esfuerzo de agents.reviewer y su
+// contrato; el oficio no va embebido porque lo lee del craft del ref.
+func TestEvalReviewerSpec(t *testing.T) {
+	s := EvalReviewerSpec(config.AgentConf{Model: "sonnet", Effort: "high"})
+	if s.Name != "eval-reviewer" || s.Subagent != "bflow-eval-reviewer" {
+		t.Errorf("nombres: %q %q", s.Name, s.Subagent)
+	}
+	if s.Model != "sonnet" || s.Effort != "high" {
+		t.Errorf("modelo y esfuerzo del reviewer: %q %q", s.Model, s.Effort)
+	}
+	if !slices.Equal(s.Tools, []string{Read, Write, Bash}) {
+		t.Errorf("herramientas: %v", s.Tools)
+	}
+	if !strings.Contains(s.Description, "Revisa un caso del eval del reviewer") || !strings.Contains(s.Description, "no lo invoques por tu cuenta") {
+		t.Errorf("descripción: %q", s.Description)
+	}
+	for _, want := range []string{
+		"`id`", "`base`", "`worktree`", "`out`", "`craft`", "`spec`",
+		"git -C <worktree> diff <base>...HEAD",
+		"no corras `bflow check`, `bflow show` ni `bflow report`",
+		"`<out>/<nombre>.md`",
+		"`bflow eval reviewer report <id> --verdict APPROVED|REJECTED`",
+		"Tu respuesta final es solo esa salida",
+	} {
+		if !strings.Contains(s.Body, want) {
+			t.Errorf("el contrato del eval no dice %q", want)
+		}
+	}
+	if strings.Contains(s.Body, "## Oficio") {
+		t.Error("sin oficio embebido")
+	}
+
+	def := EvalReviewerSpec(config.AgentConf{})
+	if def.Model != "opus" || def.Effort != "medium" {
+		t.Errorf("sin ajustes toma el catálogo del reviewer: %q %q", def.Model, def.Effort)
+	}
+}

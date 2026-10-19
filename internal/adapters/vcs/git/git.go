@@ -278,3 +278,25 @@ func (g *Git) DiffAdded(ctx context.Context, base string, paths []string) ([]vcs
 	}
 	return res, nil
 }
+
+// Operaciones del eval del reviewer (eval.Git).
+
+func (g *Git) ResolveCommit(ctx context.Context, ref string) (string, error) {
+	return "", fmt.Errorf("sin implementar")
+}
+
+func (g *Git) ShowFile(ctx context.Context, ref, path string) ([]byte, error) {
+	return nil, fmt.Errorf("sin implementar")
+}
+
+func (g *Git) WorktreeAdd(ctx context.Context, dir, sha string) error {
+	return fmt.Errorf("sin implementar")
+}
+
+func (g *Git) WorktreeRemove(ctx context.Context, dir string) error {
+	return fmt.Errorf("sin implementar")
+}
+
+func (g *Git) IsIgnored(ctx context.Context, path string) (bool, error) {
+	return false, fmt.Errorf("sin implementar")
+}

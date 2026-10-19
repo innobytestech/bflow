@@ -348,3 +348,6 @@ func Models(fc flow.Config, conf map[string]config.AgentConf) map[string]string 
 	}
 	return out
 }
+
+// EvalReviewerSpec arma el agente del eval del reviewer (bflow-eval-reviewer).
+func EvalReviewerSpec(conf config.AgentConf) Spec { return Spec{} }
