@@ -14,6 +14,7 @@ import (
 
 	"innobytes.tech/bflow/internal/agents"
 	"innobytes.tech/bflow/internal/engine"
+	"innobytes.tech/bflow/internal/eval"
 	"innobytes.tech/bflow/internal/guard"
 	"innobytes.tech/bflow/internal/metrics"
 	"innobytes.tech/bflow/internal/output"
@@ -45,6 +46,8 @@ type Env struct {
 	// Tools son todas las herramientas de agente registradas (claude, opencode).
 	// nil equivale a [Agent] si Agent no es nil. Lo provee cmd/bflow.
 	Tools []ToolAdapter
+	// EvalGit da el git del repo para el eval del reviewer (lo provee cmd/bflow).
+	EvalGit func(dir string) eval.Git
 }
 
 // Ctx es lo que recibe cada comando.

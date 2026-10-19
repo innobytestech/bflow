@@ -4,7 +4,9 @@ package git
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"slices"
 	"strconv"
@@ -277,4 +279,68 @@ func (g *Git) DiffAdded(ctx context.Context, base string, paths []string) ([]vcs
 		}
 	}
 	return res, nil
+}
+
+// Operaciones del eval del reviewer (eval.Git).
+
+// ResolveCommit da el SHA completo del commit al que apunta ref. Un ref con "-"
+// inicial se rechaza: git lo leería como opción.
+func (g *Git) ResolveCommit(ctx context.Context, ref string) (string, error) {
+	if ref == "" || strings.HasPrefix(ref, "-") {
+		return "", fmt.Errorf("%q no es un commit", ref)
+	}
+	sha, err := g.run(ctx, "rev-parse", "--verify", "--quiet", ref+"^{commit}")
+	if err != nil || sha == "" {
+		return "", fmt.Errorf("%q no es un commit", ref)
+	}
+	return sha, nil
+}
+
+// ShowFile lee el contenido exacto de path en ref.
+func (g *Git) ShowFile(ctx context.Context, ref, path string) ([]byte, error) {
+	if ref == "" || strings.HasPrefix(ref, "-") {
+		return nil, fmt.Errorf("%q no es un commit", ref)
+	}
+	cmd := exec.CommandContext(ctx, "git", "cat-file", "blob", ref+":"+path)
+	cmd.Dir = g.Dir
+	var out, errb bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, &errb
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("%s no existe en %s: %s", path, ref, strings.TrimSpace(errb.String()))
+	}
+	return out.Bytes(), nil
+}
+
+// WorktreeAdd crea un worktree desacoplado en sha.
+func (g *Git) WorktreeAdd(ctx context.Context, dir, sha string) error {
+	_, err := g.run(ctx, "worktree", "add", "--detach", "--force", dir, sha)
+	return err
+}
+
+// WorktreeRemove quita el worktree con --force y poda los registros huérfanos.
+func (g *Git) WorktreeRemove(ctx context.Context, dir string) error {
+	_, rmErr := g.run(ctx, "worktree", "remove", "--force", dir)
+	_, pruneErr := g.run(ctx, "worktree", "prune")
+	if rmErr != nil {
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			return pruneErr // ya no estaba: basta con la poda
+		}
+		return rmErr
+	}
+	return pruneErr
+}
+
+// IsIgnored dice si git ignora path (git check-ignore -q).
+func (g *Git) IsIgnored(ctx context.Context, path string) (bool, error) {
+	cmd := exec.CommandContext(ctx, "git", "check-ignore", "-q", "--", path)
+	cmd.Dir = g.Dir
+	err := cmd.Run()
+	if err == nil {
+		return true, nil
+	}
+	var ee *exec.ExitError
+	if errors.As(err, &ee) && ee.ExitCode() == 1 {
+		return false, nil
+	}
+	return false, err
 }

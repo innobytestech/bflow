@@ -1,6 +1,7 @@
 /bflow
 /bflow.exe
 /dist/
-.bflow/
+.bflow/*
+!.bflow/evals/
 *.test
 coverage.out

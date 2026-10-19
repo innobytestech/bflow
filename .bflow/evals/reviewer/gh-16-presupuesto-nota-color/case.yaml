@@ -1,0 +1,11 @@
+source: GH-16
+base: 3796ec2fc9e80d90a1204ae07e771ced00bc3df3
+head: fcb90b5ff7645ea58eeeca1e2f2602c1e22bf232
+spec: specs/GH-16-presupuesto-de-tokens-por-fase/spec.md
+defects:
+  - file: internal/engine/budget.go
+    lines: "135-137"
+    what: rejectBudget acepta un rechazo sin --note y arma la nota con el motivo vacío
+  - file: internal/cli/watch.go
+    lines: "167"
+    what: el aviso de presupuesto superado usa rojo propio (cWarn) en lugar del ámbar de los avisos a la persona

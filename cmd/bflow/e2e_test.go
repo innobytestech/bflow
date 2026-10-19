@@ -44,6 +44,7 @@ type envelope struct {
 		Skill   string `json:"skill"`
 		Show    []string
 		Display string `json:"display"`
+		Reason  string `json:"reason"`
 		Options []struct {
 			ID      string `json:"id"`
 			Command string `json:"command"`

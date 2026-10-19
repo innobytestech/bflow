@@ -43,6 +43,17 @@
 | `check [ID] [--quick pkg] [--verify]` | Compuerta determinista. |
 | `env check [--quiet]` | Verifica API, puertos y variables del entorno local. |
 | `guard` | Hook PreToolUse: lee la acción por stdin y la bloquea (exit 2) si rompe una regla. |
+| `eval reviewer [--craft ref] [--case c]... [--abort] [--from-fixes]` | Mide qué defectos conocidos atrapa el reviewer. Corre un caso a la vez con el agente `bflow-eval-reviewer` y escribe `.bflow/evals/<fecha>.json` con atrapados, no atrapados, posibles falsos positivos, tokens y tiempo. Sin flags, retoma la corrida abierta. |
+| `eval reviewer report <caso> --verdict APPROVED\|REJECTED [--note t]` | Lo usa el agente del eval para reportar su caso; no se corre a mano. |
+
+`eval reviewer`:
+
+- `--craft <ref>`: lee el oficio del reviewer de ese ref git (vacío = el árbol). Sirve para comparar oficios: corre el eval con el de cada versión.
+- `--case <nombre>`: corre solo ese caso (se puede repetir).
+- `--abort`: cancela la corrida abierta y quita sus worktrees y carpeta. No escribe resultado.
+- `--from-fixes`: crea un esqueleto `draft: true` en `.bflow/evals/reviewer/` por cada hotfix con `start --fixes`, con `base` y `head` ya llenos cuando se puede. Completa `defects` y quita `draft` a mano.
+
+Los casos viven en `.bflow/evals/reviewer/<caso>/case.yaml`: `base` y `head` (commits), `defects` (`file`, `lines` como `N` o `N-M`, `what`) y `spec` opcional. Un caso mal formado rechaza la corrida con `case_invalid` y sin crear nada. El puntaje cuenta un defecto como atrapado si un hallazgo del mismo archivo cae a ±5 líneas. Las carpetas `.bflow/evals/` se versionan; el resto de `.bflow/` no.
 
 ## Métricas
 

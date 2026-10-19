@@ -1,0 +1,14 @@
+source: GH-151
+base: dcf32746239a14ab2f73994ba80a71eb9573b696
+head: 884d97b7ff35e3d22f4069c64b73e060ba56ba71
+spec: specs/GH-151-02-comentarios-en-el-codigo-el-implementer/spec.md
+defects:
+  - file: internal/store/store.go
+    lines: "405"
+    what: el desbloqueo ignora el error de os.Remove; en Windows el borrado falla un instante y el lock queda tomado
+  - file: internal/adapters/tracker/local/local.go
+    lines: "95-96"
+    what: modify toma solo el lock de archivo, sin exclusión dentro del proceso; hilos concurrentes ven ErrLocked
+  - file: internal/adapters/tracker/local/local.go
+    lines: "185"
+    what: Create toma el lock de secuencia sin exclusión dentro del proceso

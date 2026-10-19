@@ -661,3 +661,55 @@ func TestFrozenPhase(t *testing.T) {
 		}
 	}
 }
+
+func TestEvalOutWriteAllowed(t *testing.T) {
+	const out = ".bflow/cache/evals/2026-10-19-101500/caso-uno/out/"
+	cases := []struct {
+		path  string
+		allow bool
+	}{
+		{out + "review-map.md", true},
+		{out + "security.md", true},
+		{out + "review-map.json", false},
+		{out + "sub/review-map.md", false},
+		{".bflow/cache/evals/2026-10-19-101500/caso-uno/review-map.md", false},
+		{".bflow/cache/evals/2026-10-19-101500/caso-uno/wt/x.md", false},
+		{".bflow/cache/evals/2026-10-19-101500/run.json", false},
+		{".bflow/cache/evals/2026-10-19-101500/../caso-uno/out/x.md", false},
+		{".bflow/cache/other/2026-10-19-101500/caso-uno/out/x.md", false},
+		{".bflow/evals/reviewer/caso-uno/case.yaml", false},
+		{".bflow/log.jsonl", false},
+	}
+	for _, tc := range cases {
+		for _, tool := range []string{Write, Edit} {
+			d := Evaluate(Action{Tool: tool, Path: tc.path, Subagent: true}, ctx())
+			if d.Allow != tc.allow || (!tc.allow && d.Rule != "bflow_state") {
+				t.Errorf("%s %s → allow=%v rule=%q, want allow=%v", tool, tc.path, d.Allow, d.Rule, tc.allow)
+			}
+		}
+	}
+}
+
+func TestGitAddEvalsAllowed(t *testing.T) {
+	cases := []struct {
+		cmd   string
+		allow bool
+	}{
+		{"git add .bflow/evals/2026-10-19-101500.json", true},
+		{"git add .bflow/evals/reviewer/caso-uno/case.yaml", true},
+		{"git -C . add .bflow/evals/reviewer", true},
+		{"git add -f .bflow/evals/reviewer/caso-uno/case.yaml", false},
+		{"git add --force .bflow/evals/x.json", false},
+		{"git add .bflow/evals/x.json .bflow/log.jsonl", false},
+		{"git add .bflow/tasks/X/walkthrough.md", false},
+		{"git add .bflow/cache/evals/x", false},
+		{`git add .bflow\evals\x.json`, true},
+		{"git add .bflow/evals/../log.jsonl", false},
+	}
+	for _, tc := range cases {
+		d := Evaluate(Action{Tool: Bash, Command: tc.cmd}, ctx())
+		if d.Allow != tc.allow || (!tc.allow && d.Rule != "bflow_tracked") {
+			t.Errorf("%q → allow=%v rule=%q, want allow=%v", tc.cmd, d.Allow, d.Rule, tc.allow)
+		}
+	}
+}

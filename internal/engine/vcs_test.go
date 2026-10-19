@@ -673,6 +673,24 @@ func TestBflowInDiffIgnoresDeleted(t *testing.T) {
 	mustT(t)(v.e.Report(ctx, id, ReportOpts{Agent: "implementer", Verdict: flow.DoneV}))
 }
 
+func TestBflowInDiffAllowsEvals(t *testing.T) {
+	v := newEnv(t, "vcs: { base_branch: dev }\n")
+	g := &fakeGit{branch: "dev", kept: []string{".bflow/evals/reviewer/c1/case.yaml", ".bflow/evals/2026-01-01-000000.json"}}
+	v.e.Git = g
+	ctx := context.Background()
+	id := v.task(t, "Demo")
+	mustT(t)(v.e.Start(ctx, id, flow.Hotfix, "", ""))
+	mustT(t)(v.e.Report(ctx, id, ReportOpts{Agent: "implementer", Verdict: flow.DoneV}))
+	g.kept = append(g.kept, ".bflow/tasks/X/walkthrough.md")
+	id = v.task(t, "Otra")
+	mustT(t)(v.e.Start(ctx, id, flow.Hotfix, "", ""))
+	_, err := v.e.Report(ctx, id, ReportOpts{Agent: "implementer", Verdict: flow.DoneV})
+	var rj *flow.Rejection
+	if !errors.As(err, &rj) || rj.Code != "bflow_in_diff" || strings.Contains(rj.Reason, ".bflow/evals/") {
+		t.Fatalf("evals pasa, lo demás de .bflow/ no: %v", err)
+	}
+}
+
 func TestOpenPRRejectsBflowInDiff(t *testing.T) {
 	v := newEnv(t, "vcs: { base_branch: dev }\n")
 	g, h := &fakeGit{branch: "dev"}, newHost()

@@ -10,7 +10,9 @@ import (
 
 	"innobytes.tech/bflow/internal/adapters/agent/claude"
 	"innobytes.tech/bflow/internal/adapters/agent/opencode"
+	gitad "innobytes.tech/bflow/internal/adapters/vcs/git"
 	"innobytes.tech/bflow/internal/cli"
+	"innobytes.tech/bflow/internal/eval"
 )
 
 // version se inyecta con -ldflags "-X main.version=…".
@@ -30,5 +32,6 @@ func main() {
 		Agent:    claude.Agent{},
 		Tools:    []cli.ToolAdapter{claude.Agent{}, opencode.Agent{}},
 		Projects: projects,
+		EvalGit:  func(dir string) eval.Git { return gitad.New(dir) },
 	}))
 }

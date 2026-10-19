@@ -180,10 +180,15 @@ func (e *Engine) bflowInDiff(ctx context.Context) []string {
 	if err != nil {
 		return nil
 	}
-	for i, f := range files {
-		files[i] = strings.ReplaceAll(f, `\`, "/")
+	var out []string
+	for _, f := range files {
+		f = strings.ReplaceAll(f, `\`, "/")
+		// Los casos y resultados del eval se versionan a propósito.
+		if !strings.HasPrefix(f, ".bflow/evals/") {
+			out = append(out, f)
+		}
 	}
-	return files
+	return out
 }
 
 func bflowInDiffRejection(files []string, when string) *flow.Rejection {

@@ -1,0 +1,17 @@
+source: GH-159
+base: 3bf9db1c9d4f56c5e8298deccf73c29cda52cada
+head: 08702adfbb4bdde7bc1c1d0cb0f480de013ed9c0
+spec: specs/GH-159-03-hotfix-exigir-con-codigo-que-la-prueba/spec.md
+defects:
+  - file: internal/engine/repro.go
+    lines: "44-46"
+    what: descarta el último commit de la lista como si fuera HEAD; si HEAD es un merge o la lista no termina en HEAD, descarta un commit de pruebas válido
+  - file: internal/engine/repro.go
+    lines: "85-87"
+    what: con commits de solo pruebas sin check mezclados con otros con check verde, el motivo no menciona los que faltan por correr
+  - file: internal/flow/machine.go
+    lines: "372"
+    what: el rechazo del gate repro no deja marca, y un --no-repro rechazado por una persona se puede volver a pedir
+  - file: internal/adapters/vcs/git/git.go
+    lines: "165"
+    what: rev-list sin --topo-order puede listar los commits fuera del orden de la rama

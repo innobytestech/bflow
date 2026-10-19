@@ -13,6 +13,7 @@ import (
 
 	"innobytes.tech/bflow/internal/agents"
 	"innobytes.tech/bflow/internal/config"
+	"innobytes.tech/bflow/internal/eval"
 	"innobytes.tech/bflow/internal/output"
 )
 
@@ -67,6 +68,9 @@ func planRender(c *Ctx, cfg *config.Config) (*renderPlan, error) {
 	specs, err := agents.Build(cfg.Flow.Core(), cfg.Agents, cfg.Root)
 	if err != nil {
 		return nil, err
+	}
+	if st, err := os.Stat(filepath.Join(cfg.Root, filepath.FromSlash(eval.CasesDir))); err == nil && st.IsDir() {
+		specs = append(specs, agents.EvalReviewerSpec(cfg.Agents["reviewer"]))
 	}
 	files := map[string][]byte{}
 	p := &renderPlan{Files: files, Unresolved: map[string][]agents.Unresolved{}}

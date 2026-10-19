@@ -1,0 +1,7 @@
+source: GH-103
+base: 4689527a7ecb5ea82f01da2b9e8b150afd561d3c
+head: ea0aba7d6cd555be00d8f84079d2d55e058e68ad
+defects:
+  - file: adapters/opencode/plugin2/index.js
+    lines: "94"
+    what: session.step.failed sin tokens sale antes de borrar la entrada de steps, y el mapa de pasos crece
