@@ -109,6 +109,12 @@ func (e *Engine) Approve(ctx context.Context, id string, o ApproveOpts) (Outcome
 			out.Warnings = append(out.Warnings, fmt.Sprintf("%d prueba(s) congelada(s): no se editan hasta el PR", n))
 		}
 	}
+	if pending != nil && pending.Name == flow.GateRepro {
+		line := fmt.Sprintf("- %s · gate repro: hotfix sin prueba de reproducción: %s (%s)\n", e.now().Format("2006-01-02"), oneLine(pending.Note), e.User)
+		if err := e.appendFile(id, "decisions.md", "# Decisiones en vuelo\n\n", line); err != nil {
+			out.Warnings = append(out.Warnings, "no se pudo guardar decisions.md: "+err.Error())
+		}
+	}
 	if pending != nil && pending.Name == flow.GateDecision && out.Record != nil {
 		line := fmt.Sprintf("- %s · %s: %s → **%s** (%s)\n", e.now().Format("2006-01-02"), pending.Agent,
 			oneLine(pending.Note), out.Record.Flow.Decision, e.User)
@@ -161,6 +167,12 @@ type ReportOpts struct {
 func (e *Engine) Report(ctx context.Context, id string, o ReportOpts) (Outcome, error) {
 	ev := flow.Event{Kind: flow.EvReport, Agent: o.Agent, Verdict: flow.Verdict(strings.ToUpper(string(o.Verdict))), Note: o.Note, Options: o.Options}
 	var after func() error
+	if o.NoRepro != nil {
+		if strings.TrimSpace(*o.NoRepro) == "" {
+			return Outcome{ID: id}, &flow.Rejection{Code: "no_repro_invalid", Reason: "--no-repro necesita el motivo de cerrar sin prueba de reproducción"}
+		}
+		ev.NoRepro = strings.TrimSpace(*o.NoRepro)
+	}
 	if o.Content != nil && o.Agent != flow.ScoutAgent {
 		return Outcome{ID: id}, &flow.Rejection{Code: "stdin_scout_only", Reason: "--stdin solo lo usa el scout; los demás reportan con --file o --note"}
 	}

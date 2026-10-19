@@ -168,6 +168,11 @@ func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug s
 			if found := e.NarrativeComments(ctx, id); len(found) > 0 {
 				return narrativeRejection(found)
 			}
+			if rec.Flow.Lane == flow.Hotfix && e.Checks != nil && e.Git != nil && ev.NoRepro == "" && rec.Flow.NoRepro == "" {
+				if rej := e.reproMissing(ctx, *rec); rej != nil {
+					return rej
+				}
+			}
 			ev.CheckOK = true
 		}
 
@@ -274,6 +279,9 @@ func (e *Engine) entry(id string, ev flow.Event, before, after flow.State) store
 	}
 	if ev.Kind == flow.EvUnblock && ev.NoChangelog {
 		en.Data = map[string]any{"no_changelog": true}
+	}
+	if ev.Kind == flow.EvApprove && before.Gate != nil && before.Gate.Name == flow.GateRepro {
+		en.Data = map[string]any{"no_repro": before.Gate.Note}
 	}
 	if ev.Kind == flow.EvStart {
 		en.Data = map[string]any{"lane": string(ev.Lane)}
@@ -408,6 +416,9 @@ func (e *Engine) createBranch(ctx context.Context, rec *store.Record, _ bool) ([
 	how, err := e.Git.EnsureBranch(ctx, name, base)
 	if err != nil {
 		return nil, fmt.Errorf("git: %w", err)
+	}
+	if head, err := e.Git.HeadSHA(ctx); err == nil {
+		rec.StartSHA = head
 	}
 	warns := []string{fmt.Sprintf("rama %s (%s)", name, how)}
 	return append(warns, e.commitSpec(ctx, rec.Flow, "spec")...), nil
