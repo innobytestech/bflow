@@ -205,19 +205,19 @@ func TestReportRejections(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := h.r.Report(ctx, "alfa", "APPROVED", "")
-	rejected(t, err, "eval_not_running")
+	_ = rejected(t, err, "eval_not_running")
 
 	sp := h.next(Opts{}).Spawn
 	_, err = h.r.Report(ctx, "alfa", "TAL_VEZ", "")
-	rejected(t, err, "bad_verdict")
+	_ = rejected(t, err, "bad_verdict")
 	_, err = h.r.Report(ctx, "alfa", "approved", "")
-	rejected(t, err, "bad_verdict")
+	_ = rejected(t, err, "bad_verdict")
 	_, err = h.r.Report(ctx, "beta", "APPROVED", "")
-	rejected(t, err, "case_not_pending")
+	_ = rejected(t, err, "case_not_pending")
 	_, err = h.r.Report(ctx, "nada", "APPROVED", "")
-	rejected(t, err, "case_not_pending")
+	_ = rejected(t, err, "case_not_pending")
 	_, err = h.r.Report(ctx, "alfa", "APPROVED", "")
-	rejected(t, err, "review_map_missing")
+	_ = rejected(t, err, "review_map_missing")
 	if len(h.g.removes) != 0 {
 		t.Error("un rechazo no quita el worktree")
 	}
@@ -226,7 +226,7 @@ func TestReportRejections(t *testing.T) {
 	h.answer(sp, "ok\n")
 	h.report("alfa", "APPROVED", "")
 	_, err = h.r.Report(ctx, "alfa", "APPROVED", "")
-	rejected(t, err, "case_not_pending")
+	_ = rejected(t, err, "case_not_pending")
 }
 
 func writeCalls(t *testing.T, path string, lines ...string) {

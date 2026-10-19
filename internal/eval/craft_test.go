@@ -56,7 +56,7 @@ func TestCraftUnknownRef(t *testing.T) {
 	h := newHarness(t)
 	h.validCase("alfa", "")
 	_, err := h.r.Next(context.Background(), Opts{Craft: "no-existe"})
-	rejected(t, err, "craft_ref_unknown")
+	_ = rejected(t, err, "craft_ref_unknown")
 	h.noCache()
 }
 
@@ -64,7 +64,7 @@ func TestCraftMissingAtRef(t *testing.T) {
 	h := newHarness(t)
 	h.validCase("alfa", "")
 	_, err := h.r.Next(context.Background(), Opts{Craft: "v1"}) // resuelve, pero no trae el oficio
-	rejected(t, err, "craft_missing")
+	_ = rejected(t, err, "craft_missing")
 	h.noCache()
 }
 
@@ -74,6 +74,6 @@ func TestCraftRefWithDash(t *testing.T) {
 	h.g.files["--upload-pack=x:"+CraftPath] = "oficio"
 	// El fake resuelve y trae este ref: el rechazo es de la regla, no de git.
 	_, err := h.r.Next(context.Background(), Opts{Craft: "--upload-pack=x"})
-	rejected(t, err, "craft_ref_unknown")
+	_ = rejected(t, err, "craft_ref_unknown")
 	h.noCache()
 }
