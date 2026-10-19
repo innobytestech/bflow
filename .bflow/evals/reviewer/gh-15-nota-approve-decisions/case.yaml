@@ -1,0 +1,11 @@
+source: GH-15
+base: 60cf5e07a8f504b9241e2c04f8f6d34332ac869f
+head: 50bfaf47345849398c2df4c0c98844e8abe4edcf
+spec: specs/GH-15-traspaso-con-clear-en-cada-gate/spec.md
+defects:
+  - file: internal/engine/commands.go
+    lines: "111"
+    what: la nota de approve solo llega a decisions.md en el gate de la spec; en los demás gates se pierde
+  - file: adapters/opencode/plugin.js
+    lines: "44-45"
+    what: inject lee la salida de bflow hook session-start sin comprobar el código de salida ni poner un tiempo máximo

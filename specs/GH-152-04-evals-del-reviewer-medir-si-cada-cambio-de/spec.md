@@ -286,7 +286,7 @@ Preparar = `WorktreeAdd(<caso>/wt, head)` + `MkdirAll(<caso>/out)`; si falla, R1
 
 ## Tasks
 
-- [ ] T1 Contrato: paquete `internal/eval` con los tipos y firmas del Design (cuerpos que devuelven cero o `errors.New("sin implementar")`), métodos vacíos en `adapters/vcs/git`, `agents.EvalReviewerSpec` vacío y estas pruebas, que fallan:
+- [x] T1 Contrato: paquete `internal/eval` con los tipos y firmas del Design (cuerpos que devuelven cero o `errors.New("sin implementar")`), métodos vacíos en `adapters/vcs/git`, `agents.EvalReviewerSpec` vacío y estas pruebas, que fallan:
   - `internal/eval/case_test.go`: `TestLoadCasesRejectsMalformed` (R1), `TestLoadCasesSkipsDrafts` (R3), `TestLoadCasesNoCases` (R3), `TestParseLines` (R1).
   - `internal/eval/craft_test.go`: `TestCraftFromTree`, `TestCraftUnknownRef`, `TestCraftMissingAtRef`, `TestCraftRefWithDash` (R2).
   - `internal/eval/score_test.go`: `TestScoreCatchesWithinTolerance`, `TestScoreMissesOutsideTolerance` (R11), `TestFindingsSkipsExcluded` (R11), `TestFindingsTrimsWorktreePrefix` (R11), `TestScoreFalsePositivesDeduped` (R12).
@@ -295,9 +295,9 @@ Preparar = `WorktreeAdd(<caso>/wt, head)` + `MkdirAll(<caso>/out)`; si falla, R1
   - `internal/guard/guard_test.go`: `TestEvalOutWriteAllowed`, `TestGitAddEvalsAllowed` (R17).
   - `internal/agents/agents_test.go`: `TestEvalReviewerSpec` (R18); `internal/cli/eval_test.go`: `TestRenderEvalAgentOnlyWithCases` (R18), `TestEvalAgentMissing` (R4).
   - `cmd/bflow/e2e_eval_test.go`: `TestE2EEvalReviewer` (repo git real: un caso, spawn, report, cierre y JSON; R5, R8, R13, R20).
-- [ ] T2 Casos, oficio y git: `LoadCases`, `Problems`, `ParseLines`, lectura del oficio del árbol o del ref, y `ResolveCommit`, `ShowFile`, `WorktreeAdd`, `WorktreeRemove`, `IsIgnored` en `adapters/vcs/git`. (R1, R2, R3)
-- [ ] T3 Puntaje: `Findings` y `ScoreCase` con exclusiones, normalización de rutas y tolerancia. (R11, R12)
-- [ ] T4 Corrida: `Runner.Next`, `Runner.Report`, `Tokens`, `run.json`, resultado, `--abort`, limpieza, `.bflow/.gitignore` y comandos `eval reviewer` y `eval reviewer report` en `internal/cli/evalcmds.go` (JSON compacto, texto con color sin emojis). (R5-R10, R13, R14, R16, R20)
-- [ ] T5 Agente y guard: `agents.EvalReviewerSpec` y su contrato, render condicional en `rendercmds.go`, chequeo `eval_agent_missing`, excepciones del guard. (R4, R17, R18)
-- [ ] T6 `--from-fixes`: esqueletos desde los eventos `start` con `fixes`, `start_sha` y `check.json`. (R15)
-- [ ] T7 Dataset y docs: 5 o más casos curados en `.bflow/evals/reviewer/` (escapes conocidos: GH-159, #108 y otros con `fix(GH-…)` posterior a su aprobación), cada uno con `base`, `head` y defectos archivo:rango verificados con `git show`; `.gitignore` raíz a `.bflow/*` + `!.bflow/evals/`; `bflow render` para generar el agente; `docs/comandos.md` y `CHANGELOG.md`. (R16, R19, R20)
+- [x] T2 Casos, oficio y git: `LoadCases`, `Problems`, `ParseLines`, lectura del oficio del árbol o del ref, y `ResolveCommit`, `ShowFile`, `WorktreeAdd`, `WorktreeRemove`, `IsIgnored` en `adapters/vcs/git`. (R1, R2, R3)
+- [x] T3 Puntaje: `Findings` y `ScoreCase` con exclusiones, normalización de rutas y tolerancia. (R11, R12)
+- [x] T4 Corrida: `Runner.Next`, `Runner.Report`, `Tokens`, `run.json`, resultado, `--abort`, limpieza, `.bflow/.gitignore` y comandos `eval reviewer` y `eval reviewer report` en `internal/cli/evalcmds.go` (JSON compacto, texto con color sin emojis). (R5-R10, R13, R14, R16, R20)
+- [x] T5 Agente y guard: `agents.EvalReviewerSpec` y su contrato, render condicional en `rendercmds.go`, chequeo `eval_agent_missing`, excepciones del guard. (R4, R17, R18)
+- [x] T6 `--from-fixes`: esqueletos desde los eventos `start` con `fixes`, `start_sha` y `check.json`. (R15)
+- [x] T7 Dataset y docs: 5 o más casos curados en `.bflow/evals/reviewer/` (escapes conocidos: GH-159, #108 y otros con `fix(GH-…)` posterior a su aprobación), cada uno con `base`, `head` y defectos archivo:rango verificados con `git show`; `.gitignore` raíz a `.bflow/*` + `!.bflow/evals/`; `bflow render` para generar el agente; `docs/comandos.md` y `CHANGELOG.md`. (R16, R19, R20)
