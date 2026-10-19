@@ -426,7 +426,7 @@ func TestRejectedDoneKeepsFreezeAllow(t *testing.T) {
 		t.Fatal(err)
 	}
 	put(t, v, fa, []byte("dos\n"))
-	rejection(t, implDone(v, id), "narrative_comment")
+	_ = rejection(t, implDone(v, id), "narrative_comment")
 	if got := v.e.Frozen(id); len(got) != 0 {
 		t.Fatalf("la prueba debe seguir permitida tras un DONE rechazado: %v", got)
 	}
