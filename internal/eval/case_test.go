@@ -108,19 +108,19 @@ func TestLoadCasesNoCases(t *testing.T) {
 	if _, _, err := LoadCases(h.root, nil); err == nil {
 		t.Fatal("sin carpeta de casos debe rechazar")
 	} else {
-		rejected(t, err, "no_cases")
+		_ = rejected(t, err, "no_cases")
 	}
 
 	h.caseYAML("borrador", "draft: true\ndefects: []\n")
 	_, _, err := LoadCases(h.root, nil)
-	rejected(t, err, "no_cases")
+	_ = rejected(t, err, "no_cases")
 
 	h.validCase("alfa", "")
 	for _, names := range [][]string{{"inexistente"}, {"alfa", "inexistente"}, {"borrador"}, {"../alfa"}, {"ALFA"}, {"-x"}, {"a/b"}} {
 		if _, _, err := LoadCases(h.root, names); err == nil {
 			t.Errorf("--case %v debe rechazar", names)
 		} else {
-			rejected(t, err, "no_cases")
+			_ = rejected(t, err, "no_cases")
 		}
 	}
 }

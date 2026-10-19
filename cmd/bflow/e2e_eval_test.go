@@ -19,7 +19,7 @@ func TestE2EEvalReviewer(t *testing.T) {
 		src.WriteString("// relleno\n")
 	}
 	os.WriteFile(filepath.Join(r.dir, "internal", "a.go"), []byte(src.String()), 0o644)
-	os.MkdirAll(filepath.Join(r.dir, "internal", "agents", "craft"), 0o755)
+	_ = os.MkdirAll(filepath.Join(r.dir, "internal", "agents", "craft"), 0o755)
 	os.WriteFile(filepath.Join(r.dir, "internal", "agents", "craft", "reviewer.md"), []byte("# oficio\nrevisa\n"), 0o644)
 	git(t, r.dir, "add", ".")
 	git(t, r.dir, "commit", "-m", "base del caso")
@@ -31,7 +31,7 @@ func TestE2EEvalReviewer(t *testing.T) {
 	head := git(t, r.dir, "rev-parse", "HEAD")
 
 	caseDir := filepath.Join(r.dir, ".bflow", "evals", "reviewer", "uno")
-	os.MkdirAll(caseDir, 0o755)
+	_ = os.MkdirAll(caseDir, 0o755)
 	os.WriteFile(filepath.Join(caseDir, "case.yaml"), []byte("source: GH-1\nbase: "+base+"\nhead: "+head+
 		"\ndefects:\n  - file: internal/a.go\n    lines: \"33\"\n    what: división por cero\n"), 0o644)
 
