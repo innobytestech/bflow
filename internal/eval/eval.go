@@ -82,7 +82,7 @@ type Runner struct {
 	Root    string
 	Git     Git
 	Now     func() time.Time
-	Model   string // modelo configurado de agents.reviewer (respaldo de R10)
+	Model   string // modelo configurado de agents.reviewer (respaldo si el agente no lo reporta)
 	Version string
 }
 
