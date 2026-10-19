@@ -81,7 +81,7 @@ func TestHotfixReproFailThenPassAccepted(t *testing.T) {
 }
 
 func TestHotfixNoReproOpensHumanGate(t *testing.T) {
-	r, id := reproRepo(t, true)
+	r, _ := reproRepo(t, true)
 	commitFile(t, r, "internal/a.go", fixedA, "fix: sin prueba")
 	r.ok("check")
 
@@ -98,8 +98,18 @@ func TestHotfixNoReproOpensHumanGate(t *testing.T) {
 		t.Fatalf("rechazar vuelve al implementer sin gate: %v", env.Data)
 	}
 
+	env = r.run("report", "--agent", "implementer", "--verdict", "DONE", "--no-repro", "el defecto vive en la config")
+	if env.exit != 2 || env.Code != "no_repro_rejected" {
+		t.Fatalf("tras el rechazo, --no-repro no se reabre: exit %d %s", env.exit, env.Code)
+	}
+}
+
+func TestHotfixNoReproApprovedRecordsDecision(t *testing.T) {
+	r, id := reproRepo(t, true)
+	commitFile(t, r, "internal/a.go", fixedA, "fix: sin prueba")
+	r.ok("check")
 	r.ok("report", "--agent", "implementer", "--verdict", "DONE", "--no-repro", "el defecto vive en la config")
-	env = r.ok("approve", "--gate", "repro")
+	env := r.ok("approve", "--gate", "repro")
 	if env.Data["phase"] != "quality" {
 		t.Fatalf("aprobar avanza a quality: %v", env.Data)
 	}
