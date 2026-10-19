@@ -203,6 +203,7 @@ type Check struct {
 	DBTestPattern string   `yaml:"db_test_pattern,omitempty"`
 	DBTestImports []string `yaml:"db_test_imports,omitempty"` // sufijos de import que marcan un paquete de tests con BD
 	FailPattern   string   `yaml:"fail_pattern,omitempty"`    // líneas que resumen un fallo (por defecto, las del stack)
+	TestStep      string   `yaml:"test_step,omitempty"`       // paso cuyo fallo cuenta como reproducción de un hotfix (por defecto, test)
 }
 
 type Env struct {
@@ -539,6 +540,9 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Env.TimeoutMS == 0 {
 		c.Env.TimeoutMS = 2500
+	}
+	if c.Check.TestStep == "" {
+		c.Check.TestStep = "test"
 	}
 	st := stacks[c.Stack]
 	if len(c.Check.CodePaths) == 0 {

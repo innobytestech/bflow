@@ -100,6 +100,8 @@ type TaskStats struct {
 	// ClosedOutside es el motivo ("tracker" | "pr") si la tarea se cerró
 	// porque se terminó fuera de esta copia.
 	ClosedOutside string `json:"closed_outside,omitempty"`
+	// NoRepro es el motivo aprobado para cerrar un hotfix sin prueba de reproducción.
+	NoRepro string `json:"no_repro,omitempty"`
 
 	// Calidad: rechazos humanos por gate y hotfixes que la corrigen (--fixes).
 	RejectionsByGate map[string]int `json:"rejections_by_gate,omitempty"`
@@ -236,6 +238,9 @@ func Compute(id string, entries []store.Entry, now time.Time) TaskStats {
 			gateOpen = opened || (e.From == flow.Discovery && e.To == flow.Discovery)
 		case "approve":
 			gateOpen = opened
+			if m, _ := e.Data["no_repro"].(string); m != "" {
+				st.NoRepro = m
+			}
 		case "block":
 			savedGate, gateOpen = gateOpen, false
 		case "unblock":

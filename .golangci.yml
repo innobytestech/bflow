@@ -5,3 +5,8 @@ linters:
   exclusions:
     presets:
       - std-error-handling
+    rules:
+      # Las pruebas arman fixtures con os.WriteFile; si fallan, la prueba falla sola.
+      - path: _test\.go
+        linters: [errcheck]
+        source: os\.WriteFile

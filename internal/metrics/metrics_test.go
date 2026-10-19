@@ -382,3 +382,24 @@ func TestDroppedStopsClock(t *testing.T) {
 		t.Errorf("bloqueada: agent=%v blocked=%v", st.Agent, st.Blocked)
 	}
 }
+
+func TestComputeNoRepro(t *testing.T) {
+	noRepro := func(m string) func(*store.Entry) {
+		return func(en *store.Entry) { en.Data = map[string]any{"no_repro": m} }
+	}
+	log := []store.Entry{
+		e(0, "start", flow.Backlog, flow.Implementing),
+		e(30, "report", flow.Implementing, flow.Implementing, verdict("implementer", "DONE"), gateOpened("repro")),
+		e(40, "approve", flow.Implementing, flow.Quality, gate("repro"), noRepro("el defecto vive en la config")),
+	}
+	st := Compute("T-1", log, at(60))
+	if st.NoRepro != "el defecto vive en la config" {
+		t.Errorf("motivo aprobado: %q", st.NoRepro)
+	}
+	if st.Decisions != 0 {
+		t.Errorf("el gate repro no cuenta como decisión de un agente: %d", st.Decisions)
+	}
+	if none := Compute("T-1", log[:2], at(60)); none.NoRepro != "" {
+		t.Errorf("sin aprobar no hay motivo: %q", none.NoRepro)
+	}
+}

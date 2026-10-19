@@ -211,6 +211,12 @@ func gateNext(cfg Config, s State) output.Next {
 			n.Options = append(n.Options, rejectOpt(id, g.Name, "spec", "Volver a spec", ""))
 		}
 		n.Options = append(n.Options, approveOpt(id, g.Name, "Una ronda más"))
+	case GateRepro:
+		n.Question = fmt.Sprintf("%s pide cerrar el hotfix sin prueba de reproducción: %s. ¿Lo aceptas?", g.Agent, g.Note)
+		n.Options = []output.Option{
+			approveOpt(id, g.Name, "Aceptar sin prueba"),
+			rejectOpt(id, g.Name, "test", "Pedir la prueba de reproducción", ""),
+		}
 	case GateQuestions:
 		n.Skill = "walkthrough"
 		n.Show = []string{cmd("show", id, "questions")}

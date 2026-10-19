@@ -28,6 +28,11 @@ func Save(st *store.Store, id string, res Result) error {
 	if err := st.WriteFile(id, "check.json", js); err != nil {
 		return err
 	}
+	if res.SHA != "" && res.SHA != "DIRTY" {
+		if err := st.WriteFile(id, "checks/"+res.SHA+".json", js); err != nil {
+			return err
+		}
+	}
 	return st.WriteFile(id, "check.md", []byte(res.Markdown()))
 }
 
@@ -48,6 +53,33 @@ func Load(st *store.Store, id string) (*Result, error) {
 	}
 	var r Result
 	return &r, json.Unmarshal(b, &r)
+}
+
+// LoadAt lee el check guardado de un commit (nil, nil si no hay).
+func LoadAt(st *store.Store, id, sha string) (*Result, error) {
+	b, err := st.ReadFile(id, "checks/"+sha+".json")
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var r Result
+	return &r, json.Unmarshal(b, &r)
+}
+
+// StepAt dice si hay check guardado para sha y cómo terminó el paso step ("" si el check no lo trae).
+func (v Verifier) StepAt(ctx context.Context, id, sha, step string) (found bool, status string, err error) {
+	res, err := LoadAt(v.Store, id, sha)
+	if err != nil || res == nil {
+		return false, "", err
+	}
+	for _, s := range res.Steps {
+		if s.Name == step {
+			return true, s.Status, nil
+		}
+	}
+	return true, "", nil
 }
 
 // Verifier implementa engine.Verifier: DONE solo con un check vigente.

@@ -24,6 +24,11 @@ import (
 	"innobytes.tech/bflow/internal/vcs"
 )
 
+// CheckHistory lee el check guardado de un commit.
+type CheckHistory interface {
+	StepAt(ctx context.Context, id, sha, step string) (found bool, status string, err error)
+}
+
 // Verifier confirma que el check pasó sobre el código actual.
 type Verifier interface {
 	Verify(ctx context.Context, id string) (ok bool, detail string, err error)
@@ -34,9 +39,10 @@ type Engine struct {
 	Cfg      *config.Config
 	Store    *store.Store
 	Tracker  tracker.Tracker
-	Git      vcs.Git  // nil: sin git (se registra la rama pero no se crea)
-	Host     vcs.Host // nil: sin host remoto (se da la URL de compare si se puede)
-	Verifier Verifier // nil: DONE se acepta sin verificar si no hay pasos de check
+	Git      vcs.Git      // nil: sin git (se registra la rama pero no se crea)
+	Host     vcs.Host     // nil: sin host remoto (se da la URL de compare si se puede)
+	Checks   CheckHistory // nil: hotfix no exige prueba de reproducción
+	Verifier Verifier     // nil: DONE se acepta sin verificar si no hay pasos de check
 	Now      func() time.Time
 	User     string
 }
@@ -162,6 +168,11 @@ func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug s
 			if found := e.NarrativeComments(ctx, id); len(found) > 0 {
 				return narrativeRejection(found)
 			}
+			if rec.Flow.Lane == flow.Hotfix && e.Checks != nil && e.Git != nil && ev.NoRepro == "" && rec.Flow.NoRepro == "" {
+				if rej := e.reproMissing(ctx, *rec); rej != nil {
+					return rej
+				}
+			}
 			ev.CheckOK = true
 		}
 
@@ -268,6 +279,9 @@ func (e *Engine) entry(id string, ev flow.Event, before, after flow.State) store
 	}
 	if ev.Kind == flow.EvUnblock && ev.NoChangelog {
 		en.Data = map[string]any{"no_changelog": true}
+	}
+	if ev.Kind == flow.EvApprove && before.Gate != nil && before.Gate.Name == flow.GateRepro {
+		en.Data = map[string]any{"no_repro": before.Gate.Note}
 	}
 	if ev.Kind == flow.EvStart {
 		en.Data = map[string]any{"lane": string(ev.Lane)}
@@ -402,6 +416,9 @@ func (e *Engine) createBranch(ctx context.Context, rec *store.Record, _ bool) ([
 	how, err := e.Git.EnsureBranch(ctx, name, base)
 	if err != nil {
 		return nil, fmt.Errorf("git: %w", err)
+	}
+	if head, err := e.Git.HeadSHA(ctx); err == nil {
+		rec.StartSHA = head
 	}
 	warns := []string{fmt.Sprintf("rama %s (%s)", name, how)}
 	return append(warns, e.commitSpec(ctx, rec.Flow, "spec")...), nil

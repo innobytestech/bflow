@@ -253,9 +253,17 @@ func init() {
 			fs.String("file", "", "archivo del reporte")
 			fs.Bool("stdin", false, "el reporte llega por stdin (solo el scout)")
 			fs.Var(&multi{}, "option", "opción para NEEDS_DECISION (repetible)")
+			fs.String("no-repro", "", "hotfix: cierra sin prueba de reproducción; abre un gate humano con el motivo")
 		},
 		Run: flowCommand(func(ctx context.Context, e *engine.Engine, id string, c *Ctx, _ []string) (engine.Outcome, error) {
 			opts := *(c.Flags.Lookup("option").Value.(*multi))
+			var noRepro *string
+			c.Flags.Visit(func(f *flag.Flag) {
+				if f.Name == "no-repro" {
+					v := f.Value.String()
+					noRepro = &v
+				}
+			})
 			var content *string
 			if c.Flags.Lookup("stdin").Value.String() == "true" {
 				const limit = 64 << 10
@@ -270,7 +278,7 @@ func init() {
 				content = &s
 			}
 			return e.Report(ctx, id, engine.ReportOpts{Agent: str(c.Flags, "agent"), Verdict: flow.Verdict(str(c.Flags, "verdict")),
-				Note: str(c.Flags, "note"), File: str(c.Flags, "file"), Options: opts, Content: content})
+				Note: str(c.Flags, "note"), File: str(c.Flags, "file"), Options: opts, Content: content, NoRepro: noRepro})
 		})})
 
 	Register(&Command{Name: "block", Summary: "bloquea la tarea: block [ID] --reason \"motivo\"",

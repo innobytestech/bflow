@@ -160,6 +160,18 @@ func (g *Git) DiffKept(ctx context.Context, base string, paths []string) ([]stri
 	return lines(out), err
 }
 
+// Commits lista los commits sin merges de base..HEAD, del más viejo al más nuevo.
+func (g *Git) Commits(ctx context.Context, base string) ([]string, error) {
+	out, err := g.run(ctx, "rev-list", "--no-merges", "--topo-order", "--reverse", base+"..HEAD")
+	return lines(out), err
+}
+
+// CommitFiles lista los archivos que toca sha contra su padre.
+func (g *Git) CommitFiles(ctx context.Context, sha string) ([]string, error) {
+	out, err := g.run(ctx, "diff-tree", "--no-commit-id", "--name-only", "-r", "--root", sha)
+	return lines(out), err
+}
+
 func (g *Git) Push(ctx context.Context, branch string) error {
 	if slices.Contains(g.Protected, branch) {
 		return fmt.Errorf("%s es una rama protegida: bflow no empuja a ella", branch)

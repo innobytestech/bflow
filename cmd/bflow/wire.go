@@ -53,7 +53,8 @@ func build(dir string) (*engine.Engine, error) {
 	}
 	e.User = currentUser(g)
 	if g != nil && len(cfg.Check.Steps) > 0 {
-		e.Verifier = check.Verifier{Store: e.Store, Git: g, CodePaths: cfg.Check.CodePaths}
+		v := check.Verifier{Store: e.Store, Git: g, CodePaths: cfg.Check.CodePaths}
+		e.Verifier, e.Checks = v, v
 	}
 	return e, nil
 }
