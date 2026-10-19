@@ -279,6 +279,10 @@ func (t *tx) approve(ev Event) error {
 	case GateQuestions:
 		s.Note = strings.TrimSpace(ev.Note) // sus respuestas, para compararlas en el recorrido
 		s.Gate = &PendingGate{Name: GateWalkthrough}
+	case GateRepro:
+		s.NoRepro = g.Note
+		t.comments = append(t.comments, "**Hotfix sin prueba de reproducción (aprobado):** "+g.Note)
+		t.enter(t.cfg.after(s.Lane, Implementing))
 	case GateWalkthrough:
 		t.openPR = true
 		t.enter(t.cfg.after(s.Lane, Walkthrough))
@@ -297,6 +301,7 @@ var rejectTargets = map[Gate][]Phase{
 	GatePause:       {Implementing},
 	GateRounds:      {Spec},
 	GateWalkthrough: {Implementing, Spec},
+	GateRepro:       {Implementing},
 }
 
 // RejectTargets devuelve los destinos válidos de un rechazo en el carril.
@@ -469,6 +474,10 @@ func (t *tx) report(ev Event) error {
 		return reject("unexpected_verdict", "%s no puede reportar %s en %s (válidos: %s)", ev.Agent, ev.Verdict, s.Phase, joinVerdicts(valid))
 	}
 
+	if strings.TrimSpace(ev.NoRepro) != "" && (ev.Verdict != DoneV || s.Phase != Implementing || s.Lane != Hotfix) {
+		return reject("no_repro_invalid", "--no-repro solo aplica a un DONE del implementer en el carril hotfix")
+	}
+
 	switch ev.Verdict {
 	case NeedsDecision:
 		s.Gate = &PendingGate{Name: GateDecision, Agent: ev.Agent, Options: ev.Options, Note: ev.Note}
@@ -492,6 +501,10 @@ func (t *tx) report(ev Event) error {
 	case Implementing:
 		if !ev.CheckOK {
 			return reject("check_required", "DONE requiere un check verde sobre el código actual (bflow check %s)", s.ID)
+		}
+		if ev.NoRepro != "" {
+			s.Gate = &PendingGate{Name: GateRepro, Agent: ev.Agent, Note: ev.NoRepro}
+			return nil
 		}
 		t.enter(t.cfg.after(s.Lane, Implementing))
 	case Quality:
