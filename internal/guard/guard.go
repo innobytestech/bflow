@@ -484,7 +484,7 @@ func bash(a Action, c Context) Decision {
 					break
 				}
 				r := strings.ReplaceAll(rel(c.Root, f), `\`, "/")
-				if r == ".bflow" || strings.HasPrefix(r, ".bflow/") {
+				if (r == ".bflow" || strings.HasPrefix(r, ".bflow/")) && !evalsPath(r) {
 					bad = true
 					break
 				}
@@ -530,7 +530,7 @@ func edit(a Action, c Context) Decision {
 	if (base == ".env" || strings.HasPrefix(base, ".env.")) && base != ".env.example" {
 		return deny("env_file", "%s puede tener secretos: no se edita desde un agente.", p)
 	}
-	if (p == ".bflow" || strings.HasPrefix(p, ".bflow/")) && !agentArtifact(p) {
+	if (p == ".bflow" || strings.HasPrefix(p, ".bflow/")) && !agentArtifact(p) && !evalOutArtifact(p) {
 		return deny("bflow_state", "%s es estado de bflow: cámbialo con sus comandos (report, approve, block…), no a mano. Los agentes solo escriben %s en .bflow/tasks/<ID>/.",
 			p, strings.Join(flow.AgentArtifacts, ", "))
 	}
@@ -550,6 +550,29 @@ func edit(a Action, c Context) Decision {
 func agentArtifact(p string) bool {
 	parts := strings.SplitN(p, "/", 4)
 	return len(parts) == 4 && parts[1] == "tasks" && flow.IsAgentArtifact(parts[3])
+}
+
+// evalOutArtifact dice si p es un .md directo en la carpeta out de un caso del
+// eval (.bflow/cache/evals/<corrida>/<caso>/out/<nombre>.md).
+func evalOutArtifact(p string) bool {
+	parts := strings.Split(p, "/")
+	if len(parts) != 7 || parts[0] != ".bflow" || parts[1] != "cache" || parts[2] != "evals" || parts[5] != "out" {
+		return false
+	}
+	for _, s := range parts {
+		if s == "" || s == "." || s == ".." {
+			return false
+		}
+	}
+	return strings.HasSuffix(parts[6], ".md") && len(parts[6]) > 3
+}
+
+// evalsPath dice si r (relativa, con /) está bajo .bflow/evals/, sin escapar con "..".
+func evalsPath(r string) bool {
+	if strings.Contains("/"+r+"/", "/../") {
+		return false
+	}
+	return strings.HasPrefix(r, ".bflow/evals/")
 }
 
 func isFrozenPhase(c Context) bool {

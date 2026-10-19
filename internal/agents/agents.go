@@ -349,5 +349,36 @@ func Models(fc flow.Config, conf map[string]config.AgentConf) map[string]string 
 	return out
 }
 
-// EvalReviewerSpec arma el agente del eval del reviewer (bflow-eval-reviewer).
-func EvalReviewerSpec(conf config.AgentConf) Spec { return Spec{} }
+// EvalReviewerSpec arma el agente del eval del reviewer (bflow-eval-reviewer):
+// mismo modelo y esfuerzo que agents.reviewer, contrato propio y sin oficio
+// embebido, porque lo lee del archivo craft que recibe en cada corrida.
+func EvalReviewerSpec(conf config.AgentConf) Spec {
+	b := catalog["reviewer"]
+	s := Spec{
+		Name:         "eval-reviewer",
+		Subagent:     flow.SubagentPrefix + "eval-reviewer",
+		Description:  "Revisa un caso del eval del reviewer y escribe su review-map. Lo lanza la sesión principal cuando bflow eval lo pide; no lo invoques por tu cuenta.",
+		Tools:        []string{Read, Write, Bash},
+		Model:        pick(conf.Model, b.model),
+		Effort:       pick(conf.Effort, b.effort),
+		OmitClaudeMd: len(conf.Read) > 0,
+		Body:         evalContract(),
+	}
+	if conf.OmitClaudeMd != nil {
+		s.OmitClaudeMd = *conf.OmitClaudeMd
+	}
+	return s
+}
+
+func evalContract() string {
+	var w strings.Builder
+	w.WriteString("## Contrato con bflow\n\n")
+	w.WriteString("Esto es un eval: revisas un caso con defectos conocidos y bflow califica tu review-map. No le preguntas nada al humano.\n\n")
+	w.WriteString("- Recibes `id` (un caso del eval, no una tarea), `base`, `worktree` (el código del caso), `out`, `craft` y, si existe, `spec` (relativa al `worktree`).\n")
+	w.WriteString("- Antes de empezar, lee `craft`: es tu oficio; síguelo como si estuviera aquí.\n")
+	w.WriteString("- El diff es `git -C <worktree> diff <base>...HEAD`; usa rutas absolutas.\n")
+	w.WriteString("- `id` no es una tarea: no corras `bflow check`, `bflow show` ni `bflow report`. Da el check por verde; los reportes de otros agentes no existen.\n")
+	w.WriteString("- Los reportes que pida tu oficio (`reports/<nombre>.md`) van en `<out>/<nombre>.md`; el review-map es `<out>/review-map.md`. Fuera de `out` no escribes nada.\n")
+	w.WriteString("- Al terminar: `bflow eval reviewer report <id> --verdict APPROVED|REJECTED`; con REJECTED agrega `--note`. Si sale con código 2, lee el motivo y corrige. Tu respuesta final es solo esa salida.\n")
+	return w.String()
+}

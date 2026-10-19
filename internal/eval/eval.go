@@ -5,18 +5,14 @@ package eval
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"innobytes.tech/bflow/internal/metrics"
-	"innobytes.tech/bflow/internal/store"
 )
 
 const Tolerance = 5               // líneas de holgura del puntaje
 const AgentName = "eval-reviewer" // nombre sin prefijo; subagente flow.SubagentPrefix+AgentName
 const CraftPath = "internal/agents/craft/reviewer.md"
-
-var errTodo = errors.New("sin implementar")
 
 type Defect struct {
 	File  string `yaml:"file" json:"file"`
@@ -25,6 +21,8 @@ type Defect struct {
 }
 
 type Case struct {
+	parseErr error // case.yaml ilegible: Problems lo informa
+
 	Name    string   `yaml:"-" json:"case"`
 	Source  string   `yaml:"source" json:"source,omitempty"`
 	Hotfix  string   `yaml:"hotfix,omitempty" json:"hotfix,omitempty"`
@@ -49,32 +47,15 @@ type Git interface {
 	IsIgnored(ctx context.Context, path string) (bool, error)
 }
 
-func LoadCases(root string, names []string) (cases []Case, skipped []string, err error) {
-	return nil, nil, errTodo
-}
-
-func (c Case) Problems(ctx context.Context, g Git) []string { return []string{"sin implementar"} }
-
-func ParseLines(s string) (from, to int, err error) { return 0, 0, errTodo }
-
 type Finding struct {
 	File     string
 	From, To int
 }
 
-// Findings: docs es nombre .md → contenido.
-func Findings(note string, docs map[string]string, worktree string) []Finding { return nil }
-
 type Score struct {
 	Caught         []Defect `json:"caught"`
 	Missed         []Defect `json:"missed"`
 	FalsePositives []string `json:"false_positives"`
-}
-
-func ScoreCase(defects []Defect, found []Finding) Score { return Score{} }
-
-func Tokens(bflowDir string, from, to time.Time) (u metrics.Usage, model string, ok bool) {
-	return metrics.Usage{}, "", false
 }
 
 type Opts struct {
@@ -103,16 +84,6 @@ type Runner struct {
 	Now     func() time.Time
 	Model   string // modelo configurado de agents.reviewer (respaldo de R10)
 	Version string
-}
-
-func (r *Runner) Next(ctx context.Context, o Opts) (Step, error) { return Step{}, errTodo }
-
-func (r *Runner) Report(ctx context.Context, caseName, verdict, note string) (CaseResult, error) {
-	return CaseResult{}, errTodo
-}
-
-func FromFixes(root string, log []store.Entry) (created []string, warnings []string, err error) {
-	return nil, nil, errTodo
 }
 
 type CaseResult struct {
