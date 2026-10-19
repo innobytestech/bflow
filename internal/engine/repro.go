@@ -41,11 +41,15 @@ func (e *Engine) reproMissing(ctx context.Context, rec store.Record) *flow.Rejec
 	if err != nil {
 		return miss("no se pudieron listar los commits de la tarea: %v", err)
 	}
-	if len(commits) > 0 {
-		commits = commits[:len(commits)-1] // HEAD no cuenta
+	head, err := e.Git.HeadSHA(ctx)
+	if err != nil {
+		return miss("no se pudo leer HEAD: %v", err)
 	}
 	var cands []string
 	for _, sha := range commits {
+		if sha == head { // HEAD no cuenta; si es un merge ni siquiera viene en la lista
+			continue
+		}
 		files, err := e.Git.CommitFiles(ctx, sha)
 		if err != nil {
 			return miss("no se pudieron leer los archivos del commit %s: %v", short(sha), err)
@@ -83,6 +87,9 @@ func (e *Engine) reproMissing(ctx context.Context, rec store.Record) *flow.Rejec
 	}
 	if len(unchecked) == len(cands) {
 		return miss("hay commit(s) de solo pruebas (%s) pero ninguno tiene check guardado. Corre `git switch --detach <sha> && bflow check %s && git switch -` en cada uno hasta ver el fallo del paso %s.", strings.Join(unchecked, ", "), id, step)
+	}
+	if len(unchecked) > 0 {
+		return miss("el paso %s no falló en los commits de solo pruebas con check, y %s no tienen check guardado. Corre `git switch --detach <sha> && bflow check %s && git switch -` en cada uno hasta ver el fallo del paso %s.", step, strings.Join(unchecked, ", "), id, step)
 	}
 	return miss("hay commit(s) de solo pruebas pero el paso %s no falló en ninguno: la prueba no reproduce el defecto. Corrígela, haz commit y corre `bflow check %s`.", step, id)
 }

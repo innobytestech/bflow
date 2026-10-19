@@ -162,7 +162,7 @@ func (g *Git) DiffKept(ctx context.Context, base string, paths []string) ([]stri
 
 // Commits lista los commits sin merges de base..HEAD, del más viejo al más nuevo.
 func (g *Git) Commits(ctx context.Context, base string) ([]string, error) {
-	out, err := g.run(ctx, "rev-list", "--no-merges", "--reverse", base+"..HEAD")
+	out, err := g.run(ctx, "rev-list", "--no-merges", "--topo-order", "--reverse", base+"..HEAD")
 	return lines(out), err
 }
 

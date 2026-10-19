@@ -147,6 +147,8 @@ type State struct {
 	BudgetAck map[Phase]int `json:"budget_ack,omitempty"`
 	// NoRepro es el motivo aprobado para cerrar un hotfix sin prueba de reproducción.
 	NoRepro string `json:"no_repro,omitempty"`
+	// ReproRejected marca que un humano ya rechazó el escape --no-repro: no se reabre.
+	ReproRejected bool `json:"repro_rejected,omitempty"`
 }
 
 // New crea el estado inicial de una tarea.

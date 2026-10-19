@@ -370,6 +370,9 @@ func (t *tx) reject(ev Event) error {
 		return reject("invalid_target", "un rechazo de %q no puede ir a %s en el carril %s (válidos: %s)", g.Name, to, s.Lane, joinPhases(valid))
 	}
 	t.comments = append(t.comments, fmt.Sprintf("**Rechazado en %s:** %s", g.Name, note))
+	if g.Name == GateRepro {
+		s.ReproRejected = true
+	}
 	switch {
 	case to == s.Phase && g.Name == GateDiscovery:
 		// el discovery sigue abierto; el gate se mantiene
@@ -476,6 +479,9 @@ func (t *tx) report(ev Event) error {
 
 	if strings.TrimSpace(ev.NoRepro) != "" && (ev.Verdict != DoneV || s.Phase != Implementing || s.Lane != Hotfix) {
 		return reject("no_repro_invalid", "--no-repro solo aplica a un DONE del implementer en el carril hotfix")
+	}
+	if strings.TrimSpace(ev.NoRepro) != "" && s.ReproRejected {
+		return reject("no_repro_rejected", "un humano ya rechazó --no-repro en esta tarea: agrega un commit de solo pruebas que reproduzca el defecto, corre `bflow check %s` (debe fallar) y luego la corrección", s.ID)
 	}
 
 	switch ev.Verdict {
