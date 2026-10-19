@@ -20,7 +20,7 @@ func writeEvalCase(t *testing.T, env *Env, name string) {
 	}
 }
 
-// R18: el agente del eval solo existe si el repo tiene casos.
+// El agente del eval solo existe si el repo tiene casos.
 func TestRenderEvalAgentOnlyWithCases(t *testing.T) {
 	setHome(t)
 	env := toolsEnv(t, "agent: [claude, opencode]\nflow: { agents: { quality: [reviewer] } }\nagents:\n  reviewer: { model: sonnet, effort: high }\nmodels:\n  opencode: { sonnet: anthropic/claude-sonnet-4, haiku: anthropic/claude-haiku-4, opus: anthropic/claude-opus-4 }\n")
@@ -71,7 +71,7 @@ func TestRenderEvalAgentOnlyWithCases(t *testing.T) {
 	}
 }
 
-// R4: sin el agente generado el comando manda a render antes de tocar nada.
+// Sin el agente generado el comando manda a render antes de tocar nada.
 func TestEvalAgentMissing(t *testing.T) {
 	setHome(t)
 	env := toolsEnv(t, "agent: [claude]\n")

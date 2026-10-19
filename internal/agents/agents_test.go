@@ -311,7 +311,7 @@ func TestModelsRespectsRepoOverride(t *testing.T) {
 	}
 }
 
-// R18: el agente del eval usa modelo y esfuerzo de agents.reviewer y su
+// El agente del eval usa modelo y esfuerzo de agents.reviewer y su
 // contrato; el oficio no va embebido porque lo lee del craft del ref.
 func TestEvalReviewerSpec(t *testing.T) {
 	s := EvalReviewerSpec(config.AgentConf{Model: "sonnet", Effort: "high"})
