@@ -541,6 +541,9 @@ func (c *Config) applyDefaults() {
 	if c.Env.TimeoutMS == 0 {
 		c.Env.TimeoutMS = 2500
 	}
+	if c.Check.TestStep == "" {
+		c.Check.TestStep = "test"
+	}
 	st := stacks[c.Stack]
 	if len(c.Check.CodePaths) == 0 {
 		c.Check.CodePaths = st.CodePaths
