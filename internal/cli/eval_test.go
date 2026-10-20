@@ -44,7 +44,7 @@ func TestRenderEvalAgentOnlyWithCases(t *testing.T) {
 		t.Fatalf("render con casos: %s", raw)
 	}
 	cl := rendered(t, env, claudeRel)
-	for _, want := range []string{"name: bflow-eval-reviewer", "model: sonnet", "bflow eval reviewer report <id> --verdict APPROVED|REJECTED"} {
+	for _, want := range []string{"name: bflow-eval-reviewer", "model: sonnet", "tools: Read, Grep, Glob, Edit, Write, Bash\n", "bflow eval reviewer report <id> --verdict APPROVED|REJECTED"} {
 		if !strings.Contains(cl, want) {
 			t.Errorf("claude no dice %q:\n%s", want, cl)
 		}

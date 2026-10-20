@@ -426,3 +426,22 @@ func TestCommitKeptAndMergeBase(t *testing.T) {
 		t.Error("sin rama principal resoluble debe fallar")
 	}
 }
+
+func TestWorktreeRemoveMissingDir(t *testing.T) {
+	work, _ := fixture(t)
+	g := &Git{Dir: work}
+	wt := filepath.Join(filepath.Dir(work), "wt-gone")
+	ctx := context.Background()
+	if err := g.WorktreeAdd(ctx, wt, "HEAD"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(wt); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.WorktreeRemove(ctx, wt); err != nil {
+		t.Errorf("sin directorio basta la poda: %v", err)
+	}
+	if list := sh(t, work, "worktree", "list"); strings.Contains(list, "wt-gone") {
+		t.Errorf("el worktree sigue listado:\n%s", list)
+	}
+}

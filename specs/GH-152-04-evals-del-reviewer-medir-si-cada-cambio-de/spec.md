@@ -248,7 +248,7 @@ Preparar = `WorktreeAdd(<caso>/wt, head)` + `MkdirAll(<caso>/out)`; si falla, R1
 
 ### Agente `bflow-eval-reviewer`
 
-`agents.EvalReviewerSpec(conf config.AgentConf) Spec` arma el spec: descripción "Revisa un caso del eval del reviewer y escribe su review-map. Lo lanza la sesión principal cuando bflow eval lo pide; no lo invoques por tu cuenta.", herramientas Read, Write, Bash, modelo y esfuerzo de `agents.reviewer` (o del catálogo). Cuerpo (`evalContract()`):
+`agents.EvalReviewerSpec(conf config.AgentConf) Spec` arma el spec: descripción "Revisa un caso del eval del reviewer y escribe su review-map. Lo lanza la sesión principal cuando bflow eval lo pide; no lo invoques por tu cuenta.", herramientas Read, Write, Bash (abstractas; en Claude el render las vuelve Read, Grep, Glob, Edit, Write, Bash, como a todo agente), modelo y esfuerzo de `agents.reviewer` (o del catálogo). Cuerpo (`evalContract()`):
 
 - Recibes `id` (un caso del eval, no una tarea), `base`, `worktree` (el código del caso), `out`, `craft` y, si existe, `spec` (relativa al worktree).
 - Antes de empezar, lee `craft`: es tu oficio; síguelo como si estuviera aquí.

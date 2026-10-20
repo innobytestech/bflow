@@ -103,6 +103,9 @@ func (r *Runner) save(st *runState) error {
 	return os.WriteFile(filepath.Join(r.runDir(st.Run), "run.json"), raw, 0o644)
 }
 
+// removeAll es os.RemoveAll; las pruebas lo sustituyen.
+var removeAll = os.RemoveAll
+
 // cleanup quita los worktrees que queden de la corrida y borra su carpeta.
 // Devuelve los worktrees que git no pudo quitar.
 func (r *Runner) cleanup(ctx context.Context, run string) []string {
@@ -120,7 +123,9 @@ func (r *Runner) cleanup(ctx context.Context, run string) []string {
 	}
 	// Solo se borra dentro de .bflow/cache/evals/.
 	if rel, err := filepath.Rel(r.cachePath(), dir); err == nil && rel != "." && !strings.HasPrefix(rel, "..") {
-		_ = os.RemoveAll(dir)
+		// Sin run.json la carpeta ya no cuenta como corrida abierta aunque RemoveAll falle.
+		_ = os.Remove(filepath.Join(dir, "run.json"))
+		_ = removeAll(dir)
 	}
 	return failed
 }
@@ -292,8 +297,8 @@ func (r *Runner) fillTokens(st *runState) {
 func (r *Runner) finish(ctx context.Context, st *runState, warnings []string) (Step, error) {
 	res := &Result{Kind: "reviewer", Run: st.Run, Version: r.Version, Cases: []CaseResult{}}
 	res.Craft.Ref, res.Craft.SHA256 = st.Craft, st.CraftSHA
-	models := map[string]int{}
-	for _, sr := range st.Results {
+	models, lastAt := map[string]int{}, map[string]int{}
+	for i, sr := range st.Results {
 		c := sr.CaseResult
 		res.Cases = append(res.Cases, c)
 		res.Totals.Defects += len(c.Caught) + len(c.Missed)
@@ -303,11 +308,12 @@ func (r *Runner) finish(ctx context.Context, st *runState, warnings []string) (S
 		res.Totals.Tokens.Add(c.Tokens)
 		res.Totals.Seconds += c.Seconds
 		models[c.Model]++
+		lastAt[c.Model] = i
 	}
 	res.Model = r.Model
 	best := 0
 	for m, n := range models {
-		if m != "" && (n > best || (n == best && m < res.Model)) {
+		if m != "" && (n > best || (n == best && lastAt[m] > lastAt[res.Model])) {
 			res.Model, best = m, n
 		}
 	}

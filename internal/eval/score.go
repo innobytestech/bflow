@@ -9,8 +9,14 @@ import (
 	"strings"
 )
 
-// refRe es una referencia ruta:N o ruta:N-M; la ruta lleva extensión.
-var refRe = regexp.MustCompile("(?:^|[\\s(`\"'*\\[>_])((?:[A-Za-z]:)?[\\w./\\\\-]+\\.\\w+):(\\d+)(?:-(\\d+))?")
+// refRe es una referencia ruta:N o ruta:N-M. La ruta lleva extensión, o lleva
+// separador (cmd/tool), o es el nombre base de un archivo sin extensión conocido
+// (Makefile); así localhost:8080 o paso:2 no cuentan.
+var refRe = regexp.MustCompile("(?:^|[\\s(`\"'*\\[>_])((?:[A-Za-z]:)?(?:[\\w./\\\\-]+\\.\\w+|[\\w./\\\\-]*[/\\\\][\\w.-]+|" + extensionlessAlt + ")):(\\d+)(?:-(\\d+))?")
+
+var extensionless = []string{"Makefile", "GNUmakefile", "Dockerfile", "Containerfile", "Jenkinsfile", "Gemfile", "Rakefile", "Procfile", "Vagrantfile"}
+
+var extensionlessAlt = strings.Join(extensionless, "|")
 
 var driveRe = regexp.MustCompile(`^[A-Za-z]:/`)
 
