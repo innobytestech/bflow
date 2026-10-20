@@ -308,7 +308,7 @@ func (t *tx) approve(ev Event) error {
 	case GateRepro:
 		s.NoRepro = g.Note
 		t.comments = append(t.comments, "**Hotfix sin prueba de reproducción (aprobado):** "+g.Note)
-		t.enter(t.cfg.after(s.Lane, Implementing))
+		t.afterImplementing()
 	case GateWalkthrough:
 		t.openPR = true
 		t.enter(t.cfg.after(s.Lane, Walkthrough))
