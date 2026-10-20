@@ -441,6 +441,13 @@ func (e *Engine) createBranch(ctx context.Context, rec *store.Record, _ bool) ([
 	if head, err := e.Git.HeadSHA(ctx); err == nil {
 		rec.StartSHA = head
 	}
+	// Una rama que ya existía trae commits propios: el rango de la tarea arranca
+	// donde se separó de la principal, no en su punta.
+	if how != "created" {
+		if mb, err := e.Git.MergeBase(ctx, base); err == nil && mb != "" {
+			rec.StartSHA = mb
+		}
+	}
 	warns := []string{fmt.Sprintf("rama %s (%s)", name, how)}
 	return append(warns, e.commitSpec(ctx, rec.Flow, "spec")...), nil
 }

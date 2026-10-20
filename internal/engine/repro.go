@@ -50,7 +50,7 @@ func (e *Engine) reproMissing(ctx context.Context, rec store.Record) *flow.Rejec
 		if sha == head { // HEAD no cuenta; si es un merge ni siquiera viene en la lista
 			continue
 		}
-		files, err := e.Git.CommitFiles(ctx, sha)
+		files, err := e.Git.CommitKept(ctx, sha)
 		if err != nil {
 			return miss("no se pudieron leer los archivos del commit %s: %v", short(sha), err)
 		}

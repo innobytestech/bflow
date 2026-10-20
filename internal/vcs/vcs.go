@@ -48,6 +48,11 @@ type Git interface {
 	Commits(ctx context.Context, base string) ([]string, error)
 	// CommitFiles lista los archivos que toca un commit contra su padre.
 	CommitFiles(ctx context.Context, sha string) ([]string, error)
+	// CommitKept lista los archivos que un commit agrega o modifica (no borra).
+	CommitKept(ctx context.Context, sha string) ([]string, error)
+	// MergeBase devuelve el ancestro común de HEAD con la rama principal: base
+	// si se da; si no, la rama por defecto del remoto o main/master.
+	MergeBase(ctx context.Context, base string) (string, error)
 	// Commit hace commit solo de paths con msg, aunque haya otras cosas en
 	// stage. Devuelve false si esos archivos no tenían cambios.
 	Commit(ctx context.Context, paths []string, msg string) (bool, error)
