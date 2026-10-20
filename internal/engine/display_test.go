@@ -8,7 +8,7 @@ import (
 
 func TestProductQuestionsHideAnswers(t *testing.T) {
 	v := newEnv(t, "")
-	v.e.Store.WriteFile("T-1", "reports/review-map.md", []byte(`# Review map
+	if err := v.e.Store.WriteFile("T-1", "reports/review-map.md", []byte(`# Review map
 
 ## 🔴 Decisión
 - internal/x.go: valida el RFC
@@ -23,7 +23,9 @@ func TestProductQuestionsHideAnswers(t *testing.T) {
 
 ## 🟢 Mecánico
 3 archivos
-`))
+`)); err != nil {
+		t.Fatal(err)
+	}
 	q, err := v.e.productQuestions("T-1")
 	if err != nil {
 		t.Fatal(err)
@@ -36,7 +38,9 @@ func TestProductQuestionsHideAnswers(t *testing.T) {
 			t.Errorf("falta %q en: %s", w, q)
 		}
 	}
-	v.e.Store.WriteFile("T-2", "reports/review-map.md", []byte("## 🔴 Decisión\n- algo\n"))
+	if err := v.e.Store.WriteFile("T-2", "reports/review-map.md", []byte("## 🔴 Decisión\n- algo\n")); err != nil {
+		t.Fatal(err)
+	}
 	if q, _ := v.e.productQuestions("T-2"); !strings.Contains(q, "no trae preguntas") {
 		t.Errorf("sin sección: %q", q)
 	}

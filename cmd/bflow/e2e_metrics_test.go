@@ -28,7 +28,9 @@ func TestStatsTokensAndStatusline(t *testing.T) {
 	id := r.ok("task", "add", "Borrador pre-folio").Data["id"].(string)
 	r.ok("start", id, "--lane", "full")
 	r.writeMarks(metrics.Mark{TS: time.Now(), Session: "sess", ID: id}) // la sesión principal condujo la tarea
-	os.WriteFile(filepath.Join(r.dir, "d.md"), []byte("d"), 0o644)
+	if err := os.WriteFile(filepath.Join(r.dir, "d.md"), []byte("d"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	r.ok("approve", id, "--file", "d.md")
 	r.ok("report", id, "--agent", "spec-author", "--verdict", "READY")
 
@@ -36,14 +38,20 @@ func TestStatsTokensAndStatusline(t *testing.T) {
 	// uno por su hook y solo con su transcript.
 	tr := filepath.Join(r.dir, "sess.jsonl")
 	subs := filepath.Join(r.dir, "sess", "subagents")
-	os.MkdirAll(subs, 0o755)
-	os.WriteFile(tr, []byte(transcriptLine("m1", 10, 500, 20000, 3000)+transcriptLine("m1", 10, 900, 20000, 3000)), 0o644)
+	if err := os.MkdirAll(subs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(tr, []byte(transcriptLine("m1", 10, 500, 20000, 3000)+transcriptLine("m1", 10, 900, 20000, 3000)), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	stop := fmt.Sprintf(`{"hook_event_name":"Stop","session_id":"sess","transcript_path":%q}`, tr)
 	subStop := func(agent, file string) string {
 		return fmt.Sprintf(`{"hook_event_name":"SubagentStop","session_id":"sess","transcript_path":%q,"agent_id":"x","agent_type":"bflow-%s","agent_transcript_path":%q}`,
 			tr, agent, filepath.Join(subs, file))
 	}
-	os.WriteFile(filepath.Join(subs, "agent-s.jsonl"), []byte(transcriptLine("s1", 5, 100, 10000, 0)), 0o644)
+	if err := os.WriteFile(filepath.Join(subs, "agent-s.jsonl"), []byte(transcriptLine("s1", 5, 100, 10000, 0)), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	out, _, code := r.hook(subStop("spec-author", "agent-s.jsonl"), "hook", "tokens")
 	if code != 0 || out != "" {
 		t.Fatalf("hook tokens debe ser silencioso: %d %q", code, out)
@@ -66,10 +74,14 @@ func TestStatsTokensAndStatusline(t *testing.T) {
 	// El hook del implementer corre cuando la tarea ya pasó a quality: sus
 	// tokens son de implementing. La respuesta de la sesión principal se
 	// registra al terminar el turno, pero ocurrió en implementing.
-	os.WriteFile(filepath.Join(subs, "agent-i.jsonl"), []byte(transcriptLine("i1", 3, 2000, 50000, 5000)), 0o644)
+	if err := os.WriteFile(filepath.Join(subs, "agent-i.jsonl"), []byte(transcriptLine("i1", 3, 2000, 50000, 5000)), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	r.hook(subStop("implementer", "agent-i.jsonl"), "hook", "tokens")
 	f, _ := os.OpenFile(tr, os.O_APPEND|os.O_WRONLY, 0o644)
-	f.WriteString(transcriptLineAt(inImpl, "m2", 1, 40, 8000, 0))
+	if _, err := f.WriteString(transcriptLineAt(inImpl, "m2", 1, 40, 8000, 0)); err != nil {
+		t.Fatal(err)
+	}
 	f.Close()
 	r.hook(stop, "hook", "tokens")
 
@@ -138,9 +150,15 @@ func TestQualityFrictionAndModelMetrics(t *testing.T) {
 			"usage": map[string]any{"input_tokens": 1, "output_tokens": out}}})
 		return string(b) + "\n"
 	}
-	os.WriteFile(tr, []byte(line("m1", "claude-opus-5-5", 300)), 0o644)
-	os.MkdirAll(filepath.Join(r.dir, "sess", "subagents"), 0o755)
-	os.WriteFile(filepath.Join(r.dir, "sess", "subagents", "agent-x.jsonl"), []byte(line("s1", "claude-haiku-4-5", 99)), 0o644)
+	if err := os.WriteFile(tr, []byte(line("m1", "claude-opus-5-5", 300)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(r.dir, "sess", "subagents"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(r.dir, "sess", "subagents", "agent-x.jsonl"), []byte(line("s1", "claude-haiku-4-5", 99)), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	r.hook(fmt.Sprintf(`{"hook_event_name":"Stop","session_id":"sess","transcript_path":%q}`, tr), "hook", "tokens")
 	r.hook(fmt.Sprintf(`{"hook_event_name":"SubagentStop","session_id":"sess","transcript_path":%q,"agent_id":"x","agent_type":"Explore","agent_transcript_path":%q}`,
 		tr, filepath.Join(r.dir, "sess", "subagents", "agent-x.jsonl")), "hook", "tokens")
@@ -193,8 +211,12 @@ func TestWatchOpen(t *testing.T) {
 	}
 	// Con un panel vivo, --open no abre otro (y no llega a buscar terminal).
 	alive := filepath.Join(r.dir, ".bflow", "cache", "watch.alive")
-	os.MkdirAll(filepath.Dir(alive), 0o755)
-	os.WriteFile(alive, []byte("2000"), 0o644)
+	if err := os.MkdirAll(filepath.Dir(alive), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(alive, []byte("2000"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if env := r.ok("watch", "--open"); env.Data["watch"] != "already" {
 		t.Errorf("con panel abierto: %v", env.Data)
 	}

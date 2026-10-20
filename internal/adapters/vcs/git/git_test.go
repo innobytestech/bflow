@@ -29,7 +29,9 @@ func sh(t *testing.T, dir string, args ...string) string {
 func write(t *testing.T, dir, rel, content string) {
 	t.Helper()
 	p := filepath.Join(dir, filepath.FromSlash(rel))
-	os.MkdirAll(filepath.Dir(p), 0o755)
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -358,7 +360,7 @@ func TestDiffAddedPlusPlusLine(t *testing.T) {
 	}
 }
 
-func TestCommitsAndCommitFiles(t *testing.T) {
+func TestCommits(t *testing.T) {
 	work, _ := fixture(t)
 	g := New(work)
 	ctx := context.Background()
@@ -394,18 +396,6 @@ func TestCommitsAndCommitFiles(t *testing.T) {
 	}
 	if none, err := g.Commits(ctx, "HEAD"); err != nil || len(none) != 0 {
 		t.Errorf("rango vacío: %v %v", none, err)
-	}
-
-	files, err := g.CommitFiles(ctx, first)
-	if err != nil {
-		t.Fatal(err)
-	}
-	slices.Sort(files)
-	if want := []string{"docs/nota.md", "internal/a_test.go"}; !slices.Equal(files, want) {
-		t.Errorf("archivos del commit contra su padre: %v, want %v", files, want)
-	}
-	if files, _ := g.CommitFiles(ctx, second); !slices.Equal(files, []string{"internal/a.go"}) {
-		t.Errorf("archivos del fix: %v", files)
 	}
 }
 

@@ -34,13 +34,16 @@ func (g *ghFake) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == "POST" && r.URL.Path == base:
 		var in map[string]any
-		json.NewDecoder(r.Body).Decode(&in)
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		g.next++
 		n := 40 + g.next
 		pr := map[string]any{"number": n, "html_url": fmt.Sprintf("https://github.com/acme/app/pull/%d", n), "state": "open", "merged": false, "head": in["head"], "body": in["body"]}
 		g.prs[n] = pr
 		w.WriteHeader(201)
-		json.NewEncoder(w).Encode(pr)
+		_ = json.NewEncoder(w).Encode(pr)
 	case r.Method == "GET" && r.URL.Path == base:
 		out := []map[string]any{}
 		for _, pr := range g.prs {
@@ -48,10 +51,13 @@ func (g *ghFake) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				out = append(out, pr)
 			}
 		}
-		json.NewEncoder(w).Encode(out)
+		_ = json.NewEncoder(w).Encode(out)
 	case strings.HasPrefix(r.URL.Path, base+"/"):
 		var n int
-		fmt.Sscan(strings.TrimPrefix(r.URL.Path, base+"/"), &n)
+		if _, err := fmt.Sscan(strings.TrimPrefix(r.URL.Path, base+"/"), &n); err != nil {
+			w.WriteHeader(404)
+			return
+		}
 		pr, ok := g.prs[n]
 		if !ok {
 			w.WriteHeader(404)
@@ -59,10 +65,13 @@ func (g *ghFake) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		if r.Method == "PATCH" {
 			var in map[string]any
-			json.NewDecoder(r.Body).Decode(&in)
+			if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 			pr["body"] = in["body"]
 		}
-		json.NewEncoder(w).Encode(pr)
+		_ = json.NewEncoder(w).Encode(pr)
 	default:
 		w.WriteHeader(404)
 	}
@@ -90,8 +99,12 @@ func gitRepo(t *testing.T, bflowYAML string) (*repo, string) {
 	// bflow hace commits (la spec) con la identidad del repo: en CI no hay una global.
 	git(t, r.dir, "config", "user.name", "t")
 	git(t, r.dir, "config", "user.email", "t@t")
-	os.MkdirAll(filepath.Join(r.dir, "internal"), 0o755)
-	os.WriteFile(filepath.Join(r.dir, "internal", "a.go"), []byte("package a\n"), 0o644)
+	if err := os.MkdirAll(filepath.Join(r.dir, "internal"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(r.dir, "internal", "a.go"), []byte("package a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	r.writeConfig(bflowYAML)
 	git(t, r.dir, "add", ".")
 	git(t, r.dir, "commit", "-m", "inicio")
@@ -113,7 +126,9 @@ func TestGitAndGitHubEndToEnd(t *testing.T) {
 	r.ok("report", id, "--agent", "spec-author", "--verdict", "READY")
 
 	// Con cambios sin commitear en el código, aprobar el spec no crea la rama.
-	os.WriteFile(filepath.Join(r.dir, "internal", "a.go"), []byte("package a // sucio\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(r.dir, "internal", "a.go"), []byte("package a // sucio\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	env := r.run("approve", id)
 	if env.exit != 2 || env.Code != "dirty_worktree" {
 		t.Fatalf("árbol sucio: exit %d %s %v", env.exit, env.Code, env.Data)
@@ -131,7 +146,9 @@ func TestGitAndGitHubEndToEnd(t *testing.T) {
 		t.Errorf("commit de la spec:\n%s", last)
 	}
 
-	os.WriteFile(filepath.Join(r.dir, "internal", "b.go"), []byte("package a\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(r.dir, "internal", "b.go"), []byte("package a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	git(t, r.dir, "add", "internal")
 	git(t, r.dir, "commit", "-m", "feat: validación")
 
@@ -139,16 +156,24 @@ func TestGitAndGitHubEndToEnd(t *testing.T) {
 	specAbs := filepath.Join(r.dir, filepath.FromSlash(spec))
 	b, _ := os.ReadFile(specAbs)
 	doc := strings.Replace(string(b), "## Tasks\n", "## Tasks\n\n- [x] T1 validar RFC\n- [ ] T2 mensaje de error\n", 1)
-	os.WriteFile(specAbs, []byte(doc), 0o644)
+	if err := os.WriteFile(specAbs, []byte(doc), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	env = r.run("report", "--agent", "implementer", "--verdict", "DONE")
 	if env.exit != 2 || env.Code != "tasks_open" || !strings.Contains(env.Data["reason"].(string), "T2 mensaje de error") {
 		t.Fatalf("DONE con tareas abiertas: exit %d %s %v", env.exit, env.Code, env.Data)
 	}
-	os.WriteFile(specAbs, []byte(strings.Replace(doc, "- [ ] T2", "- [x] T2", 1)), 0o644)
+	if err := os.WriteFile(specAbs, []byte(strings.Replace(doc, "- [ ] T2", "- [x] T2", 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	r.ok("report", "--agent", "implementer", "--verdict", "DONE") // tarea activa por rama
 	r.ok("report", "--agent", "reviewer", "--verdict", "APPROVED")
-	os.MkdirAll(filepath.Join(r.dir, ".bflow", "tasks", id, "reports"), 0o755)
-	os.WriteFile(filepath.Join(r.dir, ".bflow", "tasks", id, "reports", "review-map.md"), []byte("🔴 internal/b.go: validación nueva\n"), 0o644)
+	if err := os.MkdirAll(filepath.Join(r.dir, ".bflow", "tasks", id, "reports"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(r.dir, ".bflow", "tasks", id, "reports", "review-map.md"), []byte("🔴 internal/b.go: validación nueva\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	r.ok("report", "--agent", "documenter", "--verdict", "DONE")
 	r.ok("approve", "--gate", "questions") // saltar las preguntas de producto
 	env = r.ok("approve", "--gate", "walkthrough")
@@ -226,19 +251,25 @@ func TestContractHollowAndBackToContract(t *testing.T) {
 	r, _ := gitRepo(t, "stack: go\nvcs: { base_branch: dev }\n")
 	id := r.ok("task", "add", "Suma").Data["id"].(string)
 	r.ok("start", id, "--lane", "full")
-	os.WriteFile(filepath.Join(r.dir, "d.md"), []byte("d"), 0o644)
+	if err := os.WriteFile(filepath.Join(r.dir, "d.md"), []byte("d"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	r.ok("approve", id, "--file", "d.md")
 	os.Remove(filepath.Join(r.dir, "d.md"))
 	r.ok("report", id, "--agent", "spec-author", "--verdict", "READY")
 	r.ok("approve", id) // contract, en la rama nueva
 
 	test := filepath.Join(r.dir, "internal", "a_test.go")
-	os.WriteFile(test, []byte("package a\n\nimport \"testing\"\n\nfunc TestSuma(t *testing.T) {\n\tt.Skip(\"contrato\")\n}\n"), 0o644)
+	if err := os.WriteFile(test, []byte("package a\n\nimport \"testing\"\n\nfunc TestSuma(t *testing.T) {\n\tt.Skip(\"contrato\")\n}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	env := r.run("report", id, "--agent", "implementer", "--verdict", "CONTRACT_READY")
 	if env.exit != 2 || env.Code != "contract_hollow" || !strings.Contains(fmt.Sprint(env.Data), "internal/a_test.go:5 TestSuma se salta siempre") {
 		t.Fatalf("contrato hueco: exit %d %s %v", env.exit, env.Code, env.Data)
 	}
-	os.WriteFile(test, []byte("package a\n\nimport \"testing\"\n\nfunc TestSuma(t *testing.T) {\n\tif Suma(1, 2) != 3 {\n\t\tt.Fatal(\"suma\")\n\t}\n}\n"), 0o644)
+	if err := os.WriteFile(test, []byte("package a\n\nimport \"testing\"\n\nfunc TestSuma(t *testing.T) {\n\tif Suma(1, 2) != 3 {\n\t\tt.Fatal(\"suma\")\n\t}\n}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	r.ok("report", id, "--agent", "implementer", "--verdict", "CONTRACT_READY")
 	r.ok("approve", id) // implementing, pruebas congeladas
 
@@ -266,13 +297,17 @@ func TestUncommittedChangesNeverMissThePR(t *testing.T) {
 	r.ok("report", id, "--agent", "spec-author", "--verdict", "READY")
 	r.ok("approve", id)
 	code := filepath.Join(r.dir, "internal", "a.go")
-	os.WriteFile(code, []byte("package a\n\nfunc A() {}\n"), 0o644)
+	if err := os.WriteFile(code, []byte("package a\n\nfunc A() {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	git(t, r.dir, "add", "internal")
 	git(t, r.dir, "commit", "-m", "a")
 	r.ok("report", id, "--agent", "implementer", "--verdict", "DONE")
 	r.ok("report", id, "--agent", "reviewer", "--verdict", "APPROVED")
 
-	os.WriteFile(code, []byte("package a\n\n// A hace algo.\nfunc A() {}\n"), 0o644)
+	if err := os.WriteFile(code, []byte("package a\n\n// A hace algo.\nfunc A() {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	env := r.run("report", id, "--agent", "documenter", "--verdict", "DONE")
 	if env.exit != 2 || env.Code != "uncommitted" || !strings.Contains(fmt.Sprint(env.Data), "internal/a.go") {
 		t.Fatalf("documenter sin commit: exit %d %s %v", env.exit, env.Code, env.Data)
@@ -281,7 +316,9 @@ func TestUncommittedChangesNeverMissThePR(t *testing.T) {
 	r.ok("report", id, "--agent", "documenter", "--verdict", "DONE")
 	r.ok("approve", id, "--gate", "questions")
 
-	os.WriteFile(code, []byte("package a\n\n// A hace algo más.\nfunc A() {}\n"), 0o644)
+	if err := os.WriteFile(code, []byte("package a\n\n// A hace algo más.\nfunc A() {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if env := r.run("approve", id); env.exit != 2 || env.Code != "uncommitted" {
 		t.Fatalf("PR con cambios sin commit: exit %d %s %v", env.exit, env.Code, env.Data)
 	}

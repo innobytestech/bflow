@@ -56,8 +56,12 @@ func TestRealGoModule(t *testing.T) {
 	}
 	for f, c := range files {
 		p := filepath.Join(dir, filepath.FromSlash(f))
-		os.MkdirAll(filepath.Dir(p), 0o755)
-		os.WriteFile(p, []byte(c), 0o644)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(c), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	for _, args := range [][]string{{"init", "-b", "main"}, {"add", "."}, {"-c", "user.name=t", "-c", "user.email=t@t", "commit", "-m", "x"}} {
 		cmd := exec.Command("git", args...)

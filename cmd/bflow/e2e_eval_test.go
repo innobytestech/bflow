@@ -18,22 +18,30 @@ func TestE2EEvalReviewer(t *testing.T) {
 	for i := 0; i < 30; i++ {
 		src.WriteString("// relleno\n")
 	}
-	os.WriteFile(filepath.Join(r.dir, "internal", "a.go"), []byte(src.String()), 0o644)
+	if err := os.WriteFile(filepath.Join(r.dir, "internal", "a.go"), []byte(src.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	_ = os.MkdirAll(filepath.Join(r.dir, "internal", "agents", "craft"), 0o755)
-	os.WriteFile(filepath.Join(r.dir, "internal", "agents", "craft", "reviewer.md"), []byte("# oficio\nrevisa\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(r.dir, "internal", "agents", "craft", "reviewer.md"), []byte("# oficio\nrevisa\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	git(t, r.dir, "add", ".")
 	git(t, r.dir, "commit", "-m", "base del caso")
 	base := git(t, r.dir, "rev-parse", "HEAD")
 
-	os.WriteFile(filepath.Join(r.dir, "internal", "a.go"), []byte(src.String()+"func Bug() int { return 1 / 0 }\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(r.dir, "internal", "a.go"), []byte(src.String()+"func Bug() int { return 1 / 0 }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	git(t, r.dir, "add", ".")
 	git(t, r.dir, "commit", "-m", "head del caso")
 	head := git(t, r.dir, "rev-parse", "HEAD")
 
 	caseDir := filepath.Join(r.dir, ".bflow", "evals", "reviewer", "uno")
 	_ = os.MkdirAll(caseDir, 0o755)
-	os.WriteFile(filepath.Join(caseDir, "case.yaml"), []byte("source: GH-1\nbase: "+base+"\nhead: "+head+
-		"\ndefects:\n  - file: internal/a.go\n    lines: \"33\"\n    what: división por cero\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(caseDir, "case.yaml"), []byte("source: GH-1\nbase: "+base+"\nhead: "+head+
+		"\ndefects:\n  - file: internal/a.go\n    lines: \"33\"\n    what: división por cero\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	// Sin el agente generado, rechaza antes de crear nada.
 	if env := r.run("eval", "reviewer"); env.exit != 2 || env.Code != "eval_agent_missing" {
@@ -69,7 +77,9 @@ func TestE2EEvalReviewer(t *testing.T) {
 	if e := r.run("eval", "reviewer", "report", "uno", "--verdict", "REJECTED"); e.exit != 2 || e.Code != "review_map_missing" {
 		t.Fatalf("sin review-map: %d %s", e.exit, e.Code)
 	}
-	os.WriteFile(filepath.Join(ag.Args["out"], "review-map.md"), []byte("# Review\n- internal/a.go:33 división por cero\n- internal/a.go:2 ruido\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(ag.Args["out"], "review-map.md"), []byte("# Review\n- internal/a.go:33 división por cero\n- internal/a.go:2 ruido\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	rep := r.ok("eval", "reviewer", "report", "uno", "--verdict", "REJECTED", "--note", "internal/a.go:33 rompe")
 	score, _ := rep.Data["score"].(map[string]any)
 	if caught, _ := score["caught"].([]any); len(caught) != 1 {

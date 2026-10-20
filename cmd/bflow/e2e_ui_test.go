@@ -18,9 +18,15 @@ import (
 func TestUINetwork(t *testing.T) {
 	a := newRepo(t)
 	b := &repo{t: t, dir: testutil.TempDir(t)}
-	os.WriteFile(filepath.Join(os.Getenv("BFLOW_CONFIG_HOME"), "config.yaml"), []byte("profiles:\n  acme:\n    agent: claude\n"), 0o644)
-	os.WriteFile(filepath.Join(a.dir, "bflow.yaml"), []byte("profile: acme\n"), 0o644)
-	os.WriteFile(filepath.Join(b.dir, "bflow.yaml"), []byte("stack: go\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(os.Getenv("BFLOW_CONFIG_HOME"), "config.yaml"), []byte("profiles:\n  acme:\n    agent: claude\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(a.dir, "bflow.yaml"), []byte("profile: acme\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(b.dir, "bflow.yaml"), []byte("stack: go\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	idA := a.ok("task", "add", "Alta de clientes").Data["id"].(string)
 	a.ok("start", idA, "--lane", "light")
 	idB := b.ok("task", "add", "Servidor no arranca").Data["id"].(string)
@@ -32,7 +38,7 @@ func TestUINetwork(t *testing.T) {
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
-	defer cmd.Process.Kill()
+	defer func() { _ = cmd.Process.Kill() }()
 	line, _ := bufio.NewReader(out).ReadString('\n')
 	url := strings.Fields(strings.TrimPrefix(line, "bflow ui en "))[0]
 

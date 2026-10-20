@@ -73,9 +73,15 @@ func TestBuildDefaultFlow(t *testing.T) {
 
 func TestBuildRepoCraftAndCustomAgent(t *testing.T) {
 	root := testutil.TempDir(t)
-	os.MkdirAll(filepath.Join(root, "docs", "bflow"), 0o755)
-	os.WriteFile(filepath.Join(root, "docs", "bflow", "impl.md"), []byte("Commits de una línea.\n"), 0o644)
-	os.WriteFile(filepath.Join(root, "docs", "bflow", "perf.md"), []byte("Mide p95 de los endpoints tocados.\n"), 0o644)
+	if err := os.MkdirAll(filepath.Join(root, "docs", "bflow"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "docs", "bflow", "impl.md"), []byte("Commits de una línea.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "docs", "bflow", "perf.md"), []byte("Mide p95 de los endpoints tocados.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	fc := flow.DefaultConfig()
 	fc.Agents[flow.Quality] = append(fc.Agents[flow.Quality], "perf-auditor")
 	no := false

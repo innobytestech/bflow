@@ -53,8 +53,12 @@ func TestNotes(t *testing.T) {
 func TestArchiveRoundTripAndChecksums(t *testing.T) {
 	dir := testutil.TempDir(t)
 	bin := filepath.Join(dir, "bflow")
-	os.WriteFile(bin, []byte("binario"), 0o755)
-	os.WriteFile(filepath.Join(dir, "LICENSE"), []byte("apache"), 0o644)
+	if err := os.WriteFile(bin, []byte("binario"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "LICENSE"), []byte("apache"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	sums := map[string]string{}
 	var order []string
 	for _, goos := range []string{"windows", "linux"} {
@@ -83,7 +87,9 @@ func TestArchiveRoundTripAndChecksums(t *testing.T) {
 func TestReplace(t *testing.T) {
 	dir := testutil.TempDir(t)
 	exe := filepath.Join(dir, BinaryName(runtime.GOOS))
-	os.WriteFile(exe, []byte("viejo"), 0o755)
+	if err := os.WriteFile(exe, []byte("viejo"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := Replace(exe, []byte("nuevo")); err != nil {
 		t.Fatal(err)
 	}

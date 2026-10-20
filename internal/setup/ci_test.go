@@ -29,8 +29,12 @@ jobs:
 func TestCIGaps(t *testing.T) {
 	dir := t.TempDir()
 	wf := filepath.Join(dir, ".github", "workflows")
-	os.MkdirAll(wf, 0o755)
-	os.WriteFile(filepath.Join(wf, "ci.yml"), []byte(workflow), 0o644)
+	if err := os.MkdirAll(wf, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wf, "ci.yml"), []byte(workflow), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	steps := []string{"go vet ./...", "go test -count=1 {race} ./...", "govulncheck ./..."}
 	n, gaps := CIGaps(dir, steps)

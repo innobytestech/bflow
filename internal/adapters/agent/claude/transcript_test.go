@@ -28,7 +28,9 @@ func appendTo(t *testing.T, path, s string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.WriteString(s)
+	if _, err := f.WriteString(s); err != nil {
+		t.Fatal(err)
+	}
 	f.Close()
 }
 
@@ -82,7 +84,9 @@ func TestReadUsageIncrementalWithDuplicates(t *testing.T) {
 	appendTo(t, main, `1,"output_tokens":7,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}`+"\n")
 	appendTo(t, main, line("m2", opus, 1, 5, 2000, 0))
 	sub := filepath.Join(dir, "sess-1", "subagents")
-	os.MkdirAll(sub, 0o755)
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	appendTo(t, filepath.Join(sub, "agent-abc.jsonl"), line("s1", haiku, 3, 100, 5000, 1000))
 	u, err = a.ReadUsage(main, cur)
 	if err != nil {

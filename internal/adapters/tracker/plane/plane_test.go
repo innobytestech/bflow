@@ -77,7 +77,7 @@ func (f *fakePlane) page(w http.ResponseWriter, r *http.Request, rows []map[stri
 	start, _ := strconv.Atoi(r.URL.Query().Get("cursor"))
 	end := min(start+per, len(rows))
 	resp := map[string]any{"results": rows[start:end], "next_page_results": end < len(rows), "next_cursor": strconv.Itoa(end)}
-	json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 func (f *fakePlane) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -109,11 +109,14 @@ func (f *fakePlane) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		f.page(w, r, f.states)
 	case r.Method == "POST" && p == proj+"/states/":
 		var in map[string]any
-		json.NewDecoder(r.Body).Decode(&in)
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		in["id"] = "st-new-" + strconv.Itoa(len(f.states))
 		f.states = append(f.states, in)
 		w.WriteHeader(201)
-		json.NewEncoder(w).Encode(in)
+		_ = json.NewEncoder(w).Encode(in)
 	case r.Method == "GET" && p == proj+"/work-items/":
 		f.page(w, r, f.items)
 	case r.Method == "POST" && p == proj+"/work-items/":
@@ -156,7 +159,7 @@ func (f *fakePlane) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						out["state"] = s
 					}
 				}
-				json.NewEncoder(w).Encode(out)
+				_ = json.NewEncoder(w).Encode(out)
 				return
 			}
 		}
@@ -177,19 +180,25 @@ func (f *fakePlane) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case len(rest) == 1 && r.Method == "PATCH":
 			var in map[string]any
-			json.NewDecoder(r.Body).Decode(&in)
+			if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 			for k, v := range in {
 				it[k] = v
 			}
-			json.NewEncoder(w).Encode(it)
+			_ = json.NewEncoder(w).Encode(it)
 		case len(rest) == 2 && rest[1] == "comments" && r.Method == "POST":
 			var in map[string]any
-			json.NewDecoder(r.Body).Decode(&in)
+			if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 			f.postedHTML = append(f.postedHTML, in["comment_html"].(string))
 			c := map[string]any{"id": "c" + strconv.Itoa(len(f.comments[rest[0]])), "comment_html": in["comment_html"], "created_at": "2026-09-25T10:00:00Z"}
 			f.comments[rest[0]] = append(f.comments[rest[0]], c)
 			w.WriteHeader(201)
-			json.NewEncoder(w).Encode(c)
+			_ = json.NewEncoder(w).Encode(c)
 		case len(rest) == 2 && rest[1] == "comments":
 			f.page(w, r, f.comments[rest[0]])
 		default:
@@ -363,11 +372,17 @@ func TestProjectResolvedOnceAndCached(t *testing.T) {
 	c := newClient(t, f)
 	f.add(1, "a", "st-backlog")
 	ctx := context.Background()
-	c.Get(ctx, "API-1")
-	c.Transition(ctx, "API-1", flow.Spec, tracker.Patch{})
+	if _, err := c.Get(ctx, "API-1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Transition(ctx, "API-1", flow.Spec, tracker.Patch{}); err != nil {
+		t.Fatal(err)
+	}
 	c2 := New(Options{URL: c.URL, Workspace: ws, Project: "API", Token: "key", CachePath: c.cachePath})
 	c2.HTTP = c.HTTP
-	c2.Transition(ctx, "API-1", flow.Implementing, tracker.Patch{})
+	if err := c2.Transition(ctx, "API-1", flow.Implementing, tracker.Patch{}); err != nil {
+		t.Fatal(err)
+	}
 	n := 0
 	for _, call := range f.calls {
 		if strings.HasSuffix(call, "/projects/") {

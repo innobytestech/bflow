@@ -130,7 +130,9 @@ func buildAs(t *testing.T, args ...string) string {
 func runCopy(t *testing.T, src, api string, args ...string) (exe string, out string, code int) {
 	exe = filepath.Join(testutil.TempDir(t), filepath.Base(src))
 	b, _ := os.ReadFile(src)
-	os.WriteFile(exe, b, 0o755)
+	if err := os.WriteFile(exe, b, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	cmd := exec.Command(exe, args...)
 	cmd.Env = append(os.Environ(), "BFLOW_RELEASES_URL="+api)
 	o, err := cmd.CombinedOutput()
