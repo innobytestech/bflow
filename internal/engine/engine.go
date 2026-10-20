@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"innobytes.tech/bflow/internal/agents"
+	"innobytes.tech/bflow/internal/check"
 	"innobytes.tech/bflow/internal/config"
 	"innobytes.tech/bflow/internal/flow"
 	"innobytes.tech/bflow/internal/output"
@@ -34,15 +35,21 @@ type Verifier interface {
 	Verify(ctx context.Context, id string) (ok bool, detail string, err error)
 }
 
+// ContractChecker lee el último check de la tarea para validar el contrato.
+type ContractChecker interface {
+	Last(ctx context.Context, id string) (res *check.Result, fresh bool, detail string, err error)
+}
+
 // Engine ejecuta comandos de flujo.
 type Engine struct {
 	Cfg      *config.Config
 	Store    *store.Store
 	Tracker  tracker.Tracker
-	Git      vcs.Git      // nil: sin git (se registra la rama pero no se crea)
-	Host     vcs.Host     // nil: sin host remoto (se da la URL de compare si se puede)
-	Checks   CheckHistory // nil: hotfix no exige prueba de reproducción
-	Verifier Verifier     // nil: DONE se acepta sin verificar si no hay pasos de check
+	Git      vcs.Git         // nil: sin git (se registra la rama pero no se crea)
+	Host     vcs.Host        // nil: sin host remoto (se da la URL de compare si se puede)
+	Checks   CheckHistory    // nil: hotfix no exige prueba de reproducción
+	Verifier Verifier        // nil: DONE se acepta sin verificar si no hay pasos de check
+	Contract ContractChecker // nil: el contrato pasa por la gate contract
 	Now      func() time.Time
 	User     string
 }
@@ -108,10 +115,11 @@ func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug s
 		}
 
 		if ev.Kind == flow.EvReport && ev.Verdict == flow.ContractReady && rec.Flow.Phase == flow.Contract {
-			if hollow := hollowTests(e.Cfg.Root, e.taskTests(ctx)); len(hollow) > 0 {
-				return &flow.Rejection{Code: "contract_hollow", Reason: "el contrato tiene pruebas que se saltan siempre o no tienen cuerpo; al aprobarlo se congelan y ya no se pueden completar:\n" +
-					strings.Join(hollow, "\n") + "\nEscribe su cuerpo real (preparar, actuar, verificar contra las firmas) para que fallen contra los stubs, y reporta otra vez."}
+			verified, rej := e.contractCheck(ctx, id)
+			if rej != nil {
+				return rej
 			}
+			ev.ContractOK = verified
 		}
 		if ev.Kind == flow.EvReport && ev.Verdict == flow.Split && rec.Flow.Phase == flow.Spec {
 			brief, err := e.specSection(*rec, "brief")

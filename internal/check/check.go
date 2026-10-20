@@ -566,3 +566,9 @@ func splitArgs(s string) []string {
 	}
 	return out
 }
+
+// Fresh dice si el check guardado sigue vigente sobre el código actual, sin
+// mirar si pasó o falló.
+func Fresh(ctx context.Context, g GitReader, codePaths []string, res *Result) (bool, string) {
+	return false, "sin implementar"
+}

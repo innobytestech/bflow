@@ -97,3 +97,8 @@ func (v Verifier) Verify(ctx context.Context, id string) (bool, string, error) {
 	ok, detail := Verify(ctx, v.Git, v.CodePaths, res)
 	return ok, detail, nil
 }
+
+// Last lee el último check de la tarea y dice si sigue vigente.
+func (v Verifier) Last(ctx context.Context, id string) (res *Result, fresh bool, detail string, err error) {
+	return nil, false, "sin implementar", nil
+}

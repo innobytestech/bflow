@@ -147,6 +147,8 @@ type State struct {
 	BudgetAck map[Phase]int `json:"budget_ack,omitempty"`
 	// NoRepro es el motivo aprobado para cerrar un hotfix sin prueba de reproducción.
 	NoRepro string `json:"no_repro,omitempty"`
+	// PauseRequested: una persona pidió parar al terminar implementing.
+	PauseRequested bool `json:"pause_requested,omitempty"`
 	// ReproRejected marca que un humano ya rechazó el escape --no-repro: no se reabre.
 	ReproRejected bool `json:"repro_rejected,omitempty"`
 }
@@ -165,7 +167,8 @@ const (
 	EvBlock   EventKind = "block"
 	EvUnblock EventKind = "unblock"
 	EvMerged  EventKind = "merged"
-	EvDrop    EventKind = "drop" // retira la tarea sin terminarla (Note = motivo)
+	EvPause   EventKind = "pause" // marca la tarea para parar tras implementing
+	EvDrop    EventKind = "drop"  // retira la tarea sin terminarla (Note = motivo)
 	// EvClosedOutside cierra una tarea que se terminó fuera de esta copia
 	// (el tracker la da por hecha o su PR se mergeó), en cualquier fase empezada.
 	EvClosedOutside EventKind = "closed_outside"
@@ -186,10 +189,11 @@ type Event struct {
 	Manual     bool   `json:"manual,omitempty"`     // approve decision: la hace la sesión principal, no un agente
 	Attachment string `json:"attachment,omitempty"` // approve discovery: texto completo
 
-	Agent   string   `json:"agent,omitempty"` // report
-	Verdict Verdict  `json:"verdict,omitempty"`
-	Options []string `json:"options,omitempty"`  // report NEEDS_DECISION
-	CheckOK bool     `json:"check_ok,omitempty"` // report DONE en implementing: check verificado en HEAD
+	Agent      string   `json:"agent,omitempty"` // report
+	Verdict    Verdict  `json:"verdict,omitempty"`
+	Options    []string `json:"options,omitempty"`     // report NEEDS_DECISION
+	ContractOK bool     `json:"contract_ok,omitempty"` // report CONTRACT_READY: el engine validó el contrato
+	CheckOK    bool     `json:"check_ok,omitempty"`    // report DONE en implementing: check verificado en HEAD
 
 	NoRepro string `json:"no_repro,omitempty"` // report DONE en hotfix: motivo para cerrar sin prueba de reproducción
 
