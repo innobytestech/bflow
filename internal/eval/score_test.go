@@ -89,8 +89,8 @@ func TestFindingsSkipsExcluded(t *testing.T) {
 		t.Errorf("hallazgos:\n got %v\nwant %v", got, want)
 	}
 
-	// Sin extensión o sin número no es una referencia.
-	if fs := Findings("Makefile:3 y a.go: y a.go:x", nil, "/wt"); len(fs) != 0 {
+	// Sin número no es una referencia.
+	if fs := Findings("localhost:8080 paso:2 y a.go: y a.go:x", nil, "/wt"); len(fs) != 0 {
 		t.Errorf("no son referencias: %v", fs)
 	}
 	// Cada .md de out cuenta, y la nota también.
@@ -145,5 +145,17 @@ func TestScoreFalsePositivesDeduped(t *testing.T) {
 	}
 	if len(s.Caught) != 1 {
 		t.Errorf("el defecto se atrapó: %+v", s)
+	}
+}
+
+func TestFindingsExtensionlessPaths(t *testing.T) {
+	got := keys(Findings("Makefile:3 y Dockerfile:12-14 y cmd/tool:4 y /wt/Makefile:3", nil, "/wt"))
+	want := []string{"Dockerfile:12-14", "Makefile:3-3", "Makefile:3-3", "cmd/tool:4-4"}
+	slices.Sort(got)
+	if !slices.Equal(got, want) {
+		t.Errorf("hallazgos:\n got %v\nwant %v", got, want)
+	}
+	if fs := Findings("localhost:8080 y paso:2 y MiMakefile:3", nil, "/wt"); len(fs) != 0 {
+		t.Errorf("no son referencias: %v", fs)
 	}
 }

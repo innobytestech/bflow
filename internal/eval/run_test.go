@@ -440,3 +440,44 @@ func TestGitignoreExceptions(t *testing.T) {
 		t.Error("sin .gitignore previo también lo crea")
 	}
 }
+
+func TestFinishModelTieUsesLatest(t *testing.T) {
+	h := newHarness(t)
+	h.validCase("alfa", "")
+	h.validCase("beta", "")
+	t0 := h.now
+	h.write(".bflow/tasks/GH-9/calls.jsonl",
+		call(t0.Add(10*time.Second), "eval-reviewer", "alfa", "x1", 10, 5, 2, 100, false)+"\n"+
+			call(t0.Add(70*time.Second), "eval-reviewer", "zeta", "x2", 10, 5, 2, 100, false)+"\n")
+	sp := h.next(Opts{}).Spawn
+	h.answer(sp, "ok\n")
+	h.now = t0.Add(60 * time.Second)
+	h.report("alfa", "APPROVED", "")
+	sp = h.next(Opts{}).Spawn
+	h.answer(sp, "ok\n")
+	h.now = t0.Add(90 * time.Second)
+	h.report("beta", "APPROVED", "")
+	done := h.next(Opts{})
+	if done.Result == nil || done.Result.Model != "zeta" {
+		t.Fatalf("en empate gana el modelo del último caso: %+v", done.Result)
+	}
+}
+
+func TestOrphanRunDirIsNotOpen(t *testing.T) {
+	h := newHarness(t)
+	h.validCase("alfa", "")
+	h.next(Opts{})
+	if h.r.Open() == "" {
+		t.Fatal("la corrida debería estar abierta")
+	}
+	orig := removeAll
+	removeAll = func(string) error { return errors.New("no se pudo borrar") }
+	t.Cleanup(func() { removeAll = orig })
+	h.next(Opts{Abort: true})
+	if !h.exists(cacheRel()) {
+		t.Fatal("la carpeta debería seguir en la caché")
+	}
+	if got := h.r.Open(); got != "" {
+		t.Errorf("la corrida huérfana no está abierta: %q", got)
+	}
+}

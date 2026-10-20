@@ -354,6 +354,7 @@ func Models(fc flow.Config, conf map[string]config.AgentConf) map[string]string 
 // embebido, porque lo lee del archivo craft que recibe en cada corrida.
 func EvalReviewerSpec(conf config.AgentConf) Spec {
 	b := catalog["reviewer"]
+	// Tools son abstractas: el render de Claude las vuelve Read, Grep, Glob, Edit, Write, Bash, como a todo agente.
 	s := Spec{
 		Name:         "eval-reviewer",
 		Subagent:     flow.SubagentPrefix + "eval-reviewer",
