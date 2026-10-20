@@ -10,7 +10,9 @@ func TestRememberRepo(t *testing.T) {
 	t.Setenv("BFLOW_CONFIG_HOME", t.TempDir())
 	a, b, gone := t.TempDir(), t.TempDir(), t.TempDir()
 	for _, d := range []string{a, b, gone} {
-		os.WriteFile(filepath.Join(d, RepoFile), []byte("stack: go\n"), 0o644)
+		if err := os.WriteFile(filepath.Join(d, RepoFile), []byte("stack: go\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	for _, d := range []string{a, b, a, gone} {
 		if err := RememberRepo(d); err != nil {

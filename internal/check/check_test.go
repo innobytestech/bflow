@@ -159,7 +159,9 @@ func TestOptionalMissingToolDegrades(t *testing.T) {
 func TestShellOnlyWithOperators(t *testing.T) {
 	fx := &fakeExec{}
 	r := runner(t, []config.Step{{Name: "a", Run: "npm run check:architecture"}, {Name: "b", Run: "npm test && npm run build"}}, fx, &fakeGit{sha: "a"})
-	r.Run(context.Background())
+	if _, err := r.Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 	if len(fx.calls) != 1 || len(fx.shells) != 1 || fx.shells[0] != "npm test && npm run build" {
 		t.Errorf("directo: %v · shell: %v", fx.calls, fx.shells)
 	}
@@ -182,7 +184,9 @@ func TestAcceptedVulns(t *testing.T) {
 				exit int
 			}{"govulncheck": {vulnOut, 3}}}
 			r := runner(t, []config.Step{{Name: "vulns", Run: "govulncheck ./...", Accept: "accepted-vulns.json"}}, fx, &fakeGit{sha: "a"})
-			os.WriteFile(filepath.Join(r.Root, "accepted-vulns.json"), []byte(c.accepted), 0o644)
+			if err := os.WriteFile(filepath.Join(r.Root, "accepted-vulns.json"), []byte(c.accepted), 0o644); err != nil {
+				t.Fatal(err)
+			}
 			res, _ := r.Run(context.Background())
 			if res.Steps[0].Status != c.status {
 				t.Errorf("status %s, want %s (tail %q)", res.Steps[0].Status, c.status, res.Steps[0].Tail)

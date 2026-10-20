@@ -28,7 +28,9 @@ func (m memSecrets) Delete(k string) error { delete(m, k); return nil }
 func connectEnv(t *testing.T, stdin string, valid bool) (*Env, memSecrets, *[]ConnectOpts) {
 	dir := testutil.TempDir(t)
 	t.Setenv("BFLOW_CONFIG_HOME", testutil.TempDir(t))
-	os.WriteFile(filepath.Join(dir, "bflow.yaml"), []byte("tracker: { adapter: plane, url: https://plane.example.com, workspace: acme-dev, project: API }\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(dir, "bflow.yaml"), []byte("tracker: { adapter: plane, url: https://plane.example.com, workspace: acme-dev, project: API }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	sec := memSecrets{}
 	var seen []ConnectOpts
 	env := &Env{Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}, Stdin: strings.NewReader(stdin), Dir: dir, Secrets: sec,

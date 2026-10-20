@@ -215,7 +215,9 @@ func TestFullFeatureWithLocalTracker(t *testing.T) {
 	// Lo que escribe el spec-author es lo que el humano ve en la gate, sin correr show.
 	specAbs := filepath.Join(r.dir, spec)
 	sb, _ := os.ReadFile(specAbs)
-	os.WriteFile(specAbs, []byte(strings.Replace(string(sb), "## Brief\n", "## Brief\n\n**Objetivo:** borrador compartido de cotización.\n", 1)), 0o644)
+	if err := os.WriteFile(specAbs, []byte(strings.Replace(string(sb), "## Brief\n", "## Brief\n\n**Objetivo:** borrador compartido de cotización.\n", 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	env = r.ok("report", id, "--agent", "spec-author", "--verdict", "READY")
 	expectNext(t, env, "ask", "spec")
@@ -245,8 +247,12 @@ func TestFullFeatureWithLocalTracker(t *testing.T) {
 
 	env = r.ok("report", id, "--agent", "implementer", "--verdict", "CONTRACT_READY")
 	expectNext(t, env, "ask", "contract")
-	os.MkdirAll(filepath.Join(r.dir, ".bflow", "tasks", id), 0o755)
-	os.WriteFile(filepath.Join(r.dir, ".bflow", "tasks", id, "contract.md"), []byte("type Draft struct{}"), 0o644)
+	if err := os.MkdirAll(filepath.Join(r.dir, ".bflow", "tasks", id), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(r.dir, ".bflow", "tasks", id, "contract.md"), []byte("type Draft struct{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if c := r.ok("show", id, "contract"); c.Data["content"] != "type Draft struct{}" {
 		t.Errorf("show contract: %v", c.Data)
 	}
@@ -286,9 +292,13 @@ func TestFullFeatureWithLocalTracker(t *testing.T) {
 	r.ok("report", id, "--agent", "security-auditor", "--verdict", "APPROVED")
 	env = r.ok("report", id, "--agent", "reviewer", "--verdict", "APPROVED")
 	spawned(t, env, "documenter")
-	os.MkdirAll(filepath.Join(r.dir, ".bflow", "tasks", id, "reports"), 0o755)
-	os.WriteFile(filepath.Join(r.dir, ".bflow", "tasks", id, "reports", "review-map.md"),
-		[]byte("## 🔴 Decisión\n- folio: se reserva al confirmar\n\n## Preguntas de producto\n1. ¿El borrador consume folio?\n   el código responde: no (quotation.go:10)\n"), 0o644)
+	if err := os.MkdirAll(filepath.Join(r.dir, ".bflow", "tasks", id, "reports"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(r.dir, ".bflow", "tasks", id, "reports", "review-map.md"),
+		[]byte("## 🔴 Decisión\n- folio: se reserva al confirmar\n\n## Preguntas de producto\n1. ¿El borrador consume folio?\n   el código responde: no (quotation.go:10)\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	env = r.ok("report", id, "--agent", "documenter", "--verdict", "DONE")
 	expectNext(t, env, "ask", "questions")
 	if env.Next.Skill != "walkthrough" || !strings.Contains(env.Next.Display, "¿El borrador consume folio?") || strings.Contains(env.Next.Display, "el código responde") {
@@ -370,7 +380,9 @@ func TestRejectionsExitTwo(t *testing.T) {
 
 func TestBrokenConfigIsReadable(t *testing.T) {
 	r := newRepo(t)
-	os.WriteFile(filepath.Join(r.dir, "bflow.yaml"), []byte("tracker: { adapter: plane, api_key: x }\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(r.dir, "bflow.yaml"), []byte("tracker: { adapter: plane, api_key: x }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	env := r.run("status")
 	if env.exit != 1 || !strings.Contains(fmt.Sprint(env.Data["error"]), "llavero") {
 		t.Errorf("config con secreto: exit %d %v", env.exit, env.Data)

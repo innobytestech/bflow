@@ -33,12 +33,12 @@ type fakeGit struct {
 	// status (sin rutas, todo el árbol).
 	byPath bool
 	head   string // HeadSHA; vacío: "abc"
-	// Commits y CommitFiles: la historia de la rama para la evidencia de reproducción.
-	commits     []string
-	commitsErr  error
-	commitsBase string // la base con que se pidió el rango
-	files       map[string][]string
-	kept2       map[string][]string // CommitKept; sin entrada, igual que files
+	// Commits y CommitKept: la historia de la rama para la evidencia de reproducción.
+	commits      []string
+	commitsErr   error
+	commitsBase  string // la base con que se pidió el rango
+	files        map[string][]string
+	keptByCommit map[string][]string // CommitKept; sin entrada, igual que files
 	// MergeBase: lo que devuelve y si falla.
 	mergeBase    string
 	mergeBaseErr error
@@ -94,11 +94,8 @@ func (g *fakeGit) Commits(_ context.Context, base string) ([]string, error) {
 	g.commitsBase = base
 	return g.commits, g.commitsErr
 }
-func (g *fakeGit) CommitFiles(_ context.Context, sha string) ([]string, error) {
-	return g.files[sha], nil
-}
 func (g *fakeGit) CommitKept(_ context.Context, sha string) ([]string, error) {
-	if k, ok := g.kept2[sha]; ok {
+	if k, ok := g.keptByCommit[sha]; ok {
 		return k, nil
 	}
 	return g.files[sha], nil

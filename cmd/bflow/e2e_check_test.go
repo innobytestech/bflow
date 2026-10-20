@@ -11,13 +11,19 @@ import (
 func TestDoneRequiresVigentCheck(t *testing.T) {
 	yaml := "stack: go\ncheck:\n  steps:\n    - { name: vet, run: \"go vet ./...\" }\n    - { name: test, run: \"go test -count=1 ./...\" }\n"
 	r, _ := gitRepo(t, yaml)
-	os.WriteFile(filepath.Join(r.dir, "go.mod"), []byte("module demo\n\ngo 1.21\n"), 0o644)
-	os.WriteFile(filepath.Join(r.dir, "internal", "a_test.go"), []byte("package a\n\nimport \"testing\"\n\nfunc TestX(t *testing.T) { t.Fatal(\"rojo\") }\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(r.dir, "go.mod"), []byte("module demo\n\ngo 1.21\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(r.dir, "internal", "a_test.go"), []byte("package a\n\nimport \"testing\"\n\nfunc TestX(t *testing.T) { t.Fatal(\"rojo\") }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	git(t, r.dir, "add", ".")
 	git(t, r.dir, "commit", "-m", "base")
 	id := r.ok("task", "add", "Demo").Data["id"].(string)
 	r.ok("start", id, "--lane", "hotfix")
-	os.WriteFile(filepath.Join(r.dir, "internal", "a_test.go"), []byte("package a\n\nimport \"testing\"\n\nfunc TestX(t *testing.T) { t.Fatal(\"rojo\") } // reproduce\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(r.dir, "internal", "a_test.go"), []byte("package a\n\nimport \"testing\"\n\nfunc TestX(t *testing.T) { t.Fatal(\"rojo\") } // reproduce\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	git(t, r.dir, "commit", "-am", "test: reproduce")
 
 	env := r.run("report", "--agent", "implementer", "--verdict", "DONE")
@@ -32,7 +38,9 @@ func TestDoneRequiresVigentCheck(t *testing.T) {
 		t.Fatalf("con check rojo: %v", env.Data)
 	}
 
-	os.WriteFile(filepath.Join(r.dir, "internal", "a_test.go"), []byte("package a\n\nimport \"testing\"\n\nfunc TestX(t *testing.T) {}\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(r.dir, "internal", "a_test.go"), []byte("package a\n\nimport \"testing\"\n\nfunc TestX(t *testing.T) {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if env = r.run("check"); env.Data["sha"] != "DIRTY" {
 		t.Fatalf("sin commitear el sha es DIRTY: %v", env.Data)
 	}
@@ -48,7 +56,9 @@ func TestDoneRequiresVigentCheck(t *testing.T) {
 	}
 
 	// Cambio de código después del check: DONE vuelve a rechazarse.
-	os.WriteFile(filepath.Join(r.dir, "internal", "b.go"), []byte("package a\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(r.dir, "internal", "b.go"), []byte("package a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	git(t, r.dir, "add", ".")
 	git(t, r.dir, "commit", "-m", "otro")
 	env = r.run("report", "--agent", "implementer", "--verdict", "DONE")

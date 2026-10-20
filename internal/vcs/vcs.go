@@ -46,8 +46,6 @@ type Git interface {
 	DiffAdded(ctx context.Context, base string, paths []string) ([]AddedLine, error)
 	// Commits lista los commits sin merges de base..HEAD, del más viejo al más nuevo.
 	Commits(ctx context.Context, base string) ([]string, error)
-	// CommitFiles lista los archivos que toca un commit contra su padre.
-	CommitFiles(ctx context.Context, sha string) ([]string, error)
 	// CommitKept lista los archivos que un commit agrega o modifica (no borra).
 	CommitKept(ctx context.Context, sha string) ([]string, error)
 	// MergeBase devuelve el ancestro común de HEAD con la rama principal: base

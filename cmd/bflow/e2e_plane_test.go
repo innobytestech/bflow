@@ -23,19 +23,24 @@ func planeFake(t *testing.T) (*httptest.Server, *sync.Map) {
 			return
 		}
 		p := r.URL.Path
-		page := func(rows any) { json.NewEncoder(w).Encode(map[string]any{"results": rows, "next_page_results": false}) }
+		page := func(rows any) {
+			_ = json.NewEncoder(w).Encode(map[string]any{"results": rows, "next_page_results": false})
+		}
 		switch {
 		case strings.HasSuffix(p, "/projects/"):
 			page([]map[string]any{{"id": "p-uuid", "identifier": "API", "name": "acme-api"}})
 		case strings.HasSuffix(p, "/states/"):
 			page(states)
 		case strings.HasSuffix(p, "/work-items/API-120/"):
-			json.NewEncoder(w).Encode(item)
+			_ = json.NewEncoder(w).Encode(item)
 		case r.Method == "PATCH":
 			var in map[string]any
-			json.NewDecoder(r.Body).Decode(&in)
+			if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 			patched.Store(p, in["state"])
-			w.Write([]byte("{}"))
+			_, _ = w.Write([]byte("{}"))
 		case strings.HasSuffix(p, "/work-items/"):
 			page([]map[string]any{item})
 		default:
@@ -52,7 +57,9 @@ func TestPlaneWiring(t *testing.T) {
 	r := newRepo(t)
 	t.Setenv("BFLOW_NO_KEYRING", "1")
 	t.Setenv("BFLOW_PLANE_TOKEN", "key")
-	os.WriteFile(filepath.Join(r.dir, "bflow.yaml"), []byte("tracker: { adapter: plane, url: "+srv.URL+", workspace: acme-dev, project: API }\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(r.dir, "bflow.yaml"), []byte("tracker: { adapter: plane, url: "+srv.URL+", workspace: acme-dev, project: API }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	st := r.ok("status", "API-120")
 	task := st.Data["task"].(map[string]any)

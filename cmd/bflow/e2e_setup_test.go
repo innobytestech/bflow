@@ -38,7 +38,9 @@ func readFile(t *testing.T, p string) string {
 func TestInitGoRepoWithYes(t *testing.T) {
 	r, _ := gitRepo(t, "")
 	os.Remove(filepath.Join(r.dir, "bflow.yaml"))
-	os.WriteFile(filepath.Join(r.dir, "go.mod"), []byte("module demo\n\ngo 1.21\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(r.dir, "go.mod"), []byte("module demo\n\ngo 1.21\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	env := r.ok("init", "--yes")
 	y := readFile(t, filepath.Join(r.dir, "bflow.yaml"))
 	for _, want := range []string{"stack: go", "go vet ./...", "base_branch: dev", "quick:"} {
@@ -68,8 +70,12 @@ func TestInitAngularInteractiveWithProfile(t *testing.T) {
 	t.Setenv("GITHUB_TOKEN", "")
 	// Copia de los scripts reales de acme-web (sin depender del repo).
 	scripts := []byte(`{"name":"acme-web","scripts":{"start":"ng serve","build":"ng build","test":"ng test","test:e2e":"playwright test","check:architecture":"node scripts/check-architecture.js","check:ui":"node scripts/check-ui-controls.js --scope=select","check:ui:full":"node scripts/check-ui-controls.js --scope=all","check:touch":"node scripts/check-touch.js","check:touch:list":"node scripts/check-touch.js --list","check:all":"npm run check:architecture && npm run check:ui","check:theme":"node scripts/check-theme.js","check:theme:hex":"node scripts/check-theme.js --hex"}}`)
-	os.WriteFile(filepath.Join(r.dir, "package.json"), scripts, 0o644)
-	os.WriteFile(filepath.Join(r.dir, "angular.json"), []byte("{}"), 0o644)
+	if err := os.WriteFile(filepath.Join(r.dir, "package.json"), scripts, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(r.dir, "angular.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	git(t, r.dir, "init", "-b", "dev")
 	git(t, r.dir, "remote", "add", "origin", "https://github.com/acme/acme-web.git")
 
@@ -118,7 +124,9 @@ func TestInitAsksPanelOnce(t *testing.T) {
 	t.Setenv("CI", "")
 	t.Setenv("DISPLAY", ":0") // Linux sin escritorio no pregunta
 	t.Setenv("SSH_CONNECTION", "")
-	os.WriteFile(filepath.Join(r.dir, "Makefile"), []byte("test:\n\tgo test\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(r.dir, "Makefile"), []byte("test:\n\tgo test\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	// tracker local (1), rama base por defecto, usar pasos (s), solo el panel (2).
 	out, code := r.runIn("1\n\ns\n2\n", "init")
 	if code != 0 || !strings.Contains(out, "¿qué abro?") || !strings.Contains(out, "al empezar una tarea: solo el panel") {
@@ -130,7 +138,9 @@ func TestInitAsksPanelOnce(t *testing.T) {
 	}
 	// Otro repo en la misma máquina: ya no pregunta.
 	other := &repo{t: t, dir: testutil.TempDir(t)}
-	os.WriteFile(filepath.Join(other.dir, "Makefile"), []byte("test:\n\tgo test\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(other.dir, "Makefile"), []byte("test:\n\tgo test\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if out, code := other.runIn("1\n\ns\n", "init"); code != 0 || strings.Contains(out, "¿qué abro?") {
 		t.Errorf("segundo init (exit %d):\n%s", code, out)
 	}
@@ -138,7 +148,9 @@ func TestInitAsksPanelOnce(t *testing.T) {
 
 func TestInitDryRunWritesNothing(t *testing.T) {
 	r := newRepo(t)
-	os.WriteFile(filepath.Join(r.dir, "Makefile"), []byte("test:\n\tgo test\nbuild:\n\tgo build\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(r.dir, "Makefile"), []byte("test:\n\tgo test\nbuild:\n\tgo build\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	env := r.ok("init", "--yes", "--dry-run")
 	if !strings.Contains(env.Data["yaml"].(string), "make test") {
 		t.Errorf("plan: %v", env.Data["yaml"])

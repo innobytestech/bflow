@@ -50,11 +50,15 @@ func TestGuardHook(t *testing.T) {
 	// Prueba congelada: la tarea pasa por el contrato con una prueba escrita.
 	id := r.ok("task", "add", "Demo").Data["id"].(string)
 	r.ok("start", id, "--lane", "full")
-	os.WriteFile(filepath.Join(r.dir, "d.md"), []byte("d"), 0o644)
+	if err := os.WriteFile(filepath.Join(r.dir, "d.md"), []byte("d"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	r.ok("approve", id, "--file", "d.md")
 	r.ok("report", id, "--agent", "spec-author", "--verdict", "READY")
 	r.ok("approve", id)
-	os.WriteFile(filepath.Join(r.dir, "internal", "cas_test.go"), []byte("package a\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(r.dir, "internal", "cas_test.go"), []byte("package a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	r.ok("report", id, "--agent", "implementer", "--verdict", "CONTRACT_READY")
 	r.ok("approve", id)
 	edit := preToolUse(r.dir, "Edit", map[string]any{"file_path": filepath.Join(r.dir, "internal", "cas_test.go"), "old_string": "a", "new_string": "b"})
@@ -83,18 +87,24 @@ func TestFrozenTestsWithoutHooks(t *testing.T) {
 	r, _ := gitRepo(t, "vcs: { base_branch: dev }\nguard: { test_patterns: [\"*_test.go\"] }\n")
 	id := r.ok("task", "add", "Demo").Data["id"].(string)
 	r.ok("start", id, "--lane", "full")
-	os.WriteFile(filepath.Join(r.dir, "d.md"), []byte("d"), 0o644)
+	if err := os.WriteFile(filepath.Join(r.dir, "d.md"), []byte("d"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	r.ok("approve", id, "--file", "d.md")
 	r.ok("report", id, "--agent", "spec-author", "--verdict", "READY")
 	git(t, r.dir, "add", ".")
 	git(t, r.dir, "commit", "-m", "spec")
 	r.ok("approve", id)
 	test := filepath.Join(r.dir, "internal", "cas_test.go")
-	os.WriteFile(test, []byte("package a\n"), 0o644)
+	if err := os.WriteFile(test, []byte("package a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	r.ok("report", id, "--agent", "implementer", "--verdict", "CONTRACT_READY")
 	r.ok("approve", id)
 
-	os.WriteFile(test, []byte("package a // debilitada\n"), 0o644)
+	if err := os.WriteFile(test, []byte("package a // debilitada\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	env := r.run("report", id, "--agent", "implementer", "--verdict", "DONE")
 	if env.exit != 2 || env.Code != "frozen_changed" {
 		t.Fatalf("DONE con una prueba congelada cambiada: exit %d code %s", env.exit, env.Code)
@@ -107,7 +117,9 @@ func TestFrozenTestsWithoutHooks(t *testing.T) {
 	if n := r.ok("freeze", id).Data["files"].(float64); n != 1 {
 		t.Errorf("freeze: %v archivos", n)
 	}
-	os.WriteFile(test, []byte("package a // debilitada\r\n"), 0o644) // autocrlf no cuenta como cambio
+	if err := os.WriteFile(test, []byte("package a // debilitada\r\n"), 0o644); err != nil { // autocrlf no cuenta como cambio
+		t.Fatal(err)
+	}
 	// Aceptado el cambio, lo que falta es commitearlo: sin commit no entraría al PR.
 	if env := r.run("report", id, "--agent", "implementer", "--verdict", "DONE"); env.Code != "uncommitted" || !strings.Contains(fmt.Sprint(env.Data), "internal/cas_test.go") {
 		t.Fatalf("DONE sin commit: %s %v", env.Code, env.Data)

@@ -30,9 +30,15 @@ const stateTimes = `{
 
 func writeHarness(t *testing.T, root string) {
 	t.Helper()
-	os.MkdirAll(filepath.Join(root, "harness", "progress"), 0o755)
-	os.WriteFile(filepath.Join(root, "harness", "feature-list.json"), []byte(featureList), 0o644)
-	os.WriteFile(filepath.Join(root, "harness", "progress", ".state-times.json"), []byte(stateTimes), 0o644)
+	if err := os.MkdirAll(filepath.Join(root, "harness", "progress"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "harness", "feature-list.json"), []byte(featureList), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "harness", "progress", ".state-times.json"), []byte(stateTimes), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestImportFeatureListIntoCreatorTracker(t *testing.T) {

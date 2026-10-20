@@ -15,8 +15,12 @@ func files(t *testing.T, m map[string]string) string {
 	dir := testutil.TempDir(t)
 	for f, c := range m {
 		p := filepath.Join(dir, filepath.FromSlash(f))
-		os.MkdirAll(filepath.Dir(p), 0o755)
-		os.WriteFile(p, []byte(c), 0o644)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(c), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	return dir
 }
@@ -110,9 +114,15 @@ func TestParseRemoteAndBase(t *testing.T) {
 
 func TestDetectDBEnvFromExamples(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module x\n"), 0o644)
-	os.WriteFile(filepath.Join(dir, ".env.example"), []byte("PORT=8080\nDB_URI=postgres://localhost/app\nexport REDIS_URL=x\n"), 0o644)
-	os.WriteFile(filepath.Join(dir, ".env"), []byte("SECRET_DATABASE_URL=prod\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".env.example"), []byte("PORT=8080\nDB_URI=postgres://localhost/app\nexport REDIS_URL=x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("SECRET_DATABASE_URL=prod\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	d := Detect(dir, Tools{})
 	if len(d.DBEnv) != 1 || d.DBEnv[0] != "DB_URI" {
 		t.Errorf("DBEnv = %v: solo DB_URI, y nunca de .env", d.DBEnv)

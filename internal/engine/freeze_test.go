@@ -18,8 +18,14 @@ import (
 func TestFrozenHashes(t *testing.T) {
 	v := newEnv(t, "")
 	root := v.e.Cfg.Root
-	os.MkdirAll(filepath.Join(root, "internal"), 0o755)
-	write := func(rel, s string) { os.WriteFile(filepath.Join(root, filepath.FromSlash(rel)), []byte(s), 0o644) }
+	if err := os.MkdirAll(filepath.Join(root, "internal"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write := func(rel, s string) {
+		if err := os.WriteFile(filepath.Join(root, filepath.FromSlash(rel)), []byte(s), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 	write("internal/a_test.go", "package a\n")
 
 	if err := v.e.writeFrozen("T-1", []string{"internal/a_test.go", "internal/borrada_test.go"}); err != nil {
@@ -70,7 +76,9 @@ func TestFrozenHashes(t *testing.T) {
 	}
 
 	// Formato anterior: solo rutas. Se siguen leyendo; sin hash no hay con qué comparar.
-	v.e.Store.WriteFile("T-2", FrozenFile, []byte(`["internal/a_test.go"]`))
+	if err := v.e.Store.WriteFile("T-2", FrozenFile, []byte(`["internal/a_test.go"]`)); err != nil {
+		t.Fatal(err)
+	}
 	if got := v.e.Frozen("T-2"); !slices.Equal(got, []string{"internal/a_test.go"}) {
 		t.Errorf("formato anterior: %v", got)
 	}

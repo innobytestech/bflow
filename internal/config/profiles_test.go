@@ -33,7 +33,9 @@ func TestSaveAndLoadProfiles(t *testing.T) {
 
 func TestSaveUI(t *testing.T) {
 	t.Setenv("BFLOW_CONFIG_HOME", t.TempDir())
-	SaveProfile("acme", map[string]any{"agent": "claude"})
+	if err := SaveProfile("acme", map[string]any{"agent": "claude"}); err != nil {
+		t.Fatal(err)
+	}
 	if d, err := UIDecided(); err != nil || d {
 		t.Fatalf("sin elegir: %v %v", d, err)
 	}
@@ -44,7 +46,9 @@ func TestSaveUI(t *testing.T) {
 	if d, _ := UIDecided(); !d {
 		t.Error("ui.watch en false cuenta como decidido")
 	}
-	SaveUI(map[string]any{"watch": true, "web": true})
+	if err := SaveUI(map[string]any{"watch": true, "web": true}); err != nil {
+		t.Fatal(err)
+	}
 	c, err := Load(t.TempDir())
 	if err != nil || !c.UI.Watch || !c.UI.Web {
 		t.Errorf("ui: %+v %v", c.UI, err)
@@ -57,7 +61,9 @@ func TestSaveUI(t *testing.T) {
 func TestSetRepoProfileKeepsComments(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, RepoFile)
-	os.WriteFile(p, []byte("# comentario importante\nstack: go # el stack\ncheck:\n  steps:\n    - { name: vet, run: \"go vet ./...\" }\n"), 0o644)
+	if err := os.WriteFile(p, []byte("# comentario importante\nstack: go # el stack\ncheck:\n  steps:\n    - { name: vet, run: \"go vet ./...\" }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if err := SetRepoProfile(dir, "acme"); err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +72,9 @@ func TestSetRepoProfileKeepsComments(t *testing.T) {
 	if !strings.Contains(s, "profile: acme") || !strings.Contains(s, "# comentario importante") || !strings.Contains(s, "# el stack") {
 		t.Errorf("resultado:\n%s", s)
 	}
-	SetRepoProfile(dir, "otro")
+	if err := SetRepoProfile(dir, "otro"); err != nil {
+		t.Fatal(err)
+	}
 	b, _ = os.ReadFile(p)
 	if strings.Count(string(b), "profile:") != 1 || !strings.Contains(string(b), "profile: otro") {
 		t.Errorf("reemplazo:\n%s", b)

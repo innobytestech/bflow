@@ -32,23 +32,26 @@ func (f *fakeGitHub) handler() http.Handler {
 		}
 		if f.status != 0 {
 			w.WriteHeader(f.status)
-			io.WriteString(w, `{"message":"Bad credentials","documentation_url":"https://docs.github.com/rest"}`)
+			_, _ = io.WriteString(w, `{"message":"Bad credentials","documentation_url":"https://docs.github.com/rest"}`)
 			return
 		}
 		const base = "/repos/acme/acme-api/pulls"
 		switch {
 		case r.Method == "GET" && r.URL.Path == "/repos/acme/acme-api":
-			io.WriteString(w, `{"full_name":"acme/acme-api"}`)
+			_, _ = io.WriteString(w, `{"full_name":"acme/acme-api"}`)
 		case r.Method == "POST" && r.URL.Path == base:
 			var in map[string]any
-			json.NewDecoder(r.Body).Decode(&in)
+			if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 			n := len(f.prs) + 101
 			pr := map[string]any{"number": n, "html_url": "https://github.com/acme/acme-api/pull/" + itoa(n),
 				"state": "open", "merged": false, "title": in["title"], "body": in["body"],
 				"head": map[string]any{"ref": in["head"]}, "base": map[string]any{"ref": in["base"]}}
 			f.prs = append(f.prs, pr)
 			w.WriteHeader(201)
-			json.NewEncoder(w).Encode(pr)
+			_ = json.NewEncoder(w).Encode(pr)
 		case r.Method == "GET" && r.URL.Path == base:
 			head := r.URL.Query().Get("head") // owner:branch
 			var out []map[string]any
@@ -57,22 +60,25 @@ func (f *fakeGitHub) handler() http.Handler {
 					out = append(out, pr)
 				}
 			}
-			json.NewEncoder(w).Encode(out)
+			_ = json.NewEncoder(w).Encode(out)
 		case strings.HasPrefix(r.URL.Path, base+"/"):
 			n := strings.TrimPrefix(r.URL.Path, base+"/")
 			for _, pr := range f.prs {
 				if itoa(pr["number"].(int)) == n {
 					if r.Method == "PATCH" {
 						var in map[string]any
-						json.NewDecoder(r.Body).Decode(&in)
+						if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+							http.Error(w, err.Error(), http.StatusBadRequest)
+							return
+						}
 						pr["body"] = in["body"]
 					}
-					json.NewEncoder(w).Encode(pr)
+					_ = json.NewEncoder(w).Encode(pr)
 					return
 				}
 			}
 			w.WriteHeader(404)
-			io.WriteString(w, `{"message":"Not Found"}`)
+			_, _ = io.WriteString(w, `{"message":"Not Found"}`)
 		default:
 			f.t.Errorf("endpoint inesperado %s %s", r.Method, r.URL)
 			w.WriteHeader(404)
@@ -128,7 +134,9 @@ func TestOpenFindUpdateStatus(t *testing.T) {
 func TestClosedWithoutMerge(t *testing.T) {
 	c, f := setup(t)
 	ctx := context.Background()
-	c.OpenPR(ctx, vcs.PRSpec{Base: "dev", Head: "feature/X-1", Title: "t"})
+	if _, err := c.OpenPR(ctx, vcs.PRSpec{Base: "dev", Head: "feature/X-1", Title: "t"}); err != nil {
+		t.Fatal(err)
+	}
 	f.prs[0]["state"] = "closed"
 	st, _ := c.PRStatus(ctx, 101)
 	if st.Merged || st.State != "closed" {

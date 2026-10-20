@@ -36,7 +36,9 @@ func TestSubagentStopKeepsAgentWorking(t *testing.T) {
 	spec, _ := filepath.Glob(filepath.Join(r.dir, "specs", id+"-*", "spec.md"))
 	b, _ := os.ReadFile(spec[0])
 	doc := strings.Replace(string(b), "## Tasks\n", "## Tasks\n\n- [x] T1 modelo\n- [ ] T2 validar RFC\n- [ ] T3 endpoint\n", 1)
-	os.WriteFile(spec[0], []byte(doc), 0o644)
+	if err := os.WriteFile(spec[0], []byte(doc), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	// Agentes ajenos a bflow, o de otra fase, terminan sin más.
 	if h, _ := subagentStop(r, "Explore"); h != nil {
@@ -76,16 +78,22 @@ func TestSubagentStopKeepsAgentWorking(t *testing.T) {
 
 func TestRenderAgentsMDAndConflicts(t *testing.T) {
 	r := newRepo(t)
-	os.WriteFile(filepath.Join(r.dir, "bflow.yaml"), []byte("stack: go\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(r.dir, "bflow.yaml"), []byte("stack: go\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	agentsMD := filepath.Join(r.dir, "AGENTS.md")
-	os.WriteFile(agentsMD, []byte("# Reglas\n\nUsa tabs.\n"), 0o644)
+	if err := os.WriteFile(agentsMD, []byte("# Reglas\n\nUsa tabs.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	r.ok("render")
 	b, _ := os.ReadFile(agentsMD)
 	if !strings.HasPrefix(string(b), "# Reglas\n\nUsa tabs.\n\n<!-- bflow:inicio") || !strings.Contains(string(b), "bflow status --json") {
 		t.Errorf("AGENTS.md:\n%s", b)
 	}
 	r.ok("render", "--check")
-	os.WriteFile(agentsMD, []byte(strings.Replace(string(b), "Usa tabs.", "Usa espacios.", 1)), 0o644)
+	if err := os.WriteFile(agentsMD, []byte(strings.Replace(string(b), "Usa tabs.", "Usa espacios.", 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	r.ok("render", "--check") // editar fuera del bloque no desactualiza nada
 
 	// Sin AGENTS.md, render no lo crea.
@@ -96,7 +104,9 @@ func TestRenderAgentsMDAndConflicts(t *testing.T) {
 	}
 
 	// Un archivo del usuario con el nombre de un agente de bflow no se pisa.
-	os.WriteFile(filepath.Join(r2.dir, ".claude", "agents", "bflow-reviewer.md"), []byte("---\nname: bflow-reviewer\n---\nmío\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(r2.dir, ".claude", "agents", "bflow-reviewer.md"), []byte("---\nname: bflow-reviewer\n---\nmío\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if env := r2.run("render"); env.exit != 1 || env.Code != "render_conflict" {
 		t.Errorf("conflicto: exit %d code %s", env.exit, env.Code)
 	}
@@ -110,17 +120,27 @@ func TestDoctorAgentsAndSkills(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("HOME", home)
-	os.WriteFile(filepath.Join(r.dir, "bflow.yaml"), []byte("stack: go\nagent: claude\ndoctor: { ignore_skills: [sdd-walkthrough] }\n"), 0o644)
-	os.MkdirAll(filepath.Join(r.dir, ".claude"), 0o755)
+	if err := os.WriteFile(filepath.Join(r.dir, "bflow.yaml"), []byte("stack: go\nagent: claude\ndoctor: { ignore_skills: [sdd-walkthrough] }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(r.dir, ".claude"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	// settings.json de antes de 3b: sin el hook de fin de subagente.
-	os.WriteFile(filepath.Join(r.dir, ".claude", "settings.json"), []byte(`{"hooks":{"PreToolUse":[{"hooks":[{"command":"bflow guard"}]}],"SessionStart":[{"hooks":[{"command":"bflow hook session-start"}]}]}}`), 0o644)
+	if err := os.WriteFile(filepath.Join(r.dir, ".claude", "settings.json"), []byte(`{"hooks":{"PreToolUse":[{"hooks":[{"command":"bflow guard"}]}],"SessionStart":[{"hooks":[{"command":"bflow hook session-start"}]}]}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	for name, desc := range map[string]string{
 		"sdd":             "Orquesta el flujo SDD: avanzar una feature, qué sigue, aprobar la spec.",
 		"sdd-walkthrough": "Walkthrough narrado previo al PR para una feature.",
 		"go-handlers":     "Convenciones de handlers HTTP en Go.",
 	} {
-		os.MkdirAll(filepath.Join(r.dir, ".claude", "skills", name), 0o755)
-		os.WriteFile(filepath.Join(r.dir, ".claude", "skills", name, "SKILL.md"), []byte("---\nname: "+name+"\ndescription: "+desc+"\n---\n"), 0o644)
+		if err := os.MkdirAll(filepath.Join(r.dir, ".claude", "skills", name), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(r.dir, ".claude", "skills", name, "SKILL.md"), []byte("---\nname: "+name+"\ndescription: "+desc+"\n---\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	text, _, _ := r.hook("", "doctor")
 	for _, want := range []string{"desactualizados", "sdd (", "doctor.ignore_skills", "bflow hook subagent-stop"} {

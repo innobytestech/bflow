@@ -137,7 +137,7 @@ func TestReproMissing(t *testing.T) {
 			setup: func(g *fakeGit, c *fakeChecks, v *env, id string) {
 				g.commits = []string{shaTest, shaHead}
 				g.files[shaTest] = []string{"internal/a_test.go"}
-				g.kept2 = map[string][]string{shaTest: nil}
+				g.keptByCommit = map[string][]string{shaTest: nil}
 				c.runs[shaTest] = fail
 			},
 			reason: []string{"no hay commit de solo pruebas"}},
