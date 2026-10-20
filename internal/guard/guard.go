@@ -364,7 +364,7 @@ var (
 
 // HumanOnly son los subcomandos que responden una decisión humana: un
 // subagente no los corre (los corre la sesión principal después de preguntar).
-var HumanOnly = []string{"approve", "reject", "unblock", "start", "new", "drop"}
+var HumanOnly = []string{"approve", "reject", "unblock", "start", "new", "drop", "pause"}
 
 // BflowSubcommand devuelve el subcomando de bflow de un segmento ya recortado
 // ("approve" en `./bin/bflow.exe --json approve X`), o "" si el segmento no

@@ -73,7 +73,6 @@ func TestStatsTokensAndStatusline(t *testing.T) {
 	f.Close()
 	r.hook(stop, "hook", "tokens")
 
-	r.ok("approve", id)
 	r.ok("report", id, "--agent", "reviewer", "--verdict", "REJECTED")
 
 	st := r.ok("stats", id).Data["stats"].(map[string]any)

@@ -190,7 +190,7 @@ func gateNext(cfg Config, s State) output.Next {
 		n.Options = append(n.Options, output.Option{ID: "other", Label: "Otra decisión", NeedsNote: true,
 			Command: cmd("approve", id, "--gate", "decision", `--note "<decisión>"`)})
 		for _, p := range decisionTargets(cfg, s.Lane, s.Phase) {
-			label := "Rehacer el contrato (al aprobarlo se vuelven a congelar las pruebas)"
+			label := "Rehacer el contrato (al aceptarlo se vuelven a congelar las pruebas)"
 			if p == Spec {
 				label = "Volver a spec"
 			}
@@ -332,7 +332,7 @@ func Upcoming(cfg Config, s State) Step {
 		case GateContract:
 			return enter(cfg.after(s.Lane, Contract))
 		case GatePause:
-			return enter(cfg.after(s.Lane, Paused))
+			return enter(cfg.afterPause(s.Lane))
 		case GateQuestions:
 			return Step{Phase: Walkthrough, Gate: GateWalkthrough}
 		case GateWalkthrough:
@@ -350,10 +350,15 @@ func Upcoming(cfg Config, s State) Step {
 	case Spec:
 		return Step{Phase: Spec, Gate: GateSpec}
 	case Contract:
-		return Step{Phase: Contract, Gate: GateContract}
+		return enter(cfg.after(s.Lane, Contract))
 	case InReview:
 		return Step{Phase: Done}
-	case Implementing, Quality, Documenting:
+	case Implementing:
+		if s.PauseRequested {
+			return enter(Paused)
+		}
+		return enter(cfg.after(s.Lane, Implementing))
+	case Quality, Documenting:
 		return enter(cfg.after(s.Lane, s.Phase))
 	}
 	return Step{}

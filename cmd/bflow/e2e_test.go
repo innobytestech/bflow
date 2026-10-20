@@ -263,6 +263,9 @@ func TestFullFeatureWithLocalTracker(t *testing.T) {
 		t.Errorf("decisión al agente: %v", env.Next.Agents[0].Args)
 	}
 
+	// Sin pedirla, el DONE no abre gate; con `bflow pause` para en la gate pause.
+	r.ok("pause", id)
+	r.ok("pause", id) // repetirlo no es error
 	env = r.ok("report", id, "--agent", "implementer", "--verdict", "DONE")
 	expectNext(t, env, "ask", "pause")
 	env = r.ok(option(t, env, "approve", nil)...)
@@ -276,7 +279,10 @@ func TestFullFeatureWithLocalTracker(t *testing.T) {
 		t.Errorf("ronda: %v", env.Data["round"])
 	}
 	env = r.ok("report", id, "--agent", "implementer", "--verdict", "DONE")
-	env = r.ok(option(t, env, "approve", nil)...)
+	spawned(t, env, "reviewer", "security-auditor")
+	if late := r.run("pause", id); late.OK {
+		t.Error("pause en quality debe rechazarse")
+	}
 	r.ok("report", id, "--agent", "security-auditor", "--verdict", "APPROVED")
 	env = r.ok("report", id, "--agent", "reviewer", "--verdict", "APPROVED")
 	spawned(t, env, "documenter")

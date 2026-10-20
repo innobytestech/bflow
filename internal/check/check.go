@@ -440,19 +440,7 @@ func Verify(ctx context.Context, g GitReader, codePaths []string, res *Result) (
 	case res.Result != "PASS":
 		return false, "el último check no pasó"
 	}
-	if dirty, err := g.Dirty(ctx, codePaths); err != nil {
-		return false, err.Error()
-	} else if len(dirty) > 0 {
-		return false, "hay código sin commitear posterior al check: " + strings.Join(dirty, ", ")
-	}
-	changed, err := g.ChangedSince(ctx, res.SHA, codePaths)
-	if err != nil {
-		return false, err.Error()
-	}
-	if len(changed) > 0 {
-		return false, "hay cambios de código posteriores al check: " + strings.Join(changed, ", ")
-	}
-	return true, "check " + res.SHA[:min(8, len(res.SHA))] + " vigente"
+	return Fresh(ctx, g, codePaths, res)
 }
 
 // Markdown es el reporte legible (bflow show check).
@@ -565,4 +553,28 @@ func splitArgs(s string) []string {
 		out = append(out, cur.String())
 	}
 	return out
+}
+
+// Fresh dice si el check guardado sigue vigente sobre el código actual, sin
+// mirar si pasó o falló.
+func Fresh(ctx context.Context, g GitReader, codePaths []string, res *Result) (bool, string) {
+	switch {
+	case res == nil:
+		return false, "no hay check registrado (bflow check)"
+	case res.SHA == "DIRTY":
+		return false, "el check corrió con código sin commitear: commitea y vuelve a correr bflow check"
+	}
+	if dirty, err := g.Dirty(ctx, codePaths); err != nil {
+		return false, err.Error()
+	} else if len(dirty) > 0 {
+		return false, "hay código sin commitear posterior al check: " + strings.Join(dirty, ", ")
+	}
+	changed, err := g.ChangedSince(ctx, res.SHA, codePaths)
+	if err != nil {
+		return false, err.Error()
+	}
+	if len(changed) > 0 {
+		return false, "hay cambios de código posteriores al check: " + strings.Join(changed, ", ")
+	}
+	return true, "check " + res.SHA[:min(8, len(res.SHA))] + " vigente"
 }

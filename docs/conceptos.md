@@ -50,8 +50,9 @@ stateDiagram-v2
   backlog --> implementing: start (hotfix)
   discovery --> spec: gate, cerrar discovery
   spec --> contract: gate, aprobar spec (crea la rama)
-  contract --> implementing: gate, aprobar contrato T1
-  implementing --> paused: DONE con check verde
+  contract --> implementing: CONTRACT_READY validado por el check (si no se puede validar, gate)
+  implementing --> quality: DONE con check verde
+  implementing --> paused: DONE con check verde y bflow pause
   paused --> quality: gate, permiso de revisión
   quality --> documenting: revisores APPROVED
   quality --> implementing: algún REJECTED (ronda +1)
@@ -61,11 +62,11 @@ stateDiagram-v2
   in_review --> done: PR mergeado
 ```
 
-Las transiciones marcadas "gate" son humanas. Cualquier fase puede pasar a `blocked` y volver a donde estaba. Si la revisión de calidad rechaza dos rondas seguidas, `bflow` pregunta si dividir la feature, volver a spec o hacer otra ronda. Nadie marca `done` a mano: se cierra al detectar el merge. Una tarea también puede pasar a `dropped` (retirada sin terminar) desde cualquier fase de trabajo con `bflow drop`, o automáticamente cuando se aprueba un split que crea tareas hijas.
+`paused` no está en ningún carril por defecto: una persona la pide con `bflow pause <ID>` (antes de quality) o un carril de `bflow.yaml` la declara. Las transiciones marcadas "gate" son humanas. Cualquier fase puede pasar a `blocked` y volver a donde estaba. Si la revisión de calidad rechaza dos rondas seguidas, `bflow` pregunta si dividir la feature, volver a spec o hacer otra ronda. Nadie marca `done` a mano: se cierra al detectar el merge. Una tarea también puede pasar a `dropped` (retirada sin terminar) desde cualquier fase de trabajo con `bflow drop`, o automáticamente cuando se aprueba un split que crea tareas hijas.
 
 | Carril | Fases |
 |---|---|
-| `full` | discovery, spec, contract, implementing, paused, quality, documenting, walkthrough, in_review, done |
+| `full` | discovery, spec, contract, implementing, quality, documenting, walkthrough, in_review, done |
 | `light` | spec, implementing, quality, documenting, walkthrough, in_review, done |
 | `hotfix` | implementing, quality, documenting, walkthrough, in_review, done |
 
@@ -73,7 +74,7 @@ Las transiciones marcadas "gate" son humanas. Cualquier fase puede pasar a `bloc
 
 ## Gates
 
-Una gate es un punto donde el flujo se detiene hasta que una persona decide: carril, discovery, spec, contrato T1, decisiones que un agente no puede tomar, pausa antes de la revisión, rondas, preguntas de producto y walkthrough. Qué ves y qué decides en cada una está en la [guía](guia.md#las-gates-qué-ves-y-qué-decides).
+Una gate es un punto donde el flujo se detiene hasta que una persona decide: carril, discovery, spec, decisiones que un agente no puede tomar, rondas, preguntas de producto y walkthrough; el contrato T1 y la pausa antes de la revisión solo abren gate cuando bflow no puede validar el contrato o cuando se pidió `bflow pause`. Qué ves y qué decides en cada una está en la [guía](guia.md#las-gates-qué-ves-y-qué-decides).
 
 ## El contrato con el agente: `next`
 

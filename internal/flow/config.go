@@ -102,10 +102,20 @@ func (c Config) AgentNames() []string {
 // SubagentPrefix distingue los agentes que genera bflow de los del usuario.
 const SubagentPrefix = "bflow-"
 
-// DefaultLanes son los carriles por defecto. `paused` solo en full.
+// afterPause es la fase que sigue a la pausa: la que sigue a paused si el
+// carril la tiene, o la que sigue a implementing.
+func (c Config) afterPause(l Lane) Phase {
+	if c.has(l, Paused) {
+		return c.after(l, Paused)
+	}
+	return c.after(l, Implementing)
+}
+
+// DefaultLanes son los carriles por defecto. `paused` es opcional: un carril
+// la puede declarar, o una persona la pide con `bflow pause`.
 func DefaultLanes() map[Lane][]Phase {
 	return map[Lane][]Phase{
-		Full:   {Discovery, Spec, Contract, Implementing, Paused, Quality, Documenting, Walkthrough, InReview, Done},
+		Full:   {Discovery, Spec, Contract, Implementing, Quality, Documenting, Walkthrough, InReview, Done},
 		Light:  {Spec, Implementing, Quality, Documenting, Walkthrough, InReview, Done},
 		Hotfix: {Implementing, Quality, Documenting, Walkthrough, InReview, Done},
 	}

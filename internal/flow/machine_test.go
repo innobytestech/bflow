@@ -143,7 +143,7 @@ func table() []row {
 		{lane: Full, from: Contract, gate: GateContract, ev: approve(), want: Implementing, fx: []EffectKind{ts, ss}},
 		{lane: Full, from: Contract, gate: GateContract, ev: rej("ajusta firmas"), want: Contract, fx: []EffectKind{cm}},
 		{lane: Full, from: Contract, gate: GateContract, ev: rejTo(Spec), want: Spec, fx: []EffectKind{ts, cm}},
-		{lane: Full, from: Implementing, ev: rep(imp, DoneV), want: Paused, wantGate: GatePause, fx: []EffectKind{ts}},
+		{lane: Full, from: Implementing, ev: rep(imp, DoneV), want: Quality, fx: []EffectKind{ts}},
 		{lane: Full, from: Paused, gate: GatePause, ev: approve(), want: Quality, fx: []EffectKind{ts}},
 		{lane: Full, from: Paused, gate: GatePause, ev: rej("probé y falla X"), want: Implementing, fx: []EffectKind{ts, cm}},
 		{lane: Full, from: Implementing, gate: GateRounds, round: 2, ev: rej("volver"), want: Spec, wantRound: 0, fx: []EffectKind{ts, cm}},
