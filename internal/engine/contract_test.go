@@ -29,7 +29,7 @@ const (
 
 const contractYAML = "stack: go\ncheck:\n  steps:\n    - { name: vet, run: \"go vet ./...\" }\n    - { name: test, run: \"go test ./...\" }\n    - { name: lint, run: \"lint\" }\n"
 
-// contractEnv deja una tarea full en contract con una prueba T1 en la rama.
+// contractEnv deja una tarea full en contract con una prueba del contrato en la rama.
 func contractEnv(t *testing.T, yaml string, fc *fakeContract) (*env, string) {
 	t.Helper()
 	v := newEnv(t, yaml)
@@ -108,7 +108,7 @@ func TestContractGreen(t *testing.T) {
 	}
 }
 
-// El test_step falló, pero por algo que no es una T1 (otro paquete roto).
+// El test_step falló, pero por algo que no es una prueba del contrato (otro paquete roto).
 func TestContractGreenNoT1Names(t *testing.T) {
 	res := &check.Result{SHA: "abc", Result: "FAIL", Steps: steps("pass", "fail", "skip", "--- FAIL: TestOtraCosa", "FAIL otro/paquete")}
 	v, id := contractEnv(t, contractYAML, &fakeContract{res: res, fresh: true})
@@ -144,7 +144,7 @@ func TestContractTestNames(t *testing.T) {
 }
 
 func TestContractReadyFreezesAndAdvances(t *testing.T) {
-	// vet pasa, test falla nombrando una T1; lint (posterior) se ignora aunque falle.
+	// vet pasa, test falla nombrando una prueba del contrato; lint (posterior) se ignora aunque falle.
 	res := &check.Result{SHA: "abc", Result: "FAIL", Steps: steps("pass", "fail", "fail", "--- FAIL: TestSuma (0.00s)")}
 	v, id := contractEnv(t, contractYAML, &fakeContract{res: res, fresh: true})
 	o, err := contractReady(v, id)
