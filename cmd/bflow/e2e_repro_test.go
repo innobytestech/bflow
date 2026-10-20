@@ -19,8 +19,8 @@ func reproRepo(t *testing.T, baseBranch bool) (*repo, string) {
 		yaml += "vcs: { base_branch: dev }\n"
 	}
 	r, _ := gitRepo(t, yaml)
-	os.WriteFile(filepath.Join(r.dir, "go.mod"), []byte("module demo\n\ngo 1.21\n"), 0o644)
-	os.WriteFile(filepath.Join(r.dir, "internal", "a.go"), []byte("package a\n\nfunc A() int { return 0 }\n"), 0o644)
+	writeFixture(t, filepath.Join(r.dir, "go.mod"), "module demo\n\ngo 1.21\n")
+	writeFixture(t, filepath.Join(r.dir, "internal", "a.go"), "package a\n\nfunc A() int { return 0 }\n")
 	git(t, r.dir, "add", ".")
 	git(t, r.dir, "commit", "-m", "base")
 	if baseBranch {
@@ -31,9 +31,16 @@ func reproRepo(t *testing.T, baseBranch bool) (*repo, string) {
 	return r, id
 }
 
+func writeFixture(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func commitFile(t *testing.T, r *repo, rel, content, msg string) {
 	t.Helper()
-	os.WriteFile(filepath.Join(r.dir, filepath.FromSlash(rel)), []byte(content), 0o644)
+	writeFixture(t, filepath.Join(r.dir, filepath.FromSlash(rel)), content)
 	git(t, r.dir, "add", rel)
 	git(t, r.dir, "commit", "-m", msg)
 }
@@ -120,5 +127,35 @@ func TestHotfixNoReproApprovedRecordsDecision(t *testing.T) {
 	st := r.ok("stats", id).Data["stats"].(map[string]any)
 	if st["no_repro"] != "el defecto vive en la config" {
 		t.Errorf("stats --json: %v", st["no_repro"])
+	}
+}
+
+func TestHotfixReproCommitBeforeStartAccepted(t *testing.T) {
+	r, _ := gitRepo(t, reproYAML)
+	writeFixture(t, filepath.Join(r.dir, "go.mod"), "module demo\n\ngo 1.21\n")
+	writeFixture(t, filepath.Join(r.dir, "internal", "a.go"), "package a\n\nfunc A() int { return 0 }\n")
+	git(t, r.dir, "add", ".")
+	git(t, r.dir, "commit", "-m", "base")
+	main := git(t, r.dir, "rev-parse", "--abbrev-ref", "HEAD")
+	id := r.ok("task", "add", "Demo").Data["id"].(string)
+
+	branch := "hotfix/" + id + "-demo"
+	git(t, r.dir, "checkout", "-b", branch)
+	commitFile(t, r, "internal/a_test.go", reproTest, "test: reproduce el defecto")
+	testSHA := git(t, r.dir, "rev-parse", "HEAD")
+	git(t, r.dir, "checkout", main)
+
+	if got := r.ok("start", id, "--lane", "hotfix").Data["branch"]; got != branch {
+		t.Fatalf("la rama existente se retoma: %v, want %s", got, branch)
+	}
+	git(t, r.dir, "checkout", "--detach", testSHA)
+	if env := r.run("check"); env.exit != 1 {
+		t.Fatalf("la prueba debe fallar: %d %v", env.exit, env.Data)
+	}
+	git(t, r.dir, "checkout", branch)
+	commitFile(t, r, "internal/a.go", fixedA, "fix: corrige A")
+	r.ok("check")
+	if env := r.ok("report", "--agent", "implementer", "--verdict", "DONE"); env.Data["phase"] != "quality" {
+		t.Fatalf("la prueba hecha antes del start cuenta: %v", env.Data)
 	}
 }

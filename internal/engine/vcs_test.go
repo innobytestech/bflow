@@ -38,12 +38,20 @@ type fakeGit struct {
 	commitsErr  error
 	commitsBase string // la base con que se pidió el rango
 	files       map[string][]string
+	kept2       map[string][]string // CommitKept; sin entrada, igual que files
+	// MergeBase: lo que devuelve y si falla.
+	mergeBase    string
+	mergeBaseErr error
+	how          string // EnsureBranch; vacío: "created"
 }
 
 func (g *fakeGit) CurrentBranch(context.Context) (string, error) { return g.branch, nil }
 func (g *fakeGit) EnsureBranch(_ context.Context, name, base string) (string, error) {
 	g.calls = append(g.calls, "branch "+name+" from "+base)
 	g.branch = name
+	if g.how != "" {
+		return g.how, nil
+	}
 	return "created", nil
 }
 func (g *fakeGit) Dirty(_ context.Context, p []string) ([]string, error) {
@@ -88,6 +96,15 @@ func (g *fakeGit) Commits(_ context.Context, base string) ([]string, error) {
 }
 func (g *fakeGit) CommitFiles(_ context.Context, sha string) ([]string, error) {
 	return g.files[sha], nil
+}
+func (g *fakeGit) CommitKept(_ context.Context, sha string) ([]string, error) {
+	if k, ok := g.kept2[sha]; ok {
+		return k, nil
+	}
+	return g.files[sha], nil
+}
+func (g *fakeGit) MergeBase(context.Context, string) (string, error) {
+	return g.mergeBase, g.mergeBaseErr
 }
 func (g *fakeGit) Commit(_ context.Context, paths []string, msg string) (bool, error) {
 	g.calls = append(g.calls, "commit "+msg+" "+strings.Join(paths, ","))
