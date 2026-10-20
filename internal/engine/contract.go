@@ -19,7 +19,7 @@ const contractFailLines = 10
 var goTestFunc = regexp.MustCompile(`(?m)^func (Test\w+)\(`)
 
 // contractCheck valida el contrato antes de aceptar CONTRACT_READY. verified
-// es true si el último check confirma que las T1 fallan contra los stubs; false
+// es true si el último check confirma que las pruebas del contrato fallan contra los stubs; false
 // sin rechazo significa que no se pudo validar y decide la gate contract.
 func (e *Engine) contractCheck(ctx context.Context, id string) (verified bool, rej *flow.Rejection) {
 	files := e.taskTests(ctx)
@@ -93,7 +93,7 @@ func firstN(s []string, n int) []string {
 }
 
 // contractTestNames son los nombres con los que una línea de fallo nombra una
-// prueba T1: el nombre base de cada archivo y cada función Test* de Go.
+// prueba del contrato: el nombre base de cada archivo y cada función Test* de Go.
 func contractTestNames(root string, files []string) []string {
 	var out []string
 	add := func(n string) {
