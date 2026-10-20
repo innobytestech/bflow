@@ -94,7 +94,7 @@ func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug s
 		out.Warnings = append(out.Warnings, w...)
 	}
 	var entries []store.Entry
-	refreeze, freezeContract := false, false
+	refreeze := false
 	rec, err := e.Store.Update(id, func(rec *store.Record, exists bool) error {
 		if !exists {
 			if ev.Kind != flow.EvStart {
@@ -120,7 +120,15 @@ func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug s
 				return rej
 			}
 			ev.ContractOK = verified
-			freezeContract = verified
+			if verified {
+				// Sin pruebas congeladas no se avanza: se abre la gate contract.
+				if n, err := e.freezeTests(ctx, id); err != nil {
+					ev.ContractOK = false
+					out.Warnings = append(out.Warnings, "no se pudieron congelar las pruebas, el contrato queda en la gate contract: "+err.Error())
+				} else if n > 0 {
+					out.Warnings = append(out.Warnings, fmt.Sprintf("%d prueba(s) congelada(s): no se editan hasta el PR", n))
+				}
+			}
 		}
 		if ev.Kind == flow.EvReport && ev.Verdict == flow.Split && rec.Flow.Phase == flow.Spec {
 			brief, err := e.specSection(*rec, "brief")
@@ -249,13 +257,6 @@ func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug s
 	}
 	if refreeze { // solo con el DONE aceptado: uno rechazado no gasta el freeze --allow
 		e.refreezeAllowed(id)
-	}
-	if freezeContract { // el contrato validado se congela como al aprobar la gate
-		if n, err := e.freezeTests(ctx, id); err != nil {
-			out.Warnings = append(out.Warnings, "no se pudieron congelar las pruebas: "+err.Error())
-		} else if n > 0 {
-			out.Warnings = append(out.Warnings, fmt.Sprintf("%d prueba(s) congelada(s): no se editan hasta el PR", n))
-		}
 	}
 	if err := e.Store.Append(entries...); err != nil {
 		out.Warnings = append(out.Warnings, "no se pudo escribir log.jsonl: "+err.Error())

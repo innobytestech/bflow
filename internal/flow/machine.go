@@ -84,6 +84,9 @@ func (t *tx) apply(ev Event) error {
 		}
 		return nil
 	}
+	if s.Phase == Blocked && ev.Kind == EvPause {
+		return t.pause()
+	}
 	if s.Phase == Blocked && ev.Kind != EvUnblock {
 		return reject("blocked", "la tarea %s está bloqueada (%s); desbloquéala primero", s.ID, s.Block.Reason)
 	}
@@ -151,7 +154,11 @@ func (t *tx) enter(p Phase) {
 // pause marca la tarea para parar al terminar implementing.
 func (t *tx) pause() error {
 	s := &t.s
-	switch s.Phase {
+	phase := s.Phase
+	if phase == Blocked && s.Block != nil {
+		phase = s.Block.From // bloqueada: cuenta la fase donde se bloqueó
+	}
+	switch phase {
 	case Backlog:
 		return reject("not_started", "la tarea %s no ha empezado", s.ID)
 	case Discovery, Spec, Contract, Implementing:
