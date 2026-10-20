@@ -335,6 +335,8 @@ func (r *Runner) finish(ctx context.Context, st *runState, warnings []string) (S
 }
 
 // Report califica el caso en curso con el review-map y los .md de su out.
+// Rechaza con worktree_missing si el worktree del caso ya no está en disco, sin
+// guardar resultado: el caso sigue en curso.
 func (r *Runner) Report(ctx context.Context, caseName, verdict, note string) (CaseResult, error) {
 	run, open := r.openRun()
 	if !open {
