@@ -2,11 +2,30 @@ package eval
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"runtime"
 	"slices"
 	"sort"
+	"strings"
 	"testing"
 )
+
+// worktreeWith crea un worktree temporal con los archivos dados (vacíos).
+func worktreeWith(t *testing.T, files ...string) string {
+	t.Helper()
+	dir := t.TempDir()
+	for _, f := range files {
+		p := filepath.Join(dir, filepath.FromSlash(f))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir
+}
 
 func keys(fs []Finding) []string {
 	var out []string
@@ -80,7 +99,9 @@ func TestFindingsSkipsExcluded(t *testing.T) {
 		"- internal/skip6.go:6\n" +
 		"# Otro\n" +
 		"- internal/e.go:50\n"
-	got := keys(Findings("internal/n.go:5-9 en la nota", map[string]string{"review-map.md": doc}, "/wt"))
+	wt := worktreeWith(t, "internal/a.go", "internal/b.go", "internal/c.go", "internal/d.go", "internal/e.go", "internal/n.go",
+		"internal/skip1.go", "internal/skip2.go", "internal/skip3.go", "internal/skip4.go", "internal/skip5.go", "internal/skip6.go", "a.go", "b.go")
+	got := keys(Findings("internal/n.go:5-9 en la nota", map[string]string{"review-map.md": doc}, wt))
 	want := []string{
 		"internal/a.go:10-10", "internal/b.go:20-25", "internal/c.go:30-30",
 		"internal/d.go:40-40", "internal/e.go:50-50", "internal/n.go:5-9",
@@ -90,38 +111,35 @@ func TestFindingsSkipsExcluded(t *testing.T) {
 	}
 
 	// Sin número no es una referencia.
-	if fs := Findings("localhost:8080 paso:2 y a.go: y a.go:x", nil, "/wt"); len(fs) != 0 {
+	if fs := Findings("localhost:8080 paso:2 y a.go: y a.go:x", nil, wt); len(fs) != 0 {
 		t.Errorf("no son referencias: %v", fs)
 	}
 	// Cada .md de out cuenta, y la nota también.
-	two := Findings("", map[string]string{"review-map.md": "a.go:1\n", "security.md": "b.go:2\n"}, "/wt")
+	two := Findings("", map[string]string{"review-map.md": "a.go:1\n", "security.md": "b.go:2\n"}, wt)
 	if len(two) != 2 {
 		t.Errorf("todos los .md cuentan: %v", two)
 	}
 }
 
 func TestFindingsTrimsWorktreePrefix(t *testing.T) {
-	note := "/tmp/w/wt/internal/a.go:10 y ./internal/b.go:2-3 y internal/c.go:4 y /etc/hosts.conf:9 y /tmp/w/wt2/internal/d.go:1\n" +
-		"`C:\\Users\\x\\wt\\internal\\e.go:7-8` y C:\\otro\\f.go:1 y (../fuera.go:1)"
-	got := keys(Findings(note, nil, "/tmp/w/wt"))
-	want := []string{"internal/a.go:10-10", "internal/b.go:2-3", "internal/c.go:4-4"}
+	wt := worktreeWith(t, "internal/a.go", "internal/b.go", "internal/c.go", "internal/d.go", "internal/e.go", "internal/g.go")
+	slash := filepath.ToSlash(wt)
+	back := strings.ReplaceAll(slash, "/", `\`)
+	note := slash + "/internal/a.go:10 y ./internal/b.go:2-3 y internal/c.go:4 y /etc/hosts.conf:9 y " + slash + "2/internal/d.go:1\n" +
+		"`" + back + `\internal\e.go:7-8` + "` y C:" + `\otro\f.go:1` + " y (../fuera.go:1)"
+	got := keys(Findings(note, nil, wt))
+	want := []string{"internal/a.go:10-10", "internal/b.go:2-3", "internal/c.go:4-4", "internal/e.go:7-8"}
 	if !slices.Equal(got, want) {
-		t.Errorf("Unix:\n got %v\nwant %v", got, want)
-	}
-
-	got = keys(Findings(note, nil, `C:\Users\x\wt`))
-	want = []string{"internal/b.go:2-3", "internal/c.go:4-4", "internal/e.go:7-8"}
-	if !slices.Equal(got, want) {
-		t.Errorf("Windows (rutas con \\):\n got %v\nwant %v", got, want)
+		t.Errorf("hallazgos:\n got %v\nwant %v", got, want)
 	}
 
 	if runtime.GOOS == "windows" {
-		got = keys(Findings(`c:\users\X\WT\internal\g.go:1`, nil, `C:\Users\x\wt`))
+		got = keys(Findings(strings.ToUpper(wt)+`\internal\g.go:1`, nil, wt))
 		if !slices.Equal(got, []string{"internal/g.go:1-1"}) {
 			t.Errorf("en Windows el prefijo no distingue mayúsculas: %v", got)
 		}
 	}
-	for _, f := range Findings(note, nil, "/tmp/w/wt") {
+	for _, f := range Findings(note, nil, wt) {
 		if f.File != "" && (f.File[0] == '/' || f.File[0] == '.') {
 			t.Errorf("la ruta del hallazgo es relativa al worktree: %q", f.File)
 		}
@@ -149,13 +167,31 @@ func TestScoreFalsePositivesDeduped(t *testing.T) {
 }
 
 func TestFindingsExtensionlessPaths(t *testing.T) {
-	got := keys(Findings("Makefile:3 y Dockerfile:12-14 y cmd/tool:4 y /wt/Makefile:3", nil, "/wt"))
-	want := []string{"Dockerfile:12-14", "Makefile:3-3", "Makefile:3-3", "cmd/tool:4-4"}
-	slices.Sort(got)
+	wt := worktreeWith(t, "Makefile", "Dockerfile", "Brewfile", "cmd/tool")
+	got := keys(Findings("Makefile:3 y Dockerfile:12-14 y Brewfile:1 y cmd/tool:4 y "+filepath.ToSlash(wt)+"/Makefile:3", nil, wt))
+	want := []string{"Brewfile:1-1", "Dockerfile:12-14", "Makefile:3-3", "Makefile:3-3", "cmd/tool:4-4"}
 	if !slices.Equal(got, want) {
 		t.Errorf("hallazgos:\n got %v\nwant %v", got, want)
 	}
-	if fs := Findings("localhost:8080 y paso:2 y MiMakefile:3", nil, "/wt"); len(fs) != 0 {
+	if fs := Findings("localhost:8080 y paso:2 y MiMakefile:3 y 10:30", nil, wt); len(fs) != 0 {
 		t.Errorf("no son referencias: %v", fs)
+	}
+}
+
+func TestFindingsSkipsMissingFiles(t *testing.T) {
+	wt := worktreeWith(t, "internal/a.go")
+	got := keys(Findings("2026/10:3 y internal/nada.go:4 y internal/a.go:1", nil, wt))
+	if !slices.Equal(got, []string{"internal/a.go:1-1"}) {
+		t.Errorf("solo cuenta el archivo que existe: %v", got)
+	}
+	if fs := Findings("internal/a.go:1", nil, ""); len(fs) != 0 {
+		t.Errorf("sin worktree no hay hallazgos: %v", fs)
+	}
+}
+
+func TestFindingsSkipsDirectories(t *testing.T) {
+	wt := worktreeWith(t, "internal/a.go")
+	if fs := Findings("internal:3", nil, wt); len(fs) != 0 {
+		t.Errorf("un directorio no es una referencia: %v", fs)
 	}
 }

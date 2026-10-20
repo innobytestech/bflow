@@ -2,6 +2,8 @@ package eval
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
@@ -9,14 +11,9 @@ import (
 	"strings"
 )
 
-// refRe es una referencia ruta:N o ruta:N-M. La ruta lleva extensión, o lleva
-// separador (cmd/tool), o es el nombre base de un archivo sin extensión conocido
-// (Makefile); así localhost:8080 o paso:2 no cuentan.
-var refRe = regexp.MustCompile("(?:^|[\\s(`\"'*\\[>_])((?:[A-Za-z]:)?(?:[\\w./\\\\-]+\\.\\w+|[\\w./\\\\-]*[/\\\\][\\w.-]+|" + extensionlessAlt + ")):(\\d+)(?:-(\\d+))?")
-
-var extensionless = []string{"Makefile", "GNUmakefile", "Dockerfile", "Containerfile", "Jenkinsfile", "Gemfile", "Rakefile", "Procfile", "Vagrantfile"}
-
-var extensionlessAlt = strings.Join(extensionless, "|")
+// refRe es una referencia ruta:N o ruta:N-M. La forma es permisiva (localhost:8080
+// o paso:2 la cumplen); lo que las descarta es que la ruta no sea un archivo del worktree.
+var refRe = regexp.MustCompile("(?:^|[\\s(`\"'*\\[>_])((?:[A-Za-z]:)?(?:[\\w./\\\\-]+\\.\\w+|[\\w./\\\\-]*[/\\\\][\\w.-]+|[\\w.-]+)):(\\d+)(?:-(\\d+))?")
 
 var driveRe = regexp.MustCompile(`^[A-Za-z]:/`)
 
@@ -77,9 +74,17 @@ func stripWorktree(text, worktree string) string {
 		flag = "(?i)"
 	}
 	for _, v := range []string{strings.ReplaceAll(wt, `\`, "/"), strings.ReplaceAll(wt, "/", `\`)} {
-		text = regexp.MustCompile(flag+regexp.QuoteMeta(v)+`[/\\]`).ReplaceAllString(text, "")
+		text = regexp.MustCompile(flag+regexp.QuoteMeta(v)+`[/\\\\]`).ReplaceAllString(text, "")
 	}
 	return text
+}
+
+func isRegularFile(worktree, rel string) bool {
+	if worktree == "" {
+		return false
+	}
+	fi, err := os.Stat(filepath.Join(worktree, filepath.FromSlash(rel)))
+	return err == nil && fi.Mode().IsRegular()
 }
 
 func findIn(text, worktree string) []Finding {
@@ -102,7 +107,7 @@ func findIn(text, worktree string) []Finding {
 		}
 		for _, m := range refRe.FindAllStringSubmatch(line, -1) {
 			file, ok := relToWorktree(strings.TrimLeft(m[1], "_"), worktree)
-			if !ok {
+			if !ok || !isRegularFile(worktree, file) {
 				continue
 			}
 			from, err := strconv.Atoi(m[2])
