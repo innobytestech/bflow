@@ -150,10 +150,10 @@
 
 ## Tasks
 
-- [ ] T1 Contrato: `check.Fresh`, `Verifier.Last`, `engine.ContractChecker`, `Engine.Contract`, `Engine.Pause`, `flow.EvPause`, `Event.ContractOK`, `State.PauseRequested`, `Config.afterPause` y stubs de `contractCheck`/`contractTestNames`. Pruebas en rojo: `TestFreshIgnoresResult`, `TestContractStale`, `TestContractBroken`, `TestContractGreen`, `TestContractGreenNoT1Names`, `TestContractTestNames`, `TestContractReadyFreezesAndAdvances`, `TestContractUnverifiableOpensGate`, `TestFullLaneNoPause`, `TestImplementingDoneGoesToQuality`, `TestPauseRequestStopsAtGate`, `TestPauseLate`, `TestPauseApproveWithoutPausedPhase`, `TestLegacyContractAndPauseGates`, `TestUpcomingPauseRequested`. (R1-R14)
-- [ ] T2 `internal/check`: `Fresh` y `Verifier.Last`; `Verify` delega en `Fresh` sin cambiar su comportamiento. (R2)
-- [ ] T3 `internal/engine/contract.go`: `contractCheck`, `contractTestNames`, rechazos `contract_stale|broken|green`, congelado tras el CONTRACT_READY aceptado; el chequeo de huecas se mueve aquí; wire en `cmd/bflow/wire.go`. (R1-R7)
-- [ ] T4 `internal/flow`: `DefaultLanes` sin `paused`, `ContractOK` en `report`, `PauseRequested`, `EvPause`/`tx.pause`, `afterPause` en approve y `Upcoming`; ajustar `machine_test`, `next_test` y `TestPausedConfigurablePerLane`. (R6-R14)
-- [ ] T5 `internal/cli`: comando `pause`, bloqueo en el guard para subagentes, `humanStops`, `watch`, `notify`; e2e en `cmd/bflow/e2e_test.go` del full sin gates contract/pause y con `pause`. (R10, R11, R15)
-- [ ] T6 Agentes: texto de `contract()` y `craft/implementer.md`, etiqueta de `decisionTargets`, re-render. (R16)
-- [ ] T7 Docs: `docs/guia.md`, `docs/conceptos.md`, `docs/comandos.md`, `CHANGELOG.md`. (R17)
+- [x] T1 Contrato: `check.Fresh`, `Verifier.Last`, `engine.ContractChecker`, `Engine.Contract`, `Engine.Pause`, `flow.EvPause`, `Event.ContractOK`, `State.PauseRequested`, `Config.afterPause` y stubs de `contractCheck`/`contractTestNames`. Pruebas en rojo: `TestFreshIgnoresResult`, `TestContractStale`, `TestContractBroken`, `TestContractGreen`, `TestContractGreenNoT1Names`, `TestContractTestNames`, `TestContractReadyFreezesAndAdvances`, `TestContractUnverifiableOpensGate`, `TestFullLaneNoPause`, `TestImplementingDoneGoesToQuality`, `TestPauseRequestStopsAtGate`, `TestPauseLate`, `TestPauseApproveWithoutPausedPhase`, `TestLegacyContractAndPauseGates`, `TestUpcomingPauseRequested`. (R1-R14)
+- [x] T2 `internal/check`: `Fresh` y `Verifier.Last`; `Verify` delega en `Fresh` sin cambiar su comportamiento. (R2)
+- [x] T3 `internal/engine/contract.go`: `contractCheck`, `contractTestNames`, rechazos `contract_stale|broken|green`, congelado tras el CONTRACT_READY aceptado; el chequeo de huecas se mueve aquí; wire en `cmd/bflow/wire.go`. (R1-R7)
+- [x] T4 `internal/flow`: `DefaultLanes` sin `paused`, `ContractOK` en `report`, `PauseRequested`, `EvPause`/`tx.pause`, `afterPause` en approve y `Upcoming`; ajustar `machine_test`, `next_test` y `TestPausedConfigurablePerLane`. (R6-R14)
+- [x] T5 `internal/cli`: comando `pause`, bloqueo en el guard para subagentes, `humanStops`, `watch`, `notify`; e2e en `cmd/bflow/e2e_test.go` del full sin gates contract/pause y con `pause`. (R10, R11, R15)
+- [x] T6 Agentes: texto de `contract()` y `craft/implementer.md`, etiqueta de `decisionTargets`, re-render. (R16)
+- [x] T7 Docs: `docs/guia.md`, `docs/conceptos.md`, `docs/comandos.md`, `CHANGELOG.md`. (R17)

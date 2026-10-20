@@ -190,7 +190,7 @@ func gateNext(cfg Config, s State) output.Next {
 		n.Options = append(n.Options, output.Option{ID: "other", Label: "Otra decisión", NeedsNote: true,
 			Command: cmd("approve", id, "--gate", "decision", `--note "<decisión>"`)})
 		for _, p := range decisionTargets(cfg, s.Lane, s.Phase) {
-			label := "Rehacer el contrato (al aprobarlo se vuelven a congelar las pruebas)"
+			label := "Rehacer el contrato (al aceptarlo se vuelven a congelar las pruebas)"
 			if p == Spec {
 				label = "Volver a spec"
 			}

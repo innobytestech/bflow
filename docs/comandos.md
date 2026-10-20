@@ -14,6 +14,7 @@
 | `report [ID] --agent a --verdict V [--note] [--file] [--option o]... [--stdin] [--no-repro "motivo"]` | Un agente reporta su veredicto (`--stdin`: reporte del scout). `--no-repro`: solo `DONE` del implementer en hotfix; cierra sin prueba de reproducción y abre el gate humano `repro` (`approve --gate repro` acepta; `reject --gate repro --note` pide la prueba). |
 | `block [ID] --reason "motivo"` | Bloquea la tarea. |
 | `unblock [ID] [--note t] [--no-changelog]` | Desbloquea la tarea y vuelve a su fase. Con `--no-changelog` (exige `--note`) exime al documenter del changelog cuando el diff toca `flow.public_paths`; el motivo queda en la bitácora. Solo una persona. |
+| `pause [ID]` | Pide parar antes de quality: al terminar implementing se abre la gate `pause` para que pruebes. Se puede repetir; en quality o después sale `pause_late`. Solo una persona. |
 | `drop <ID> --note "motivo"` | Retira una tarea sin terminarla. |
 | `freeze [ID] [--allow <archivo>]` | Vuelve a congelar las pruebas del contrato tal como están; con `--allow` deja cambiar una una vez. Solo una persona. |
 | `show [ID] task\|brief\|spec\|contract\|review-map\|questions\|decisions\|discovery\|check\|scout [--section s]` | Muestra un artefacto. |

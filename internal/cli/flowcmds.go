@@ -287,6 +287,11 @@ func init() {
 			return e.Block(ctx, id, str(c.Flags, "reason"))
 		})})
 
+	Register(&Command{Name: "pause", Summary: "pide parar antes de quality, al terminar implementing, para probar tú: pause [ID]",
+		Run: flowCommand(func(ctx context.Context, e *engine.Engine, id string, c *Ctx, _ []string) (engine.Outcome, error) {
+			return e.Pause(ctx, id)
+		})})
+
 	Register(&Command{Name: "drop", Summary: "retira una tarea sin terminarla: drop <ID> --note \"motivo\"",
 		Setup: func(fs *flag.FlagSet) { fs.String("note", "", "motivo") },
 		Run: func(c *Ctx) output.Envelope {

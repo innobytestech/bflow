@@ -20,12 +20,14 @@ Si aún no lo hiciste, corre `bflow install claude` dentro del repo: deja la ski
 | Carril | Al empezar | Las opciones full, light y hotfix | Qué tan grande es el cambio |
 | Discovery (full) | Antes de la spec | La sesión te pregunta alcance, datos, errores y restricciones, hasta 3 cosas por tanda | Cuándo ya no queda ambigüedad |
 | Spec | Spec lista | El brief (≤35 líneas) y, si el repo tiene UI, el UI blueprint | Aprobar o pedir cambios puntuales. Las decisiones nuevas `[N]` se ratifican una por una |
-| Contrato T1 (full) | Pruebas y firmas escritas | `contract.md` | Aprobar, ajustar o volver a la spec. Al aprobar, esas pruebas quedan congeladas |
+| Contrato T1 (full) | Solo si bflow no pudo validar el contrato solo (sin check configurado o sin `check.test_step`) | `contract.md` | Aprobar, ajustar o volver a la spec. Al aprobar, esas pruebas quedan congeladas |
 | Decisión | Un agente no puede decidir solo | El problema y 2-3 opciones | Una opción o tu propia decisión |
-| Pausa (full) | Implementación con el check en verde | — | Lanzar la revisión de calidad o volver a implementar |
+| Pausa (opcional) | Implementación con el check en verde, si corriste `bflow pause <ID>` | — | Lanzar la revisión de calidad o volver a implementar |
 | Rondas | Calidad rechazó dos veces seguidas | — | Dividir la feature, volver a la spec o una ronda más |
 | Preguntas de producto | Todo revisado y documentado | Hasta 4 preguntas sobre el comportamiento, sin decirte qué hace el código | Las contestas con tus palabras (o las saltas) |
 | Walkthrough | Después de tus respuestas | Tus respuestas junto al review-map: 🔴 decisiones, 🟡 lógica, 🟢 mecánico | Aprobar y abrir el PR, volver a implementar o volver a la spec |
+
+El full tiene 5 gates humanas por defecto (carril, discovery, spec, preguntas de producto y walkthrough). El contrato no abre gate: al reportar CONTRACT_READY, bflow exige el contrato commiteado y un `bflow check <ID>` vigente en el que fallen las pruebas T1 y nada anterior a ellas. Si pasa, congela las pruebas y la tarea sigue a implementing; si no, rechaza con `contract_stale` (falta commit o check), `contract_broken` (algo previo a las pruebas falla) o `contract_green` (las T1 no fallan). La pausa antes de la revisión ya no es automática: si quieres probar antes de quality, corre `bflow pause <ID>` en cualquier fase previa a quality y la gate aparece al terminar implementing.
 
 Lo que necesitas para decidir llega escrito en el chat: bflow le entrega a la sesión el texto (el brief, el contrato, el review-map) y la sesión lo copia antes de preguntar. Si alguna vez te preguntan si apruebas algo que no ves, pídelo.
 

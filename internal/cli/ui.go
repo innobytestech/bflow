@@ -207,7 +207,7 @@ type panelState struct {
 }
 
 // humanStops son las fases que terminan en una decisión de la persona.
-var humanStops = map[flow.Phase]bool{flow.Discovery: true, flow.Spec: true, flow.Contract: true,
+var humanStops = map[flow.Phase]bool{flow.Discovery: true, flow.Spec: true,
 	flow.Paused: true, flow.Walkthrough: true, flow.InReview: true}
 
 // buildPanel arma lo que muestra la página, con los mismos textos que watch.
