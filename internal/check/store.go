@@ -100,5 +100,10 @@ func (v Verifier) Verify(ctx context.Context, id string) (bool, string, error) {
 
 // Last lee el último check de la tarea y dice si sigue vigente.
 func (v Verifier) Last(ctx context.Context, id string) (res *Result, fresh bool, detail string, err error) {
-	return nil, false, "sin implementar", nil
+	res, err = Load(v.Store, id)
+	if err != nil {
+		return nil, false, "", err
+	}
+	fresh, detail = Fresh(ctx, v.Git, v.CodePaths, res)
+	return res, fresh, detail, nil
 }

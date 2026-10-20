@@ -96,6 +96,8 @@ func (t *tx) apply(ev Event) error {
 		return t.reject(ev)
 	case EvReport:
 		return t.report(ev)
+	case EvPause:
+		return t.pause()
 	case EvBlock:
 		return t.block(ev.Note)
 	case EvUnblock:
@@ -144,6 +146,30 @@ func (t *tx) enter(p Phase) {
 		// después recorre el diff. Si se pregunta todo junto, se aprueba sin mirar.
 		s.Gate = &PendingGate{Name: GateQuestions}
 	}
+}
+
+// pause marca la tarea para parar al terminar implementing.
+func (t *tx) pause() error {
+	s := &t.s
+	switch s.Phase {
+	case Backlog:
+		return reject("not_started", "la tarea %s no ha empezado", s.ID)
+	case Discovery, Spec, Contract, Implementing:
+		s.PauseRequested = true
+		return nil
+	}
+	return reject("pause_late", "la tarea %s ya pasó implementing (fase %s): no hay nada que pausar", s.ID, s.Phase)
+}
+
+// afterImplementing entra a la fase que sigue al DONE de implementing: paused
+// si el carril la tiene o una persona pidió pausa.
+func (t *tx) afterImplementing() {
+	next := t.cfg.after(t.s.Lane, Implementing)
+	if t.s.PauseRequested {
+		next = Paused
+	}
+	t.enter(next)
+	t.s.PauseRequested = false
 }
 
 func (t *tx) start(ev Event) error {
@@ -272,7 +298,7 @@ func (t *tx) approve(ev Event) error {
 			return nil
 		}
 	case GatePause:
-		t.enter(t.cfg.after(s.Lane, Paused))
+		t.enter(t.cfg.afterPause(s.Lane))
 	case GateRounds:
 		s.Gate = nil
 		s.Resume = true
@@ -503,6 +529,11 @@ func (t *tx) report(ev Event) error {
 			s.Gate = &PendingGate{Name: GateSpec}
 		}
 	case Contract:
+		if ev.ContractOK {
+			t.enter(t.cfg.after(s.Lane, Contract))
+			s.Resume = true
+			return nil
+		}
 		s.Gate = &PendingGate{Name: GateContract}
 	case Implementing:
 		if !ev.CheckOK {
@@ -512,7 +543,7 @@ func (t *tx) report(ev Event) error {
 			s.Gate = &PendingGate{Name: GateRepro, Agent: ev.Agent, Note: ev.NoRepro}
 			return nil
 		}
-		t.enter(t.cfg.after(s.Lane, Implementing))
+		t.afterImplementing()
 	case Quality:
 		t.record(ev)
 		if !t.allReported() {

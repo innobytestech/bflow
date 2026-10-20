@@ -158,10 +158,9 @@ func TestFullLaneEndToEnd(t *testing.T) {
 	}
 
 	o = mustT(t)(v.e.Report(ctx, id, ReportOpts{Agent: "implementer", Verdict: flow.DoneV, File: ".bflow/tasks/" + id + "/impl.md"}))
-	if o.To != flow.Paused {
+	if o.To != flow.Quality || o.Gate != "" {
 		t.Fatalf("DONE: %+v", o)
 	}
-	mustT(t)(v.e.Approve(ctx, id, ApproveOpts{}))
 	o = mustT(t)(v.e.Report(ctx, id, ReportOpts{Agent: "reviewer", Verdict: flow.Approved}))
 	if o.To != flow.Documenting {
 		t.Fatalf("el reviewer solo cierra quality: %+v", o)
