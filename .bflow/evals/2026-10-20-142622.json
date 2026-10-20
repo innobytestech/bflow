@@ -1,0 +1,245 @@
+{
+  "kind": "reviewer",
+  "run": "2026-10-20-142622",
+  "version": "v0.1.0-rc.9.0.20261020191655-b8a62d1c0811+dirty",
+  "craft": {
+    "ref": "v0.1.0-rc.5",
+    "sha256": "fb70f991fe4faab49e671d1d6259de57e87a0098b0e2eac11e73953b5c3b6f4d"
+  },
+  "model": "claude-opus-5-5",
+  "cases": [
+    {
+      "case": "gh-103-step-failed-opencode",
+      "verdict": "REJECTED",
+      "note": "adapters/opencode/plugin2/index.js:94 (y .opencode/plugins/bflow2/index.js:94): continue de step.failed sin tokens va antes de steps.delete (línea 96); la entrada de steps nunca se borra y el Map crece sin tope\ninternal/adapters/agent/opencode/plugin_test.go:313: la prueba solo busca texto (!d.tokens, tokens: d.tokens preexistente); no detecta la fuga ni el orden del continue",
+      "caught": [
+        {
+          "file": "adapters/opencode/plugin2/index.js",
+          "lines": "94",
+          "what": "session.step.failed sin tokens sale antes de borrar la entrada de steps, y el mapa de pasos crece"
+        }
+      ],
+      "missed": [],
+      "false_positives": [
+        ".opencode/plugins/bflow2/index.js:94",
+        "internal/adapters/agent/opencode/plugin_test.go:313",
+        "index.js:103",
+        "adapters/opencode/README.md:28"
+      ],
+      "spawned": "2026-10-20T14:26:23.7351479-05:00",
+      "reported": "2026-10-20T14:27:21.3135731-05:00",
+      "seconds": 57,
+      "model": "claude-opus-5-5",
+      "tokens": {
+        "input": 14,
+        "output": 4970,
+        "cache_read": 105078,
+        "cache_write": 26300,
+        "calls": 7,
+        "max_context": 31470
+      },
+      "tokens_available": true
+    },
+    {
+      "case": "gh-15-nota-approve-decisions",
+      "verdict": "REJECTED",
+      "note": "internal/engine/commands.go:111: la nota de approve solo se escribe en decisions.md con gate spec; R10/N3 piden cualquier gate salvo decision y questions (discovery, contract, walkthrough, split pierden la nota)\ninternal/engine/engine_test.go:505: TestApproveNoteEnDecisions solo prueba spec y questions; no hay prueba de R10 en otra gate, por eso la restriccion pasa\nadapters/leader/bflow.md:18: la skill limita --note a 'un gate de spec', contra R12b (cualquier aprobacion con comentario del humano)",
+      "caught": [
+        {
+          "file": "internal/engine/commands.go",
+          "lines": "111",
+          "what": "la nota de approve solo llega a decisions.md en el gate de la spec; en los demás gates se pierde"
+        },
+        {
+          "file": "adapters/opencode/plugin.js",
+          "lines": "44-45",
+          "what": "inject lee la salida de bflow hook session-start sin comprobar el código de salida ni poner un tiempo máximo"
+        }
+      ],
+      "missed": [],
+      "false_positives": [
+        "internal/engine/engine_test.go:505",
+        "adapters/leader/bflow.md:18",
+        "internal/engine/commands.go:117",
+        "internal/flow/next.go:328",
+        "internal/output/output.go:65",
+        "internal/cli/hookcmds.go:311-315"
+      ],
+      "spawned": "2026-10-20T14:27:26.4736214-05:00",
+      "reported": "2026-10-20T14:28:10.8042954-05:00",
+      "seconds": 44,
+      "model": "claude-opus-5-5",
+      "tokens": {
+        "input": 14,
+        "output": 3570,
+        "cache_read": 124178,
+        "cache_write": 27678,
+        "calls": 7,
+        "max_context": 32848
+      },
+      "tokens_available": true
+    },
+    {
+      "case": "gh-151-lock-tracker-local",
+      "verdict": "REJECTED",
+      "note": "La rama incumple su propia regla: con el binario nuevo report DONE y check --verify de GH-151 salen narrative_comment/not_verified (la spec, Riesgos, pedía evitarlo)\ninternal/config/config.go:144 comentario cita 'la spec'\ninternal/review/comments.go:12 comentario cita 'según'\ninternal/engine/review_test.go:671 string con ' // T3: según R4' dispara la heurística del // final\ninternal/review/comments_test.go:16,19,20 strings con ' // T3' y ' // gh-151' (ID de la tarea) se reportan como comentarios",
+      "caught": [],
+      "missed": [
+        {
+          "file": "internal/store/store.go",
+          "lines": "405",
+          "what": "el desbloqueo ignora el error de os.Remove; en Windows el borrado falla un instante y el lock queda tomado"
+        },
+        {
+          "file": "internal/adapters/tracker/local/local.go",
+          "lines": "95-96",
+          "what": "modify toma solo el lock de archivo, sin exclusión dentro del proceso; hilos concurrentes ven ErrLocked"
+        },
+        {
+          "file": "internal/adapters/tracker/local/local.go",
+          "lines": "185",
+          "what": "Create toma el lock de secuencia sin exclusión dentro del proceso"
+        }
+      ],
+      "false_positives": [
+        "internal/config/config.go:144",
+        "internal/review/comments.go:12",
+        "internal/engine/review_test.go:671",
+        "internal/review/comments_test.go:16",
+        "internal/engine/engine.go:125",
+        "internal/engine/review.go:256-290",
+        "internal/cli/checkcmds.go:87-93",
+        "internal/config/config.go:143-148",
+        "internal/vcs/vcs.go:44-61",
+        "a.go:5",
+        "internal/engine/review.go:266-272",
+        "internal/adapters/vcs/git/git.go:233-237",
+        "internal/cli/checkcmds.go:87"
+      ],
+      "spawned": "2026-10-20T14:28:16.2311768-05:00",
+      "reported": "2026-10-20T14:30:05.5640164-05:00",
+      "seconds": 109,
+      "model": "claude-opus-5-5",
+      "tokens": {
+        "input": 24,
+        "output": 9798,
+        "cache_read": 336145,
+        "cache_write": 38740,
+        "calls": 12,
+        "max_context": 43910
+      },
+      "tokens_available": true
+    },
+    {
+      "case": "gh-159-repro-hotfix",
+      "verdict": "REJECTED",
+      "note": "internal/engine/engine.go:283 entry escribe data.no_repro en cualquier approve con el gate repro abierto, incluido approve --gate budget que no lo cierra (internal/flow/machine.go:220); bflow stats (internal/metrics/metrics.go:241) muestra un motivo aprobado que ningun humano aprobo (R10/R13). Condicionar a after.NoRepro != \"\" \u0026\u0026 before.NoRepro == \"\" y agregar prueba.",
+      "caught": [
+        {
+          "file": "internal/engine/repro.go",
+          "lines": "44-46",
+          "what": "descarta el último commit de la lista como si fuera HEAD; si HEAD es un merge o la lista no termina en HEAD, descarta un commit de pruebas válido"
+        }
+      ],
+      "missed": [
+        {
+          "file": "internal/engine/repro.go",
+          "lines": "85-87",
+          "what": "con commits de solo pruebas sin check mezclados con otros con check verde, el motivo no menciona los que faltan por correr"
+        },
+        {
+          "file": "internal/flow/machine.go",
+          "lines": "372",
+          "what": "el rechazo del gate repro no deja marca, y un --no-repro rechazado por una persona se puede volver a pedir"
+        },
+        {
+          "file": "internal/adapters/vcs/git/git.go",
+          "lines": "165",
+          "what": "rev-list sin --topo-order puede listar los commits fuera del orden de la rama"
+        }
+      ],
+      "false_positives": [
+        "internal/engine/engine.go:283",
+        "internal/flow/machine.go:220",
+        "internal/metrics/metrics.go:241",
+        "internal/engine/engine.go:171",
+        "repro.go:45",
+        "internal/flow/machine.go:282",
+        "internal/engine/commands.go:112",
+        "engine.go:283-285",
+        "machine.go:220",
+        "metrics.go:241",
+        "internal/check/store.go:31",
+        "engine.go:421",
+        "internal/engine/engine.go:283-285",
+        "internal/engine/engine.go:421"
+      ],
+      "spawned": "2026-10-20T14:30:10.2011247-05:00",
+      "reported": "2026-10-20T14:33:12.8178345-05:00",
+      "seconds": 182,
+      "model": "claude-opus-5-5",
+      "tokens": {
+        "input": 40,
+        "output": 16635,
+        "cache_read": 1007191,
+        "cache_write": 76430,
+        "calls": 20,
+        "max_context": 81600
+      },
+      "tokens_available": true
+    },
+    {
+      "case": "gh-16-presupuesto-nota-color",
+      "verdict": "REJECTED",
+      "note": "internal/engine/budget.go:136 rejectBudget arma la nota con el gasto antes de validar el motivo: reject --gate budget sin --note bloquea igual (el note_required de flow/machine.go:208 nunca salta) y decisions.md queda sin motivo; viola R9. TestBudgetRejectUnblockNoReask (budget_test.go:91) no lo cubre\ninternal/cli/watch.go:464 el color de aviso de R14 no tiene prueba (TestWatchBudgetLine en watch_test.go:166 usa bannerPlain) y pinta con u \u003e b mientras que la pregunta sale con u \u003e= b: a exactamente 1x pregunta pero no se pinta",
+      "caught": [
+        {
+          "file": "internal/engine/budget.go",
+          "lines": "135-137",
+          "what": "rejectBudget acepta un rechazo sin --note y arma la nota con el motivo vacío"
+        }
+      ],
+      "missed": [
+        {
+          "file": "internal/cli/watch.go",
+          "lines": "167",
+          "what": "el aviso de presupuesto superado usa rojo propio (cWarn) en lugar del ámbar de los avisos a la persona"
+        }
+      ],
+      "false_positives": [
+        "flow/machine.go:208",
+        "budget_test.go:91",
+        "internal/cli/watch.go:464",
+        "watch_test.go:166"
+      ],
+      "spawned": "2026-10-20T14:33:22.3862731-05:00",
+      "reported": "2026-10-20T14:34:13.9123966-05:00",
+      "seconds": 51,
+      "model": "claude-opus-5-5",
+      "tokens": {
+        "input": 14,
+        "output": 4602,
+        "cache_read": 188421,
+        "cache_write": 39816,
+        "calls": 7,
+        "max_context": 44986
+      },
+      "tokens_available": true
+    }
+  ],
+  "totals": {
+    "defects": 12,
+    "caught": 5,
+    "missed": 7,
+    "false_positives": 41,
+    "tokens": {
+      "input": 106,
+      "output": 39575,
+      "cache_read": 1761013,
+      "cache_write": 208964,
+      "calls": 53,
+      "max_context": 81600
+    },
+    "seconds": 443
+  }
+}
