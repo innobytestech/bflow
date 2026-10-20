@@ -132,6 +132,7 @@ func TestReportScoresAndRemovesWorktree(t *testing.T) {
 	h.validCase("beta", "")
 	sp := h.next(Opts{}).Spawn
 	wtDir := sp.Args["worktree"]
+	touch(t, wtDir, "internal/a.go", "internal/zzz.go", "internal/q.go")
 	abs := filepath.ToSlash(wtDir) + "/internal/a.go:11"
 	h.answer(sp, "# Review\n- "+abs+" falta validar\n- internal/zzz.go:5 ruido\n\n## Docs\n- docs/x.md:3 ignorado\n")
 	h.now = h.now.Add(90 * time.Second)
@@ -165,10 +166,42 @@ func TestReportScoresAndRemovesWorktree(t *testing.T) {
 	}
 }
 
+func touch(t *testing.T, root string, files ...string) {
+	t.Helper()
+	for _, f := range files {
+		p := filepath.Join(root, filepath.FromSlash(f))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestReportRejectsMissingWorktree(t *testing.T) {
+	h := newHarness(t)
+	h.validCase("alfa", "")
+	sp := h.next(Opts{}).Spawn
+	h.answer(sp, "internal/a.go:10\n")
+	if err := os.RemoveAll(sp.Args["worktree"]); err != nil {
+		t.Fatal(err)
+	}
+	_, err := h.r.Report(context.Background(), "alfa", "REJECTED", "")
+	var rj *Rejection
+	if !errors.As(err, &rj) || rj.Code != "worktree_missing" {
+		t.Fatalf("worktree_missing: %v", err)
+	}
+	if strings.Contains(h.read(cacheRel("run.json")), "REJECTED") {
+		t.Error("un rechazo no guarda resultado")
+	}
+}
+
 func TestReportKeepsResultWhenRemoveFails(t *testing.T) {
 	h := newHarness(t)
 	h.validCase("alfa", "")
 	sp := h.next(Opts{}).Spawn
+	touch(t, sp.Args["worktree"], "internal/a.go")
 	h.answer(sp, "internal/a.go:10\n")
 	h.g.removeErr = errors.New("ocupado")
 	res, err := h.r.Report(context.Background(), "alfa", "REJECTED", "")
@@ -285,6 +318,7 @@ func TestNextWritesResult(t *testing.T) {
 	h.write(".bflow/tasks/GH-9/calls.jsonl", call(t0.Add(10*time.Second), "eval-reviewer", "m-a", "x1", 10, 5, 2, 100, false)+"\n")
 
 	sp := h.next(Opts{}).Spawn
+	touch(t, sp.Args["worktree"], "internal/a.go", "internal/ruido.go")
 	h.answer(sp, "internal/a.go:11 falta\ninternal/ruido.go:3 ruido\n")
 	h.now = t0.Add(60 * time.Second)
 	h.report("alfa", "REJECTED", "")
@@ -467,7 +501,8 @@ func TestOrphanRunDirIsNotOpen(t *testing.T) {
 	h := newHarness(t)
 	h.validCase("alfa", "")
 	h.next(Opts{})
-	if h.r.Open() == "" {
+	first := h.r.Open()
+	if first == "" {
 		t.Fatal("la corrida debería estar abierta")
 	}
 	orig := removeAll
@@ -479,5 +514,13 @@ func TestOrphanRunDirIsNotOpen(t *testing.T) {
 	}
 	if got := h.r.Open(); got != "" {
 		t.Errorf("la corrida huérfana no está abierta: %q", got)
+	}
+	h.now = h.now.Add(time.Minute)
+	st := h.next(Opts{})
+	if st.Spawn == nil || st.Spawn.Args["id"] != "alfa" {
+		t.Fatalf("arranca una corrida nueva desde el primer caso: %+v", st)
+	}
+	if now := h.r.Open(); now == "" || now == first {
+		t.Errorf("la corrida nueva es otra: %q vs %q", now, first)
 	}
 }

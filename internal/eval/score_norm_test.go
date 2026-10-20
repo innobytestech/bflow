@@ -7,7 +7,7 @@ import (
 
 func TestFindingsMarkdownDecoratedRefs(t *testing.T) {
 	note := "**internal/a.go:10**\n[internal/a.go:20]\n> internal/a.go:30\n_internal/a.go:40_\n* internal/a.go:50\n"
-	got := keys(Findings(note, nil, "/wt"))
+	got := keys(Findings(note, nil, worktreeWith(t, "internal/a.go")))
 	want := []string{"internal/a.go:10-10", "internal/a.go:20-20", "internal/a.go:30-30", "internal/a.go:40-40", "internal/a.go:50-50"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("got %v want %v", got, want)

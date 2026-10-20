@@ -42,7 +42,7 @@
 - [x] T1 Desempate de modelos por el más reciente.
   - En `Runner.finish` (internal/eval/run.go), guardar para cada modelo el índice del último caso en `st.Results` que lo usó; en empate de conteo gana el de índice mayor. Modelos vacíos se ignoran; sin modelos queda `r.Model`, como hoy.
   - Criterio: CUANDO dos modelos empatan en número de casos, el resultado DEBE reportar el del caso reportado más tarde. CUANDO uno tiene más casos, DEBE ganar ese.
-  - Prueba: `TestFinishModelTieUsesLatest` en internal/eval/run_test.go (dos casos, el primero con `r.Model = "zeta"` y el segundo con `"alfa"`; espera `"alfa"`, que el orden alfabético no habría elegido).
+  - Prueba: `TestFinishModelTieUsesLatest` en internal/eval/run_test.go (dos casos; las llamadas usan "alfa" (t0+10s) y luego "zeta" (t0+70s); espera `"zeta"`, el más reciente, que el orden alfabético no habría elegido).
 - [x] T2 La corrida limpiada deja de estar abierta aunque `RemoveAll` falle.
   - En `Runner.cleanup`, después del bucle de worktrees y dentro del mismo chequeo de que `dir` cae en la caché, `os.Remove(filepath.Join(dir, "run.json"))` antes de `RemoveAll`. Para la prueba, `RemoveAll` pasa por una variable de paquete `removeAll = os.RemoveAll` que la prueba sustituye por una que no borra nada y devuelve error.
   - Criterio: CUANDO `cleanup` corre y `RemoveAll` falla, `Runner.Open()` DEBE devolver "" y el siguiente `Next` DEBE empezar una corrida nueva, no retomar la vieja.

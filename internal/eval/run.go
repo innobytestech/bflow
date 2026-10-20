@@ -335,6 +335,8 @@ func (r *Runner) finish(ctx context.Context, st *runState, warnings []string) (S
 }
 
 // Report califica el caso en curso con el review-map y los .md de su out.
+// Rechaza con worktree_missing si el worktree del caso ya no está en disco, sin
+// guardar resultado: el caso sigue en curso.
 func (r *Runner) Report(ctx context.Context, caseName, verdict, note string) (CaseResult, error) {
 	run, open := r.openRun()
 	if !open {
@@ -356,6 +358,9 @@ func (r *Runner) Report(ctx context.Context, caseName, verdict, note string) (Ca
 	}
 	sp := r.spawnOf(st, len(st.Results))
 	out, wt := sp.Args["out"], sp.Args["worktree"]
+	if _, err := os.Stat(wt); err != nil {
+		return CaseResult{}, &Rejection{"worktree_missing", fmt.Sprintf("falta el worktree %s: aborta la corrida con --abort y empieza otra", wt)}
+	}
 	if _, err := os.Stat(filepath.Join(out, "review-map.md")); err != nil {
 		return CaseResult{}, &Rejection{"review_map_missing", fmt.Sprintf("falta %s: escribe el review-map en out y reporta otra vez", filepath.Join(out, "review-map.md"))}
 	}
