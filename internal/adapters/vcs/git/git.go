@@ -174,6 +174,31 @@ func (g *Git) CommitFiles(ctx context.Context, sha string) ([]string, error) {
 	return lines(out), err
 }
 
+// CommitKept lista los archivos que sha agrega o modifica contra su padre.
+func (g *Git) CommitKept(ctx context.Context, sha string) ([]string, error) {
+	out, err := g.run(ctx, "diff-tree", "--no-commit-id", "--name-only", "-r", "--root", "--diff-filter=d", sha)
+	return lines(out), err
+}
+
+// MergeBase devuelve el ancestro común de HEAD con la rama principal.
+func (g *Git) MergeBase(ctx context.Context, base string) (string, error) {
+	var cands []string
+	if base == "" {
+		cands = []string{g.Remote + "/HEAD", g.Remote + "/main", g.Remote + "/master", "main", "master"}
+	} else {
+		cands = []string{g.Remote + "/" + base, base}
+	}
+	for _, c := range cands {
+		if !g.ok(ctx, "rev-parse", "--verify", "--quiet", c+"^{commit}") {
+			continue
+		}
+		if sha, err := g.run(ctx, "merge-base", "HEAD", c); err == nil && sha != "" {
+			return sha, nil
+		}
+	}
+	return "", fmt.Errorf("no hay rama principal con la que calcular el merge-base")
+}
+
 func (g *Git) Push(ctx context.Context, branch string) error {
 	if slices.Contains(g.Protected, branch) {
 		return fmt.Errorf("%s es una rama protegida: bflow no empuja a ella", branch)

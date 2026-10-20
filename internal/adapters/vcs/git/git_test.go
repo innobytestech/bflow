@@ -408,3 +408,31 @@ func TestCommitsAndCommitFiles(t *testing.T) {
 		t.Errorf("archivos del fix: %v", files)
 	}
 }
+
+func TestCommitKeptAndMergeBase(t *testing.T) {
+	work, _ := fixture(t)
+	g := New(work)
+	ctx := context.Background()
+	fork := sh(t, work, "rev-parse", "origin/dev")
+	sh(t, work, "checkout", "-b", "feature/X-2-demo", "origin/dev")
+	write(t, work, "internal/a_test.go", "package a\n")
+	sh(t, work, "add", ".")
+	sh(t, work, "commit", "-m", "agrega")
+	added := sh(t, work, "rev-parse", "HEAD")
+	sh(t, work, "rm", "internal/a_test.go")
+	sh(t, work, "commit", "-m", "borra")
+	removed := sh(t, work, "rev-parse", "HEAD")
+
+	if got, err := g.CommitKept(ctx, added); err != nil || !slices.Equal(got, []string{"internal/a_test.go"}) {
+		t.Errorf("CommitKept del que agrega: %v %v", got, err)
+	}
+	if got, err := g.CommitKept(ctx, removed); err != nil || len(got) != 0 {
+		t.Errorf("CommitKept del que solo borra: %v %v", got, err)
+	}
+	if mb, err := g.MergeBase(ctx, "dev"); err != nil || mb != fork {
+		t.Errorf("MergeBase con base: %q %v, want %q", mb, err, fork)
+	}
+	if _, err := g.MergeBase(ctx, "no-existe"); err == nil {
+		t.Error("sin rama principal resoluble debe fallar")
+	}
+}

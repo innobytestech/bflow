@@ -133,6 +133,14 @@ func TestReproMissing(t *testing.T) {
 				g.files[shaTest] = []string{"internal/a_test.go"}
 				c.runs[shaTest] = fail
 			}},
+		{name: "commit que solo borra pruebas no cuenta",
+			setup: func(g *fakeGit, c *fakeChecks, v *env, id string) {
+				g.commits = []string{shaTest, shaHead}
+				g.files[shaTest] = []string{"internal/a_test.go"}
+				g.kept2 = map[string][]string{shaTest: nil}
+				c.runs[shaTest] = fail
+			},
+			reason: []string{"no hay commit de solo pruebas"}},
 		{name: "sin base ni StartSHA",
 			setup: func(g *fakeGit, c *fakeChecks, v *env, id string) {
 				v.e.Cfg.VCS.BaseBranch = ""
@@ -237,3 +245,29 @@ func TestReproOnlyHotfix(t *testing.T) {
 }
 
 func ptr(s string) *string { return &s }
+
+func TestStartResumedBranchUsesMergeBase(t *testing.T) {
+	for _, tc := range []struct {
+		name, how, want string
+		mbErr           error
+	}{
+		{"rama que ya existía", "resumed", "merge111", nil},
+		{"rama nueva", "created", "start111", nil},
+		{"sin merge-base", "resumed", "start111", errors.New("sin principal")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			v := newEnv(t, "stack: go\n")
+			g := &fakeGit{branch: "main", head: "start111", how: tc.how, mergeBase: "merge111", mergeBaseErr: tc.mbErr}
+			v.e.Git = g
+			id := v.task(t, "Demo")
+			mustT(t)(v.e.Start(context.Background(), id, flow.Hotfix, "", ""))
+			rec, err := v.e.Store.Load(id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if rec.StartSHA != tc.want {
+				t.Errorf("StartSHA %q, want %q", rec.StartSHA, tc.want)
+			}
+		})
+	}
+}
