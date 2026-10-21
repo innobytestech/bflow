@@ -15,19 +15,21 @@ Si aún no lo hiciste, corre `bflow install claude` dentro del repo: deja la ski
 
 ## Las gates: qué ves y qué decides
 
-| Gate | Cuándo | Qué te muestra | Qué decides |
-|---|---|---|---|
-| Carril | Al empezar | Las opciones full, light y hotfix | Qué tan grande es el cambio |
-| Discovery (full) | Antes de la spec | La sesión te pregunta alcance, datos, errores y restricciones, hasta 3 cosas por tanda | Cuándo ya no queda ambigüedad |
-| Spec | Spec lista | El brief (≤35 líneas) y, si el repo tiene UI, el UI blueprint | Aprobar o pedir cambios puntuales. Las decisiones nuevas `[N]` se ratifican una por una |
-| Contrato T1 (full) | Solo si bflow no pudo validar el contrato solo (sin check configurado o sin `check.test_step`) | `contract.md` | Aprobar, ajustar o volver a la spec. Al aprobar, esas pruebas quedan congeladas |
-| Decisión | Un agente no puede decidir solo | El problema y 2-3 opciones | Una opción o tu propia decisión |
-| Pausa (opcional) | Implementación con el check en verde, si corriste `bflow pause <ID>` | — | Lanzar la revisión de calidad o volver a implementar |
-| Rondas | Calidad rechazó dos veces seguidas | — | Dividir la feature, volver a la spec o una ronda más |
-| Preguntas de producto | Todo revisado y documentado | Hasta 4 preguntas sobre el comportamiento, sin decirte qué hace el código | Las contestas con tus palabras (o las saltas) |
-| Walkthrough | Después de tus respuestas | Tus respuestas junto al review-map: 🔴 decisiones, 🟡 lógica, 🟢 mecánico | Aprobar y abrir el PR, volver a implementar o volver a la spec |
+| Gate | Carril | Cuándo | Qué te muestra | Qué decides |
+|---|---|---|---|---|
+| Carril | Todos (fija) | Al empezar, si no pasaste `--lane` | Las opciones full, light y hotfix | Qué tan grande es el cambio |
+| Discovery | `full` (fija) | Antes de la spec | La sesión te pregunta alcance, datos, errores y restricciones, hasta 3 cosas por tanda | Cuándo ya no queda ambigüedad |
+| Spec | `full` y `light` (fija) | Spec lista | El brief (≤35 líneas) y, si el repo tiene UI, el UI blueprint | Aprobar o pedir cambios puntuales. Las decisiones nuevas `[N]` se ratifican una por una |
+| Contrato T1 | `full` (condicional) | Solo si bflow no pudo validar el contrato solo (ver abajo) | `contract.md` | Aprobar, ajustar o volver a la spec. Al aprobar, esas pruebas quedan congeladas |
+| Decisión | Todos (condicional) | Un agente no puede decidir solo | El problema y 2-3 opciones | Una opción o tu propia decisión |
+| Pausa | Todos (condicional) | Implementación con el check en verde, solo si corriste `bflow pause <ID>` | — | Lanzar la revisión de calidad o volver a implementar |
+| Rondas | Todos (condicional) | Calidad rechazó dos veces seguidas | — | Dividir la feature, volver a la spec o una ronda más |
+| Presupuesto | Todos (condicional) | Solo con `flow.budget` en `bflow.yaml`, cuando una fase lo pasa | El gasto de la fase contra el presupuesto | Seguir o bloquear la tarea |
+| Repro | `hotfix` (condicional) | El implementer reportó `DONE --no-repro "<motivo>"` | El motivo | Aceptar sin prueba de reproducción o pedirla |
+| Preguntas de producto | Todos (fija) | Todo revisado y documentado | Hasta 4 preguntas sobre el comportamiento, sin decirte qué hace el código | Las contestas con tus palabras (o las saltas) |
+| Walkthrough | Todos (fija) | Después de tus respuestas | Tus respuestas junto al review-map: 🔴 decisiones, 🟡 lógica, 🟢 mecánico | Aprobar y abrir el PR, volver a implementar o volver a la spec |
 
-El full tiene 5 gates humanas por defecto (carril, discovery, spec, preguntas de producto y walkthrough). El contrato no abre gate cuando bflow lo valida: al reportar CONTRACT_READY, bflow exige el contrato commiteado y un `bflow check <ID>` vigente en el que fallen las pruebas T1 y nada anterior a ellas. Si pasa, congela las pruebas y la tarea sigue a implementing; si no, rechaza con `contract_stale` (falta commit o check), `contract_broken` (algo previo a las pruebas falla) o `contract_green` (las T1 no fallan). Una prueba T1 cuenta como roja solo si su nombre exacto aparece en la salida (en Go, `--- FAIL: <Func>`; en otros stacks, la ruta completa del archivo). Si el paso de pruebas falla con `[build failed]` o `[setup failed]`, no rechaza: abre la gate contract para que una persona decida. Si el repo no puede validar el contrato (sin checker o sin `check.test_step` en `check.steps`), también abre la gate contract. La pausa antes de la revisión ya no es automática: si quieres probar antes de quality, corre `bflow pause <ID>` en cualquier fase previa a quality y la gate aparece al terminar implementing.
+Las cifras de gates fijas por carril (full 5, light 4, hotfix 3) y las condiciones de cada condicional están en [conceptos](conceptos.md#gates). Aquí, lo que cambia para ti en `full`: cuando bflow valida el contrato no hay gate. Si pasa, congela las pruebas y la tarea sigue a implementing; si no, rechaza con `contract_stale` (falta commit o check), `contract_broken` (algo previo a las pruebas falla), `contract_green` (las T1 no fallan) o `contract_hollow` (pruebas vacías). Una prueba T1 cuenta como roja solo si su nombre exacto aparece en la salida (en Go, `--- FAIL: <Func>`; en otros stacks, la ruta completa del archivo). Para probar antes de la revisión de calidad, corre `bflow pause <ID>` en cualquier fase previa a quality.
 
 Lo que necesitas para decidir llega escrito en el chat: bflow le entrega a la sesión el texto (el brief, el contrato, el review-map) y la sesión lo copia antes de preguntar. Si alguna vez te preguntan si apruebas algo que no ves, pídelo.
 
@@ -123,7 +125,7 @@ Tus reglas de arquitectura en CLAUDE.md o en los documentos de `read` son bienve
 
 ## Medir
 
-Todos los comandos de métricas están en [comandos](comandos.md#métricas); el reparto de tokens entre tareas, en [marcas de sesión](marcas-sesion.md).
+Todos los comandos de métricas están en [comandos](comandos.md#métricas); el reparto de tokens entre tareas se explica más abajo.
 
 Un ejemplo publicado, con las tareas de bflow en su propio repo: [cifras](cifras.md).
 
@@ -141,5 +143,11 @@ Si prefieres el navegador, `bflow ui` abre lo mismo en una página local. En ell
 - **Costo:** tokens nuevos y de caché por fase, por agente y por modelo.
 
 Sin ID, `bflow stats` muestra el resumen global de todas las tareas. Si hay llamadas sin asignar a tarea alguna (por ejemplo, porque la sesión solo contestó preguntas en el chat), aparece una línea `sin tarea` con su resumen. Úsala para detectar sesiones que no conducen tareas o cambios de contexto inesperados.
+
+Si muchas llamadas caen en `sin tarea`:
+
+- Verifica que la sesión del agente corrió `bflow <ID>` al empezar la tarea.
+- Revisa la configuración del guard: debe permitir comandos bflow.
+- Verifica que el prompt del subagente contenga el ID de la tarea en formato JSON (`"id":"<ID>"`).
 
 Antes de quitar un paso del flujo para ahorrar tokens, compara varias features: si las métricas de calidad no empeoran, ese paso sobraba.

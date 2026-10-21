@@ -6,7 +6,7 @@ Los cambios de bflow que ve quien lo usa. Las versiones siguen [semver](https://
 
 ### Documentación
 
-- Documentación completa para quien prueba la rc.9: README corto como entrada, y en `docs/` la motivación y rumbo, instalación, conceptos, configuración, referencia de comandos, guía de día a día, cómo probar y reportar issues, y problemas conocidos.
+- Documentación completa para quien prueba la rc.10: README corto como entrada, y en `docs/` la motivación y rumbo, instalación, conceptos, configuración, referencia de comandos, guía de día a día, cómo probar y reportar issues, y problemas conocidos. Describe solo lo que el código hace hoy: las gates de cada carril y cuándo abren las condicionales (`contract`, `pause`, `repro`), el contrato como test-first (pruebas de aceptación congeladas) y las garantías cotejadas contra `guard`.
 
 ### Cambiado
 

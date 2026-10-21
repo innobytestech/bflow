@@ -1,8 +1,8 @@
 # Byteflow · `bflow`
 
-**Motor de flujo Spec-Driven Development para trabajar con agentes de IA.** Un solo binario en Go que lleva cada tarea de la idea al PR mergeado (discovery, spec, contrato, implementación, revisión, walkthrough), decide las transiciones, habla con tu tracker y con git, y le dice al agente exactamente qué hacer después, en pocas líneas de JSON.
+**Motor de flujo Spec-Driven Development para trabajar con agentes de IA.** Un solo binario en Go que lleva cada tarea de la idea al PR mergeado (discovery, spec, implementación, revisión, walkthrough; en el carril full, también un contrato de pruebas de aceptación que se congela antes del código), decide las transiciones, habla con tu tracker y con git, y le dice al agente exactamente qué hacer después, en pocas líneas de JSON.
 
-> Estado: **prerelease v0.1.0-rc.9**. Funciona de punta a punta con el tracker local, Plane y GitHub, y con Claude Code y OpenCode como agente. La API de comandos puede cambiar antes de la 1.0. Si lo vas a probar, empieza por [cómo probar y reportar](docs/como-probar-y-reportar.md).
+> Estado: **prerelease v0.1.0-rc.10**. Funciona de punta a punta con el tracker local, Plane y GitHub, y con Claude Code y OpenCode como agente. La API de comandos puede cambiar antes de la 1.0. Si lo vas a probar, empieza por [cómo probar y reportar](docs/como-probar-y-reportar.md).
 
 ---
 
@@ -18,7 +18,7 @@ bflow es opinado a propósito: tiene un flujo definido y gates humanas fijas. Mu
 
 **Te sirve si:**
 
-- Desarrollas features con agentes de IA y quieres que las decisiones importantes (qué se construye, el contrato, qué se mergea) las tome una persona, sin leer todo lo que el agente genera.
+- Desarrollas features con agentes de IA y quieres que las decisiones importantes (qué se construye, qué se mergea) las tome una persona, sin leer todo lo que el agente genera.
 - Trabajas con git y PRs, y con Claude Code u OpenCode como agente.
 - Quieres saber cuánto cuesta cada feature (tiempo, tokens, iteraciones) y dónde se atora.
 
@@ -71,6 +71,15 @@ Cada comando imprime el siguiente paso; con `--json`, ese paso llega en `next`. 
 
 Lo que vive en el CLI se cumple con cualquier herramienta (el estado y las gates los maneja bflow, `DONE` exige un check verde, las pruebas del contrato no cambian). Lo que depende de hooks, solo donde hay hooks (Claude Code y OpenCode): bloquear `git reset --hard`, push forzado, `.env` y `.bflow/`. bflow no garantiza la calidad del código ni contiene a un agente malintencionado. La tabla completa: [Conceptos](docs/conceptos.md#qué-garantiza-y-qué-no).
 
+## Qué hace bflow y qué no
+
+Gates humanas fijas por carril: `full` tiene 5 (carril, discovery, spec, preguntas de producto y walkthrough), `light` 4 (sin discovery) y `hotfix` 3 (carril, preguntas y walkthrough). Otras gates abren solo en ciertos casos: decisión, rondas, `contract` (full, solo si bflow no puede validar el contrato), `pause` (solo con `bflow pause`) y `repro` (hotfix, solo con `--no-repro`). Condiciones y detalle: [Conceptos](docs/conceptos.md#gates).
+
+- **Sí:** lleva el estado y las transiciones, crea la rama y abre el PR, exige un check verde para el `DONE`, congela las pruebas del contrato y mide tiempo, tokens y rechazos.
+- **No garantiza la calidad del código:** la revisan los agentes y tú; bflow asegura que esos pasos ocurran.
+- **No contiene a un agente malintencionado:** `guard` es una barandilla contra errores comunes, no un sandbox.
+- **No cubre todo en Bash:** `guard` reconoce los comandos y rutas listados en [Conceptos](docs/conceptos.md#qué-garantiza-y-qué-no); un comando rebuscado puede pasar.
+
 ## Cifras reales
 
 bflow se usa para construir bflow. En las 58 tareas terminadas con corte al 2026-10-16, la tarea típica (mediana) tardó 33m de reloj: 14m de agente y 15m esperando a una persona, con 221.4k tokens nuevos y 4.4M releídos de caché. 10 tareas tuvieron al menos un rechazo en una gate.
@@ -79,19 +88,18 @@ No hay comparación con/sin bflow: son cifras de un solo repo, no una promesa de
 
 ## Rumbo
 
-Hoy: v0.1.0-rc.9. Previsto: v0.1.0 (primera release anunciada); Fase 1, legible para el mundo (inglés); Fase 2, que exista para alguien; Fase 3, adopción en equipo (Linear, Codex); Fase 4, medir y decidir; y la 1.0 con la API de comandos estable. Cada fase y su criterio de salida: [Por qué y rumbo](docs/por-que-y-rumbo.md#rumbo).
+Hoy: v0.1.0-rc.10. Previsto: [v0.1.0](https://github.com/innobytestech/bflow/milestone/1), la primera release anunciada; [v0.1.1](https://github.com/innobytestech/bflow/milestone/8), mejoras que salieron de v0.1.0; [Bloque 2 · Difusión](https://github.com/innobytestech/bflow/milestone/6); [Bloque 3 · Después de publicar](https://github.com/innobytestech/bflow/milestone/7); y la 1.0 con la API de comandos estable. El criterio de cada hito: [Por qué y rumbo](docs/por-que-y-rumbo.md#rumbo).
 
 ## Documentación
 
 | Documento | Para qué |
 |---|---|
-| [Por qué y rumbo](docs/por-que-y-rumbo.md) | La motivación, la meta y las fases. |
+| [Por qué y rumbo](docs/por-que-y-rumbo.md) | La motivación, la meta y los hitos. |
 | [Instalación](docs/instalacion.md) | Requisitos, instalar, actualizar, verificar, desinstalar. |
 | [Conceptos](docs/conceptos.md) | Núcleo y adaptadores, fases y carriles, gates, `next`, qué queda en el repo, garantías. |
 | [Cómo trabajar con bflow](docs/guia.md) | El día a día: qué haces en cada gate, ajustar agentes, qué hacer cuando algo se atora. |
 | [Configuración](docs/configuracion.md) | `bflow.yaml`, perfiles, trackers, agentes, check, Claude Code y OpenCode. |
 | [Comandos](docs/comandos.md) | Referencia de todos los comandos. |
-| [Marcas de sesión](docs/marcas-sesion.md) | Cómo se reparten los tokens entre tareas. |
 | [Cifras](docs/cifras.md) | Tiempo, tokens, rechazos y rondas por tarea de bflow en su propio repo. |
 | [Cómo probar y reportar](docs/como-probar-y-reportar.md) | Qué esperamos de quien prueba, cómo reportar y problemas conocidos. |
 
