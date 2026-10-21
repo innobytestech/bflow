@@ -42,7 +42,7 @@ func TestContractRedMatch(t *testing.T) {
 	}
 }
 
-// Un error de compilación que nombra el archivo T1 no es un T1 en rojo.
+// Un error de compilación que nombra el archivo de pruebas no cuenta como prueba en rojo.
 func TestContractBuildFailedOpensGate(t *testing.T) {
 	res := &check.Result{SHA: "abc", Result: "FAIL", Steps: steps("pass", "fail", "skip",
 		"internal/suma_test.go:5:2: undefined: Suma", "FAIL innobytes.tech/bflow/internal [build failed]")}
