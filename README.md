@@ -82,9 +82,9 @@ Gates humanas fijas por carril: `full` tiene 5 (carril, discovery, spec, pregunt
 
 ## Cifras reales
 
-bflow se usa para construir bflow. En las 58 tareas terminadas con corte al 2026-10-16, la tarea típica (mediana) tardó 33m de reloj: 14m de agente y 15m esperando a una persona, con 221.4k tokens nuevos y 4.4M releídos de caché. 10 tareas tuvieron al menos un rechazo en una gate.
+Hay dos mediciones. La del equipo (rc.9): 51 tareas terminadas en 6 repos, 48 de ellas del autor y 3 de otros devs, con calidad tras el merge todavía sin medir; la tabla y sus notas están en [Cifras del equipo](docs/por-que-y-rumbo.md#cifras-del-equipo). La de bflow construyendo bflow (58 tareas, corte al 2026-10-16): mediana de 33m de reloj, 14m de agente y 15m esperando a una persona; tabla por tarea en [Cifras](docs/cifras.md).
 
-No hay comparación con/sin bflow: son cifras de un solo repo, no una promesa de ahorro. Para medir el tuyo: `bflow stats`. Tabla por tarea y cómo reproducirla: [Cifras](docs/cifras.md).
+No hay comparación con/sin bflow, y no es una promesa de ahorro. Para medir el tuyo: `bflow stats`.
 
 ## Rumbo
 
