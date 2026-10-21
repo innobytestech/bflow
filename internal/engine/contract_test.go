@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -16,10 +17,11 @@ type fakeContract struct {
 	res    *check.Result
 	fresh  bool
 	detail string
+	err    error
 }
 
 func (f *fakeContract) Last(context.Context, string) (*check.Result, bool, string, error) {
-	return f.res, f.fresh, f.detail, nil
+	return f.res, f.fresh, f.detail, f.err
 }
 
 const (
@@ -64,6 +66,7 @@ func TestContractStale(t *testing.T) {
 		"sin check":     {res: nil, fresh: false, detail: "no hay check registrado"},
 		"DIRTY":         {res: &check.Result{SHA: "DIRTY", Steps: good.Steps}, fresh: false, detail: "con código sin commitear"},
 		"cambios luego": {res: good, fresh: false, detail: "cambios de código posteriores al check: internal/x.go"},
+		"error de Last": {res: good, fresh: true, err: errors.New("sin acceso al registro")},
 	}
 	for name, fc := range cases {
 		v, id := contractEnv(t, contractYAML, fc)
@@ -71,6 +74,9 @@ func TestContractStale(t *testing.T) {
 		rj := rejectionOf(t, err)
 		if rj.Code != "contract_stale" || !strings.Contains(rj.Reason, "bflow check "+id) {
 			t.Errorf("%s: %s %q", name, rj.Code, rj.Reason)
+		}
+		if fc.err != nil && !strings.Contains(rj.Reason, fc.err.Error()) {
+			t.Errorf("%s: la razón debe llevar el error: %q", name, rj.Reason)
 		}
 		if phaseOf(t, v, id) != flow.Contract {
 			t.Errorf("%s: la fase no debe cambiar", name)
@@ -133,13 +139,11 @@ func TestContractTestNames(t *testing.T) {
 	put(t, v, t1File, []byte(t1Src))
 	put(t, v, "web/a.spec.ts", []byte("it('x', () => {})"))
 	got := contractTestNames(v.e.Cfg.Root, []string{t1File, "web/a.spec.ts", "falta_test.go"})
-	for _, w := range []string{"suma_test.go", "TestSuma", "TestResta", "a.spec.ts", "falta_test.go"} {
-		if !slices.Contains(got, w) {
-			t.Errorf("falta %q en %v", w, got)
-		}
+	if !slices.Equal(got.Funcs, []string{"TestSuma", "TestResta"}) {
+		t.Errorf("Funcs: %v", got.Funcs)
 	}
-	if slices.Contains(got, "internal/suma_test.go") {
-		t.Errorf("solo nombres base y funciones Test*: %v", got)
+	if !slices.Equal(got.Paths, []string{"web/a.spec.ts"}) {
+		t.Errorf("Paths: %v", got.Paths)
 	}
 }
 

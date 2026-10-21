@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -54,7 +53,8 @@ func (e *Engine) contractCheck(ctx context.Context, id string) (verified bool, r
 				s.Name, strings.Join(failLines(s.Fails, s.Tail, contractFailLines), "\n"), id)}
 		}
 	}
-	names := contractTestNames(e.Cfg.Root, files)
+	t1 := contractTestNames(e.Cfg.Root, files)
+	names := t1.names()
 	for _, s := range res.Steps {
 		if s.Name != testStep || s.Status != "fail" {
 			continue
@@ -92,18 +92,21 @@ func firstN(s []string, n int) []string {
 	return s
 }
 
-// contractTestNames son los nombres con los que una línea de fallo nombra una
-// prueba del contrato: el nombre base de cada archivo y cada función Test* de Go.
-func contractTestNames(root string, files []string) []string {
-	var out []string
-	add := func(n string) {
-		if !slices.Contains(out, n) {
-			out = append(out, n)
-		}
-	}
+// contractT1 son los nombres con que una línea de fallo nombra una prueba T1.
+type contractT1 struct {
+	Funcs []string // funciones Test* de los archivos T1 .go
+	Paths []string // rutas (con /) de los archivos T1 que no son .go
+}
+
+// contractTestNames separa los archivos T1 en funciones Test* (Go) y rutas.
+func contractTestNames(root string, files []string) contractT1 {
+	var out contractT1
 	for _, f := range files {
-		add(path.Base(strings.ReplaceAll(f, `\`, "/")))
+		f = strings.ReplaceAll(f, `\`, "/")
 		if !strings.HasSuffix(f, ".go") {
+			if !slices.Contains(out.Paths, f) {
+				out.Paths = append(out.Paths, f)
+			}
 			continue
 		}
 		b, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(f)))
@@ -111,10 +114,32 @@ func contractTestNames(root string, files []string) []string {
 			continue
 		}
 		for _, m := range goTestFunc.FindAllSubmatch(b, -1) {
-			add(string(m[1]))
+			if n := string(m[1]); !slices.Contains(out.Funcs, n) {
+				out.Funcs = append(out.Funcs, n)
+			}
 		}
 	}
 	return out
+}
+
+// names son Funcs y luego Paths, para el mensaje contract_green.
+func (c contractT1) names() []string {
+	return append(slices.Clone(c.Funcs), c.Paths...)
+}
+
+// failed dice si la línea de fallo nombra con exactitud una prueba T1.
+func (c contractT1) failed(line string) bool {
+	return false
+}
+
+// buildFailed dice si alguna línea indica que la prueba no llegó a correr.
+func buildFailed(lines []string) bool {
+	return false
+}
+
+// contractValidable dice si el repo puede validar el contrato con el último check.
+func (e *Engine) contractValidable() bool {
+	return false
 }
 
 // Pause marca la tarea para parar antes de quality.

@@ -70,7 +70,14 @@ type Outcome struct {
 	Record   *store.Record `json:"-"`
 }
 
-func (e *Engine) flowCfg() flow.Config { return e.Cfg.Flow.Core() }
+func (e *Engine) flowCfg() flow.Config {
+	fc := e.Cfg.Flow.Core()
+	fc.ContractGate = !e.contractValidable()
+	return fc
+}
+
+// restoreFrozen deja frozen-tests.json como estaba antes de congelar.
+func (e *Engine) restoreFrozen(id string, prev map[string]string) {}
 
 func (e *Engine) now() time.Time {
 	if e.Now != nil {
