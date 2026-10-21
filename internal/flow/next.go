@@ -350,6 +350,9 @@ func Upcoming(cfg Config, s State) Step {
 	case Spec:
 		return Step{Phase: Spec, Gate: GateSpec}
 	case Contract:
+		if cfg.ContractGate {
+			return Step{Phase: Contract, Gate: GateContract}
+		}
 		return enter(cfg.after(s.Lane, Contract))
 	case InReview:
 		return Step{Phase: Done}

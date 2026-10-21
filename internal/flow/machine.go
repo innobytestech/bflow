@@ -165,7 +165,7 @@ func (t *tx) pause() error {
 		s.PauseRequested = true
 		return nil
 	}
-	return reject("pause_late", "la tarea %s ya pasó implementing (fase %s): no hay nada que pausar", s.ID, s.Phase)
+	return reject("pause_late", "la tarea %s ya pasó implementing (fase %s): no hay nada que pausar", s.ID, phase)
 }
 
 // afterImplementing entra a la fase que sigue al DONE de implementing: paused
