@@ -85,7 +85,7 @@ Una gate es un punto donde el flujo se detiene hasta que una persona decide. Qu�
 La gate de carril no aparece si la tarea se crea o se arranca con `--lane`. Las condicionales:
 
 - **decisión:** un agente devolvió `NEEDS_DECISION`.
-- **rondas:** la revisión de calidad rechazó dos veces seguidas.
+- **rondas:** la revisión de calidad rechazó dos veces seguidas (por defecto 2; `max_quality_rounds` lo cambia).
 - **`contract` (solo full):** bflow no pudo validar el contrato solo. Pasa si no hay checker, si `check.steps` no incluye `check.test_step`, si el paso de pruebas falla con `[build failed]` o `[setup failed]`, o si falla el congelado de las pruebas.
 - **`pause`:** solo si una persona corrió `bflow pause <ID>` (o si un carril de `bflow.yaml` declara la fase `paused`). Detiene la tarea antes de la revisión de calidad.
 - **`budget`:** solo si `flow.budget` está configurado y una fase lo pasa.
