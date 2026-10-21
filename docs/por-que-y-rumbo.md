@@ -82,7 +82,7 @@ El agente no tiene que recordar el proceso: le pregunta a `bflow` qué sigue y l
 
 ## Estado
 
-bflow es una **prerelease: v0.1.0-rc.10**. Funciona de punta a punta con el tracker local, Plane y GitHub Issues, y con Claude Code y OpenCode. La API de comandos puede cambiar antes de la 1.0.
+bflow va en la **v0.1.0**, la primera versión publicada. Funciona de punta a punta con el tracker local, Plane y GitHub Issues, y con Claude Code y OpenCode. La API de comandos puede cambiar antes de la 1.0.
 
 ## Rumbo
 
@@ -90,7 +90,6 @@ Lo de abajo es el plan, no lo ya hecho. Cada hito enlaza su milestone en GitHub.
 
 | Hito | Criterio de salida | Milestone |
 |---|---|---|
-| v0.1.0 | Primera release anunciada. Orden de trabajo: juntar lo que el equipo probó con la rc.9 (#160), seguimiento del contrato (#173), esta documentación (#158) y publicar la rc.10 sin semana de espera (#180). | [v0.1.0](https://github.com/innobytestech/bflow/milestone/1) |
 | v0.1.1 | Mejoras que salieron de v0.1.0 para no retrasar la publicación: amarillos en el walkthrough (#154) y métricas en el PR (#74). | [v0.1.1](https://github.com/innobytestech/bflow/milestone/8) |
 | Bloque 2 · Difusión | Después de publicar v0.1.0: video (#69), topics (#67), README en inglés (#62), repo de ejemplo (#76), artículo en español (#161) y en inglés (#68), comparativas (#70). | [Bloque 2](https://github.com/innobytestech/bflow/milestone/6) |
 | Bloque 3 · Después de publicar | Sin orden fijo: memoria por repo (#156, se decide con datos de la rc.10), worktrees (#155), routing (#157), inglés (#63-#66), Linear (#73), Codex (#75), estabilidad (#72), latencia (#82), página (#71), adopción (#77). | [Bloque 3](https://github.com/innobytestech/bflow/milestone/7) |
