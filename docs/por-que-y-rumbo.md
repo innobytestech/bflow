@@ -58,7 +58,7 @@ Los dos grupos van separados y no se suman como "el equipo":
 
 Notas:
 
-- **Versión:** rc.9, antes de #153. La rc.10 todavía no tiene una semana de uso.
+- **Versión:** rc.9, antes de #153.
 - **Tiempo de persona:** es la espera en las gates (incluye noches y fines de semana), no tiempo trabajado.
 - **Medianas:** solo por fila. No hay mediana global: la mediana de medianas no es la mediana real.
 - **Muestra de otros devs:** 3 tareas terminadas; no es una tendencia.
