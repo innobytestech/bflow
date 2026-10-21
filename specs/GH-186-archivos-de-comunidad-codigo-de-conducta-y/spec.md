@@ -39,17 +39,17 @@
 
 ## Tasks
 
-- [ ] **T1 · Código de conducta.** Crear `CODE_OF_CONDUCT.md` con el texto oficial en español del Contributor Covenant 2.1, sección de aplicación con info@innobytes.tech como contacto y sección de atribución con enlace a la versión 2.1 y a la licencia CC BY 4.0 del Covenant.
+- [x] **T1 · Código de conducta.** Crear `CODE_OF_CONDUCT.md` con el texto oficial en español del Contributor Covenant 2.1, sección de aplicación con info@innobytes.tech como contacto y sección de atribución con enlace a la versión 2.1 y a la licencia CC BY 4.0 del Covenant.
   - Criterio: CUANDO GitHub analiza el repo, DEBE reconocer el archivo como Contributor Covenant (Community standards en verde tras el merge).
   - Criterio: el texto no difiere del oficial salvo el marcador de contacto.
-- [ ] **T2 · Plantillas de issue.** Crear en `.github/ISSUE_TEMPLATE/`:
+- [x] **T2 · Plantillas de issue.** Crear en `.github/ISSUE_TEMPLATE/`:
   - `bug.md` (`name: Bug`, `labels: bug`): qué pasó y qué esperabas; pasos en orden; salida de `bflow version`; sistema operativo; agente y su versión (Claude Code u OpenCode); tracker (local, Plane, GitHub); salida completa del comando que falló (con `--json` si salió con código 2); salida de `bflow status --json` o `bflow doctor`. Aviso visible: no pegar tokens, `.env` ni datos internos.
   - `propuesta.md` (`name: Propuesta`, `labels: enhancement`): problema que resuelve, propuesta, alternativas consideradas, qué no entra.
   - `config.yml`: `blank_issues_enabled: true` y `contact_links` a vulnerabilidades (advisory privado, como dice SECURITY.md) y a la guía `docs/como-probar-y-reportar.md`.
   - Criterio: CUANDO alguien abre "New issue", DEBE ver Bug, Propuesta y los dos enlaces; todo en español.
   - Criterio: cada dato que pide la guía de reporte aparece en `bug.md`.
-- [ ] **T3 · Plantilla de PR.** Crear `.github/pull_request_template.md` con: qué cambia, cómo se probó, `Closes #` y checklist: cada cambio trae su prueba; CHANGELOG actualizado si cambia la salida pública; sin datos internos (URLs, IDs, correos); `gofmt` y `go vet` limpios.
+- [x] **T3 · Plantilla de PR.** Crear `.github/pull_request_template.md` con: qué cambia, cómo se probó, `Closes #` y checklist: cada cambio trae su prueba; CHANGELOG actualizado si cambia la salida pública; sin datos internos (URLs, IDs, correos); `gofmt` y `go vet` limpios.
   - Criterio: CUANDO alguien abre un PR, el cuerpo DEBE prellenarse con esa plantilla; los puntos del checklist coinciden con reglas de CONTRIBUTING.md.
-- [ ] **T4 · Enlaces y CHANGELOG.** En `CONTRIBUTING.md` agregar una línea que enlace `CODE_OF_CONDUCT.md`; en `README.md:116` agregar "Código de conducta: [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)." junto a CONTRIBUTING y SECURITY; en `CHANGELOG.md`, bajo `## v0.1.0` → `### Documentación`, una viñeta: código de conducta (Contributor Covenant 2.1), plantillas de bug y propuesta, plantilla de PR.
+- [x] **T4 · Enlaces y CHANGELOG.** En `CONTRIBUTING.md` agregar una línea que enlace `CODE_OF_CONDUCT.md`; en `README.md:116` agregar "Código de conducta: [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)." junto a CONTRIBUTING y SECURITY; en `CHANGELOG.md`, bajo `## v0.1.0` → `### Documentación`, una viñeta: código de conducta (Contributor Covenant 2.1), plantillas de bug y propuesta, plantilla de PR.
   - Criterio: los enlaces relativos resuelven; no se toca el encabezado de versión del CHANGELOG.
   - Criterio: `bflow check` (si existe para el repo) queda verde.

@@ -24,6 +24,8 @@ go test ./...        # incluye E2E que compilan el binario y usan git real
 
 ## Commits y pull requests
 
+Participar en este proyecto implica aceptar el [código de conducta](CODE_OF_CONDUCT.md).
+
 - Mensajes estilo Conventional Commits: `feat(tracker): …`, `fix(guard): …`, `docs: …`.
 - Un PR por tema, con descripción de qué cambia y cómo se probó.
 - No incluyas datos internos de tu organización (URLs, IDs de proyectos, correos) en código, pruebas ni fixtures.
