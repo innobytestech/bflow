@@ -42,11 +42,11 @@
 
 ## Tasks
 
-- [ ] T1. Tabla del equipo en `docs/por-que-y-rumbo.md`.
+- [x] T1. Tabla del equipo en `docs/por-que-y-rumbo.md`.
   - CUANDO se lea `docs/por-que-y-rumbo.md`, DEBE existir `## Cifras del equipo` con una fila por repo y dev con estas columnas: Repo, Tipo, Dev, Tareas, Terminadas, Mediana agente, Mediana persona, Mediana tokens nuevos, Mediana caché, Con rechazo en gate, Con ronda de calidad; los valores, idénticos a `resumen-anonimo.md`.
   - DEBE separar dos grupos (dev 1: 48 terminadas; otros devs: 3) con sus totales de terminadas, con rechazo y con ronda, sin un total combinado ni medianas globales.
   - DEBE incluir las notas: rc.9 antes de #153; tiempo de persona = espera en gates, no tiempo trabajado; calidad tras el merge no medida (pendiente v0.1.1); sin comparables sin bflow; faltan 2 personas.
   - DEBE enlazar `cifras.md` como medición aparte de bflow en bflow.
   - NO DEBE aparecer ningún nombre de persona, nombre de repo privado ni ID de tarea de otro repo (`grep` contra los nombres de las carpetas fuente da vacío).
-- [ ] T2. `## Lo que medí` deja claro que sus cifras (7.000 tokens, 73-80%) son del harness anterior, y apunta a `## Cifras del equipo` para las de bflow.
-- [ ] T3. README: `## Cifras reales` resume en ≤3 frases las dos mediciones (equipo y bflow en bflow), enlaza `docs/por-que-y-rumbo.md#cifras-del-equipo` y `docs/cifras.md`, y deja de afirmar "un solo repo". Los enlaces resuelven.
+- [x] T2. `## Lo que medí` deja claro que sus cifras (7.000 tokens, 73-80%) son del harness anterior, y apunta a `## Cifras del equipo` para las de bflow.
+- [x] T3. README: `## Cifras reales` resume en ≤3 frases las dos mediciones (equipo y bflow en bflow), enlaza `docs/por-que-y-rumbo.md#cifras-del-equipo` y `docs/cifras.md`, y deja de afirmar "un solo repo". Los enlaces resuelven.

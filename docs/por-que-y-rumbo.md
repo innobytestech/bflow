@@ -27,13 +27,45 @@ Quiero que otros lo prueben y, si les sirve, sigan esta metodología: SDD a mi m
 
 ## Lo que medí
 
-Estos datos salen del harness que tenía en dos repos reales, uno de backend y otro de frontend:
+Estos datos salen del harness anterior a bflow, que tenía en dos repos reales, uno de backend y otro de frontend. Las cifras de bflow están en [Cifras del equipo](#cifras-del-equipo):
 
 - **Las reglas vivían en prosa.** "OBLIGATORIO", "NUNCA", "no saltes la compuerta". El modelo las respetaba casi siempre, y justo ese "casi" es donde se cuelan los errores caros.
 - **El modelo movía el estado a mano.** Cambiaba estados en el tracker, creaba ramas y armaba URLs de PR, cada vez a su manera. En un repo el flujo estaba validado por scripts; en el otro, no.
 - **Gastaba tokens en trabajo mecánico.** Leer el tracker, releer bitácoras, interpretar la salida de 4 comandos de pruebas, mantener archivos de estado. En uno de los repos, unos 7.000 tokens fijos por sesión antes de hacer nada útil.
 - **Llenaba el repo de estado de trabajo.** Entre el 73% y el 80% de los archivos del harness versionados eran bitácoras, reportes y estado, no especificaciones.
 - **Cada repo tenía su copia.** Se desviaban: estados distintos, prefijos de rama distintos, reglas que un repo tenía y el otro no.
+
+## Cifras del equipo
+
+Lo que el equipo ha probado con bflow v0.1.0-rc.9 (con las gates de contrato y pausa del carril full, antes de #153), medido con `bflow stats` el 2026-10-20/21. Anónimo y sin maquillar: 51 tareas terminadas en 6 repos.
+
+| Repo | Tipo | Dev | Tareas | Terminadas | Mediana agente | Mediana persona | Mediana tokens nuevos | Mediana caché | Con rechazo en gate | Con ronda de calidad |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Repo A | backend | dev 1 | 31 | 28 | 49m | 49m | 668.6k | 11.6M | 14 | 2 |
+| Repo B | frontend | dev 1 | 6 | 5 | 32m | 36m | 698.8k | 28.0M | 0 | 1 |
+| Repo C | sitio web | dev 1 | 12 | 11 | 9m | 9m | 275.1k | 2.5M | 2 | 3 |
+| Repo D | API | dev 1 | 3 | 3 | 1h40m | 25m | 991.9k | 31.5M | 1 | 0 |
+| Repo E | frontend | dev 1 | 1 | 1 | 35m | 1h11m | 631.2k | 11.4M | 0 | 0 |
+| Repo D | API | dev 2 | 3 | 2 | 2h45m | 67h20m | 679.4k | 10.5M | 0 | 0 |
+| Repo F | punto de venta | dev 3 | 4 | 1 | 19m | 23h16m | 344.8k | 5.9M | 1 | 0 |
+
+Los dos grupos van separados y no se suman como "el equipo":
+
+| Grupo | Terminadas | Con rechazo en gate | Con ronda de calidad |
+|---|---|---|---|
+| dev 1 (el autor de bflow) | 48 | 17 | 6 |
+| Otros devs (dev 2 y dev 3) | 3 | 1 | 0 |
+
+Notas:
+
+- **Versión:** rc.9, antes de #153. La rc.10 todavía no tiene una semana de uso.
+- **Tiempo de persona:** es la espera en las gates (incluye noches y fines de semana), no tiempo trabajado.
+- **Medianas:** solo por fila. No hay mediana global: la mediana de medianas no es la mediana real.
+- **Muestra de otros devs:** 3 tareas terminadas; no es una tendencia.
+- **Calidad tras el merge:** no se midió. Queda pendiente para v0.1.1.
+- **Sin comparables:** no hay tareas equivalentes hechas sin bflow.
+- **Faltan datos de 2 personas.**
+- bflow construyendo bflow se mide aparte, con otro corte (2026-10-16): [Cifras](cifras.md).
 
 ## La meta
 
