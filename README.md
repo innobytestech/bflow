@@ -2,7 +2,7 @@
 
 **Motor de flujo Spec-Driven Development para trabajar con agentes de IA.** Un solo binario en Go que lleva cada tarea de la idea al PR mergeado (discovery, spec, implementación, revisión, walkthrough; en el carril full, también un contrato de pruebas de aceptación que se congela antes del código), decide las transiciones, habla con tu tracker y con git, y le dice al agente exactamente qué hacer después, en pocas líneas de JSON.
 
-> Estado: **prerelease v0.1.0-rc.10**. Funciona de punta a punta con el tracker local, Plane y GitHub, y con Claude Code y OpenCode como agente. La API de comandos puede cambiar antes de la 1.0. Si lo vas a probar, empieza por [cómo probar y reportar](docs/como-probar-y-reportar.md).
+> Estado: **v0.1.0**, la primera versión publicada. Funciona de punta a punta con el tracker local, Plane y GitHub, y con Claude Code y OpenCode como agente. La API de comandos puede cambiar antes de la 1.0. Si lo vas a probar, empieza por [cómo probar y reportar](docs/como-probar-y-reportar.md).
 
 ---
 
@@ -88,7 +88,7 @@ No hay comparación con/sin bflow, y no es una promesa de ahorro. Para medir el 
 
 ## Rumbo
 
-Hoy: v0.1.0-rc.10. Previsto: [v0.1.0](https://github.com/innobytestech/bflow/milestone/1), la primera release anunciada; [v0.1.1](https://github.com/innobytestech/bflow/milestone/8), mejoras que salieron de v0.1.0; [Bloque 2 · Difusión](https://github.com/innobytestech/bflow/milestone/6); [Bloque 3 · Después de publicar](https://github.com/innobytestech/bflow/milestone/7); y la 1.0 con la API de comandos estable. El criterio de cada hito: [Por qué y rumbo](docs/por-que-y-rumbo.md#rumbo).
+Hoy: v0.1.0, la primera release anunciada. Previsto: [v0.1.1](https://github.com/innobytestech/bflow/milestone/8), mejoras que salieron de v0.1.0; [Bloque 2 · Difusión](https://github.com/innobytestech/bflow/milestone/6); [Bloque 3 · Después de publicar](https://github.com/innobytestech/bflow/milestone/7); y la 1.0 con la API de comandos estable. El criterio de cada hito: [Por qué y rumbo](docs/por-que-y-rumbo.md#rumbo).
 
 ## Documentación
 

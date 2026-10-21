@@ -1,6 +1,6 @@
-# Cómo probar la rc.10 y reportar issues
+# Cómo probar bflow y reportar issues
 
-Gracias por probar bflow. Es una prerelease (v0.1.0-rc.10): hay cosas que fallan, y lo más útil que puedes hacer es contarnos cuáles.
+Gracias por probar bflow. Va en la v0.1.0, la primera versión publicada: hay cosas que fallan, y lo más útil que puedes hacer es contarnos cuáles.
 
 ## Qué cambió desde la rc.9
 
@@ -28,7 +28,7 @@ Gracias por probar bflow. Es una prerelease (v0.1.0-rc.10): hay cosas que fallan
 
 Para entender qué esperar en cada paso, lee la [guía](guia.md) y los [conceptos](conceptos.md).
 
-## Qué pedimos que pruebes en la rc.10
+## Qué pedimos que pruebes
 
 - **Una tarea `full` con check configurado** (con un paso `test`): confirma que no aparece la gate contract. T1 reporta `CONTRACT_READY`, bflow lo valida y la tarea sigue sola a implementing. Si apareció la gate, anota por qué te lo dijo.
 - **Un hotfix con prueba roja y luego verde:** commit solo con la prueba y `bflow check` en rojo; después la corrección, `bflow check` en verde y `DONE`. Prueba también que `DONE` sin ese commit se rechaza con `repro_test_missing`.
@@ -51,6 +51,6 @@ Abre un issue en <https://github.com/innobytestech/bflow/issues> con:
 
 No pegues tokens ni el contenido de `.env`. Si el problema es de una tarea, `bflow show <ID> check` y `bflow stats <ID>` ayudan.
 
-## Problemas conocidos de la rc.10
+## Problemas conocidos
 
 Hoy no hay bugs abiertos que conozcamos: los que figuraban en la rc.9 (#39, #52, #53, #86 y #91) están cerrados. Lo que sigue pendiente son mejoras y trabajo planeado; míralo en los [issues abiertos](https://github.com/innobytestech/bflow/issues) antes de reportar.

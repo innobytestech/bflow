@@ -26,14 +26,14 @@ En Windows, `BFLOW_INSTALL_NO_PATH=1` evita que el script toque tu `PATH`.
 
 ### Fijar una versión
 
-Los scripts instalan la última versión. Mientras solo haya prereleases publicadas (`v0.1.0-rc.*`), que GitHub no cuenta como "latest", instalan la más reciente. `BFLOW_VERSION` fija una versión, con o sin la `v`:
+Los scripts instalan la última versión estable. `BFLOW_VERSION` fija una versión, con o sin la `v`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/innobytestech/bflow/main/install.sh | BFLOW_VERSION=v0.1.0-rc.10 sh
+curl -fsSL https://raw.githubusercontent.com/innobytestech/bflow/main/install.sh | BFLOW_VERSION=v0.1.0 sh
 ```
 
 ```powershell
-$env:BFLOW_VERSION = 'v0.1.0-rc.10'; irm https://raw.githubusercontent.com/innobytestech/bflow/main/install.ps1 | iex
+$env:BFLOW_VERSION = 'v0.1.0'; irm https://raw.githubusercontent.com/innobytestech/bflow/main/install.ps1 | iex
 ```
 
 ### Verificar lo que bajaste
@@ -89,7 +89,7 @@ bflow update --check    # solo dice si hay una versión nueva
 bflow update --force    # reemplaza aunque este binario no venga de una versión publicada (por ejemplo, uno compilado por ti)
 ```
 
-`bflow update` elige el canal según lo que tienes instalado: con una prerelease recibes la siguiente (`rc.10` a `rc.11` o `v0.1.0`); con una estable nunca recibes prereleases. También refresca la skill de Claude Code y el comando de OpenCode si ya estaban instalados.
+`bflow update` elige el canal según lo que tienes instalado: con una prerelease recibes la siguiente (por ejemplo, de `v0.1.0-rc.10` a `v0.1.0`); con una estable nunca recibes prereleases. También refresca la skill de Claude Code y el comando de OpenCode si ya estaban instalados.
 
 ## Desinstalar
 
