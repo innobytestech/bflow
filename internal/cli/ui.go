@@ -207,6 +207,13 @@ type panelState struct {
 }
 
 // humanStops son las fases que terminan en una decisión de la persona.
+func humanStop(p flow.Phase, contractGate bool) bool {
+	if p == flow.Contract {
+		return contractGate
+	}
+	return humanStops[p]
+}
+
 var humanStops = map[flow.Phase]bool{flow.Discovery: true, flow.Spec: true,
 	flow.Paused: true, flow.Walkthrough: true, flow.InReview: true}
 
@@ -234,7 +241,7 @@ func buildPanel(version string, d watchData, now time.Time) panelState {
 		if p == flow.Done {
 			continue
 		}
-		pp := panelPhase{Name: string(p), State: "pending", Stop: humanStops[p]}
+		pp := panelPhase{Name: string(p), State: "pending", Stop: humanStop(p, v.ContractGate)}
 		switch {
 		case i == cur:
 			pp.State = "current"

@@ -199,3 +199,15 @@ func TestRenderWatchStale(t *testing.T) {
 		t.Errorf("watch no avisa: %s", out)
 	}
 }
+
+func TestHumanStopContract(t *testing.T) {
+	if !humanStop(flow.Contract, true) {
+		t.Error("con gate contract es parada humana")
+	}
+	if humanStop(flow.Contract, false) {
+		t.Error("sin gate contract no es parada")
+	}
+	if !humanStop(flow.Spec, false) || humanStop(flow.Implementing, true) {
+		t.Error("las demás paradas no cambian")
+	}
+}

@@ -131,7 +131,8 @@ func TestHotfixNoReproApprovedRecordsDecision(t *testing.T) {
 }
 
 func TestHotfixReproCommitBeforeStartAccepted(t *testing.T) {
-	r, _ := gitRepo(t, reproYAML)
+	// Con base_branch explícito el merge-base no depende de que git cree origin/HEAD al hacer fetch.
+	r, _ := gitRepo(t, reproYAML+"vcs: { base_branch: dev }\n")
 	writeFixture(t, filepath.Join(r.dir, "go.mod"), "module demo\n\ngo 1.21\n")
 	writeFixture(t, filepath.Join(r.dir, "internal", "a.go"), "package a\n\nfunc A() int { return 0 }\n")
 	git(t, r.dir, "add", ".")

@@ -20,6 +20,8 @@ type Config struct {
 	// UI: el proyecto tiene interfaz; la spec lleva UI blueprint y el humano
 	// lo ve al aprobarla.
 	UI bool
+	// ContractGate: el repo no puede validar el contrato, así que CONTRACT_READY abre la gate contract.
+	ContractGate bool
 	// Changelog: plantilla de la ruta del changelog para consumidores, con
 	// {id} y {slug}; vacía, va junto a la spec.
 	Changelog string

@@ -89,7 +89,7 @@ func TestPauseLate(t *testing.T) {
 	// Una tarea retirada ya no se puede pausar.
 	d := stateFor(row{lane: Full, from: Implementing})
 	d = apply(t, cfg, d, Event{Kind: EvDrop, Note: "ya no"})
-	if got := rejectionCode(t, cfg, d, Event{Kind: EvPause}); got != "task_dropped" && got != "pause_late" {
+	if got := rejectionCode(t, cfg, d, Event{Kind: EvPause}); got != "task_dropped" {
 		t.Errorf("retirada: %q", got)
 	}
 }
@@ -159,5 +159,32 @@ func TestUpcomingPauseRequested(t *testing.T) {
 	g := stateFor(row{lane: Full, from: Paused, gate: GatePause})
 	if u := Upcoming(cfg, g); u.Phase != Quality || !strings.Contains(strings.Join(u.Agents, ","), "reviewer") {
 		t.Errorf("tras la pausa: %+v", u)
+	}
+}
+
+func TestPauseLateBlockedPhase(t *testing.T) {
+	cfg := testConfig()
+	s := stateFor(row{lane: Full, from: Quality})
+	s.Block = &BlockInfo{Reason: "x", From: Quality}
+	s.Phase = Blocked
+	_, err := Apply(cfg, s, Event{Kind: EvPause})
+	var rj *Rejection
+	if !errors.As(err, &rj) || rj.Code != "pause_late" {
+		t.Fatalf("esperaba pause_late: %v", err)
+	}
+	if !strings.Contains(rj.Reason, "fase quality") || strings.Contains(rj.Reason, "fase blocked") {
+		t.Errorf("debe nombrar la fase real: %q", rj.Reason)
+	}
+}
+
+func TestUpcomingContractGate(t *testing.T) {
+	cfg := testConfig()
+	s := stateFor(row{lane: Full, from: Contract})
+	if u := Upcoming(cfg, s); u.Phase != Implementing || u.Gate != "" {
+		t.Errorf("sin ContractGate: %+v", u)
+	}
+	cfg.ContractGate = true
+	if u := Upcoming(cfg, s); u.Phase != Contract || u.Gate != GateContract {
+		t.Errorf("con ContractGate: %+v", u)
 	}
 }

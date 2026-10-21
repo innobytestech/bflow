@@ -70,7 +70,22 @@ type Outcome struct {
 	Record   *store.Record `json:"-"`
 }
 
-func (e *Engine) flowCfg() flow.Config { return e.Cfg.Flow.Core() }
+func (e *Engine) flowCfg() flow.Config {
+	fc := e.Cfg.Flow.Core()
+	fc.ContractGate = !e.contractValidable()
+	return fc
+}
+
+// restoreFrozen deja frozen-tests.json como estaba antes de congelar.
+func (e *Engine) restoreFrozen(id string, prev map[string]string) {
+	if prev == nil {
+		if p, err := e.Store.Path(id, FrozenFile); err == nil {
+			_ = os.Remove(p)
+		}
+		return
+	}
+	_ = e.saveFrozen(id, prev)
+}
 
 func (e *Engine) now() time.Time {
 	if e.Now != nil {
@@ -114,21 +129,16 @@ func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug s
 			rec.Title, rec.URL = task.Title, task.URL
 		}
 
+		freeze := false
+		var prevFrozen map[string]string
+		froze := false
 		if ev.Kind == flow.EvReport && ev.Verdict == flow.ContractReady && rec.Flow.Phase == flow.Contract {
 			verified, rej := e.contractCheck(ctx, id)
 			if rej != nil {
 				return rej
 			}
 			ev.ContractOK = verified
-			if verified {
-				// Sin pruebas congeladas no se avanza: se abre la gate contract.
-				if n, err := e.freezeTests(ctx, id); err != nil {
-					ev.ContractOK = false
-					out.Warnings = append(out.Warnings, "no se pudieron congelar las pruebas, el contrato queda en la gate contract: "+err.Error())
-				} else if n > 0 {
-					out.Warnings = append(out.Warnings, fmt.Sprintf("%d prueba(s) congelada(s): no se editan hasta el PR", n))
-				}
-			}
+			freeze = verified
 		}
 		if ev.Kind == flow.EvReport && ev.Verdict == flow.Split && rec.Flow.Phase == flow.Spec {
 			brief, err := e.specSection(*rec, "brief")
@@ -216,6 +226,22 @@ func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug s
 				return err
 			}
 		}
+		if freeze && res.State.Phase != flow.Contract {
+			// Sin pruebas congeladas no se avanza: se abre la gate contract.
+			prevFrozen = e.readFrozen(id)
+			if n, err := e.freezeTests(ctx, id); err != nil {
+				ev.ContractOK = false
+				out.Warnings = append(out.Warnings, "no se pudieron congelar las pruebas, el contrato queda en la gate contract: "+err.Error())
+				if res, err = flow.Apply(fc, before, ev); err != nil {
+					return err
+				}
+			} else {
+				froze = true
+				if n > 0 {
+					out.Warnings = append(out.Warnings, fmt.Sprintf("%d prueba(s) congelada(s): no se editan hasta el PR", n))
+				}
+			}
+		}
 		rec.Flow = res.State
 		if before.Phase == flow.Quality && rec.Flow.Phase == flow.Implementing && e.Git != nil {
 			if head, err := e.Git.HeadSHA(ctx); err == nil {
@@ -231,6 +257,9 @@ func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug s
 		warns, err := e.runEffects(ctx, rec, res.Effects)
 		if err != nil {
 			rec.Flow = before
+			if froze {
+				e.restoreFrozen(id, prevFrozen)
+			}
 			return err
 		}
 		out.Warnings = append(out.Warnings, warns...)

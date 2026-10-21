@@ -80,7 +80,7 @@
 - R8 [D] El carril full por defecto DEBE ser discovery, spec, contract, implementing, quality, documenting, walkthrough, in_review, done (sin `paused`).
 - R9 [D] CUANDO llega un DONE válido de implementing (check verde vigente, como hoy) y la tarea no pidió pausa, el sistema DEBE pasar a la fase siguiente del carril (quality en full).
 - R10 [D] CUANDO una persona corre `bflow pause <id>` con la tarea en una fase anterior a quality (incluida implementing), el sistema DEBE marcarla para pausar; repetirlo no es error.
-- R11 [N] CUANDO se corre `bflow pause <id>` con la tarea en quality o una fase posterior, o retirada, el sistema DEBE rechazar con `pause_late`; sin empezar, con `not_started`.
+- R11 [N] CUANDO se corre `bflow pause <id>` con la tarea en quality o una fase posterior, el sistema DEBE rechazar con `pause_late`; retirada, con `task_dropped`; sin empezar, con `not_started`.
 - R12 [D] CUANDO llega un DONE válido de implementing y la tarea tiene la marca de pausa, o el carril incluye `paused`, el sistema DEBE entrar a `paused` con la gate `pause` y quitar la marca.
 - R13 [N] CUANDO se aprueba la gate `pause`, el sistema DEBE ir a la fase que sigue a `paused` en el carril o, si el carril no la tiene, a la que sigue a implementing; al rechazarla, vuelve a implementing como hoy.
 - R14 [D] Las tareas que ya esperan en la gate `contract` o `pause` DEBEN poder aprobarse y rechazarse con los mismos comandos y destinos que hoy.

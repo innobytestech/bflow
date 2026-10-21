@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -27,13 +26,11 @@ func (e *Engine) contractCheck(ctx context.Context, id string) (verified bool, r
 		return false, &flow.Rejection{Code: "contract_hollow", Reason: "el contrato tiene pruebas que se saltan siempre o no tienen cuerpo; al aprobarlo se congelan y ya no se pueden completar:" + "\n" +
 			strings.Join(hollow, "\n") + "\n" + "Escribe su cuerpo real (preparar, actuar, verificar contra las firmas) para que fallen contra los stubs, y reporta otra vez."}
 	}
-	steps := e.Cfg.Check.Steps
 	testStep := e.Cfg.Check.TestStep
 	if testStep == "" {
 		testStep = "test"
 	}
-	testIdx := slices.IndexFunc(steps, func(s config.Step) bool { return s.Name == testStep })
-	if e.Contract == nil || testIdx < 0 {
+	if !e.contractValidable() {
 		return false, nil
 	}
 	res, fresh, detail, err := e.Contract.Last(ctx, id)
@@ -54,15 +51,18 @@ func (e *Engine) contractCheck(ctx context.Context, id string) (verified bool, r
 				s.Name, strings.Join(failLines(s.Fails, s.Tail, contractFailLines), "\n"), id)}
 		}
 	}
-	names := contractTestNames(e.Cfg.Root, files)
+	t1 := contractTestNames(e.Cfg.Root, files)
+	names := t1.names()
 	for _, s := range res.Steps {
 		if s.Name != testStep || s.Status != "fail" {
 			continue
 		}
-		for _, l := range failLines(s.Fails, s.Tail, -1) {
-			if slices.ContainsFunc(names, func(n string) bool { return strings.Contains(l, n) }) {
-				return true, nil
-			}
+		lines := failLines(s.Fails, s.Tail, -1)
+		if buildFailed(lines) {
+			return false, nil
+		}
+		if slices.ContainsFunc(lines, t1.failed) {
+			return true, nil
 		}
 	}
 	return false, &flow.Rejection{Code: "contract_green", Reason: fmt.Sprintf("el paso %q no falla por ninguna prueba T1 (%s): las T1 deben fallar contra los stubs; si pasan no verifican nada.\nAjusta las pruebas, haz commit, corre `bflow check %s` y reporta otra vez.",
@@ -92,18 +92,21 @@ func firstN(s []string, n int) []string {
 	return s
 }
 
-// contractTestNames son los nombres con los que una línea de fallo nombra una
-// prueba del contrato: el nombre base de cada archivo y cada función Test* de Go.
-func contractTestNames(root string, files []string) []string {
-	var out []string
-	add := func(n string) {
-		if !slices.Contains(out, n) {
-			out = append(out, n)
-		}
-	}
+// contractT1 son los nombres con que una línea de fallo nombra una prueba del contrato.
+type contractT1 struct {
+	Funcs []string // funciones Test* de los archivos .go del contrato
+	Paths []string // rutas (con /) de los archivos del contrato que no son .go
+}
+
+// contractTestNames separa los archivos del contrato en funciones Test* (Go) y rutas.
+func contractTestNames(root string, files []string) contractT1 {
+	var out contractT1
 	for _, f := range files {
-		add(path.Base(strings.ReplaceAll(f, `\`, "/")))
+		f = strings.ReplaceAll(f, `\`, "/")
 		if !strings.HasSuffix(f, ".go") {
+			if !slices.Contains(out.Paths, f) {
+				out.Paths = append(out.Paths, f)
+			}
 			continue
 		}
 		b, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(f)))
@@ -111,10 +114,69 @@ func contractTestNames(root string, files []string) []string {
 			continue
 		}
 		for _, m := range goTestFunc.FindAllSubmatch(b, -1) {
-			add(string(m[1]))
+			if n := string(m[1]); !slices.Contains(out.Funcs, n) {
+				out.Funcs = append(out.Funcs, n)
+			}
 		}
 	}
 	return out
+}
+
+// names son Funcs y luego Paths, para el mensaje contract_green.
+func (c contractT1) names() []string {
+	return append(slices.Clone(c.Funcs), c.Paths...)
+}
+
+// failed dice si la línea de fallo nombra con exactitud una prueba del contrato.
+func (c contractT1) failed(line string) bool {
+	t := strings.TrimSpace(line)
+	for _, f := range c.Funcs {
+		if rest, ok := strings.CutPrefix(t, "--- FAIL: "+f); ok && (rest == "" || rest[0] == ' ' || rest[0] == '/') {
+			return true
+		}
+	}
+	n := strings.ReplaceAll(line, `\`, "/")
+	for _, p := range c.Paths {
+		for from := 0; from <= len(n); {
+			i := strings.Index(n[from:], p)
+			if i < 0 {
+				break
+			}
+			i += from
+			end := i + len(p)
+			if (i == 0 || !pathByte(n[i-1])) && (end >= len(n) || !pathByte(n[end])) {
+				return true
+			}
+			from = i + 1
+		}
+	}
+	return false
+}
+
+func pathByte(b byte) bool {
+	return b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z' || b >= '0' && b <= '9' || b == '_' || b == '.' || b == '-'
+}
+
+// buildFailed dice si alguna línea indica que la prueba no llegó a correr.
+func buildFailed(lines []string) bool {
+	for _, l := range lines {
+		if strings.Contains(l, "[build failed]") || strings.Contains(l, "[setup failed]") {
+			return true
+		}
+	}
+	return false
+}
+
+// contractValidable dice si el repo puede validar el contrato con el último check.
+func (e *Engine) contractValidable() bool {
+	if e.Contract == nil {
+		return false
+	}
+	testStep := e.Cfg.Check.TestStep
+	if testStep == "" {
+		testStep = "test"
+	}
+	return slices.ContainsFunc(e.Cfg.Check.Steps, func(s config.Step) bool { return s.Name == testStep })
 }
 
 // Pause marca la tarea para parar antes de quality.
