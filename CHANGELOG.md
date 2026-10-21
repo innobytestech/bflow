@@ -6,6 +6,7 @@ Los cambios de bflow que ve quien lo usa. Las versiones siguen [semver](https://
 
 ### Documentación
 
+- Código de conducta (Contributor Covenant 2.1, en español), plantillas de issue para bug y propuesta, y plantilla de pull request.
 - Documentación completa para quien prueba la rc.10: README corto como entrada, y en `docs/` la motivación y rumbo, instalación, conceptos, configuración, referencia de comandos, guía de día a día, cómo probar y reportar issues, y problemas conocidos. Describe solo lo que el código hace hoy: las gates de cada carril y cuándo abren las condicionales (`contract`, `pause`, `repro`), el contrato como test-first (pruebas de aceptación congeladas) y las garantías cotejadas contra `guard`.
 
 ### Cambiado
