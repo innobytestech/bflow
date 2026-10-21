@@ -370,3 +370,44 @@ func TestLockFileUnlockRetriesRemove(t *testing.T) {
 	}
 	u2()
 }
+
+// queueWriters lanza n escritores que duermen dentro de la sección crítica:
+// la cola total (n*hold) simula un runner lento sin depender de su velocidad.
+func queueWriters(root string, n int, hold time.Duration, open func(string) *Store) []error {
+	var wg sync.WaitGroup
+	errs := make([]error, n)
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			_, errs[i] = open(root).Update("Q-1", func(*Record, bool) error {
+				time.Sleep(hold)
+				return nil
+			})
+		}(i)
+	}
+	wg.Wait()
+	return errs
+}
+
+func TestQueuedWritersOutlastShortLockTimeout(t *testing.T) {
+	short := func(root string) *Store {
+		s := Open(root)
+		s.LockTimeout = 200 * time.Millisecond
+		return s
+	}
+	gaveUp := 0
+	for _, err := range queueWriters(testutil.TempDir(t), 8, 100*time.Millisecond, short) {
+		if errors.Is(err, ErrLocked) {
+			gaveUp++
+		}
+	}
+	if gaveUp == 0 {
+		t.Fatal("con una cola mayor que LockTimeout algún escritor debía rendirse")
+	}
+	for i, err := range queueWriters(testutil.TempDir(t), 8, 100*time.Millisecond, openPatient) {
+		if err != nil {
+			t.Errorf("escritor %d con openPatient: %v", i, err)
+		}
+	}
+}
