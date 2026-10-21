@@ -92,7 +92,7 @@ Lo de abajo es el plan, no lo ya hecho. Cada hito enlaza su milestone en GitHub.
 |---|---|---|
 | v0.1.1 | Mejoras que salieron de v0.1.0 para no retrasar la publicación: amarillos en el walkthrough (#154) y métricas en el PR (#74). | [v0.1.1](https://github.com/innobytestech/bflow/milestone/8) |
 | Bloque 2 · Difusión | Después de publicar v0.1.0: video (#69), topics (#67), README en inglés (#62), repo de ejemplo (#76), artículo en español (#161) y en inglés (#68), comparativas (#70). | [Bloque 2](https://github.com/innobytestech/bflow/milestone/6) |
-| Bloque 3 · Después de publicar | Sin orden fijo: memoria por repo (#156, se decide con datos de uso), política de estabilidad (#72) y bflow completo en inglés (#191, cuando lleguen usuarios que no hablen español). Otras ideas (Linear, Codex, worktrees) se retoman si un usuario las pide. | [Bloque 3](https://github.com/innobytestech/bflow/milestone/7) |
+| Bloque 3 · Después de publicar | Sin orden fijo: memoria por repo (#156, se decide con datos de uso), política de estabilidad (#72) y bflow completo en inglés (#191, cuando lleguen usuarios que no hablen español). Los adaptadores de Linear (#73) y Codex (#75) están abiertos para quien quiera contribuirlos. | [Bloque 3](https://github.com/innobytestech/bflow/milestone/7) |
 | 1.0 | API de comandos estable. | Sin milestone todavía |
 
 ### Módulos del producto

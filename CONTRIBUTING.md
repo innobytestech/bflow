@@ -2,6 +2,16 @@
 
 Gracias por el interés. bflow está en `v0.x` y el diseño todavía cambia; antes de un cambio grande abre un issue para acordarlo.
 
+## Cómo ayudar
+
+bflow es una v0.1 que el autor usa a diario y mantiene en su tiempo libre. Crece más rápido con la ayuda de quien lo usa, y cualquier aporte suma:
+
+- **Pruébalo y cuenta qué falla.** Un issue con la plantilla de bug ya es una contribución. Qué datos incluir: [cómo probar y reportar](docs/como-probar-y-reportar.md).
+- **Toma un issue abierto.** Los de [`good first issue`](https://github.com/innobytestech/bflow/labels/good%20first%20issue) son para empezar; los de [`help wanted`](https://github.com/innobytestech/bflow/labels/help%20wanted) (por ejemplo, los adaptadores de Linear y Codex) no están en el plan del autor y esperan a alguien que los necesite. Comenta en el issue antes de empezar para no duplicar trabajo.
+- **Propón ideas.** Abre un issue con la plantilla de propuesta y lo platicamos antes de escribir código.
+
+**Ritmo:** los issues y PRs se revisan una vez por semana. Un PR chico, con su prueba y una descripción de cómo se probó, se revisa más rápido. Las vulnerabilidades van por el reporte privado ([SECURITY.md](SECURITY.md)).
+
 ## Preparar el entorno
 
 Requisitos: Go 1.25 o superior y git.
