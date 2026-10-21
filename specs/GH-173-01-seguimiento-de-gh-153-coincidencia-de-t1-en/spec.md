@@ -109,9 +109,9 @@ Sin cambios de authz ni de datos sensibles. Las líneas del check se tratan como
 
 ## Tasks
 
-- [ ] T1 Contrato: firmas de Design (`contractT1`, `failed`, `names`, `buildFailed`, `contractValidable`, `restoreFrozen`, `flow.Config.ContractGate`, `View.ContractGate`, `humanStop`) con cuerpos stub, y pruebas en rojo: `TestContractRedMatch` (mapa: `--- FAIL: TestSuma (0.00s)` sí; `--- FAIL: TestSuma/x` sí; `TestSum` contra `--- FAIL: TestSuma` no; `suma_test.go:5:2: undefined: Suma` no; `web/a.spec.ts` contra `web/ba.spec.ts` no; `a_test.go` contra `ba_test.go` no; ruta absoluta y ruta con `\` sí), `TestContractBuildFailedOpensGate` (error de compilación que nombra el T1 + `[build failed]`: gate contract, sin congelar), `TestContractNoFreezeWhenApplyFails` (gate contract ya abierta: `gate_pending` y sin `frozen-tests.json`), `TestRestoreFrozen`, caso "error de Last" en `TestContractStale`, `TestPauseLateBlockedPhase`, `TestUpcomingContractGate`, `TestHumanStopContract`; `TestPauseLate` acepta solo `task_dropped`. (R1-R12)
-- [ ] T2 Coincidencia exacta y build failed en `contract.go`; ajustar `TestContractTestNames` y `TestContractGreenNoT1Names`. (R1-R5)
-- [ ] T3 Mensaje de `pause_late` con la fase real y corrección de R11 en la spec de GH-153. (R6, R7)
-- [ ] T4 `ContractGate` en `flow.Config`/`flowCfg`, `Upcoming`, `View` y `humanStop`. (R8)
-- [ ] T5 Congelado después de `flow.Apply`: reaplicar con `ContractOK=false` si falla y `restoreFrozen` si fallan los efectos; `TestContractFreezeFailureOpensGate` sigue verde. (R9-R11)
-- [ ] T6 `fakeContract.err` y el caso de `Last` con error. (R12)
+- [x] T1 Contrato: firmas de Design (`contractT1`, `failed`, `names`, `buildFailed`, `contractValidable`, `restoreFrozen`, `flow.Config.ContractGate`, `View.ContractGate`, `humanStop`) con cuerpos stub, y pruebas en rojo: `TestContractRedMatch` (mapa: `--- FAIL: TestSuma (0.00s)` sí; `--- FAIL: TestSuma/x` sí; `TestSum` contra `--- FAIL: TestSuma` no; `suma_test.go:5:2: undefined: Suma` no; `web/a.spec.ts` contra `web/ba.spec.ts` no; `a_test.go` contra `ba_test.go` no; ruta absoluta y ruta con `\` sí), `TestContractBuildFailedOpensGate` (error de compilación que nombra el T1 + `[build failed]`: gate contract, sin congelar), `TestContractNoFreezeWhenApplyFails` (gate contract ya abierta: `gate_pending` y sin `frozen-tests.json`), `TestRestoreFrozen`, caso "error de Last" en `TestContractStale`, `TestPauseLateBlockedPhase`, `TestUpcomingContractGate`, `TestHumanStopContract`; `TestPauseLate` acepta solo `task_dropped`. (R1-R12)
+- [x] T2 Coincidencia exacta y build failed en `contract.go`; ajustar `TestContractTestNames` y `TestContractGreenNoT1Names`. (R1-R5)
+- [x] T3 Mensaje de `pause_late` con la fase real y corrección de R11 en la spec de GH-153. (R6, R7)
+- [x] T4 `ContractGate` en `flow.Config`/`flowCfg`, `Upcoming`, `View` y `humanStop`. (R8)
+- [x] T5 Congelado después de `flow.Apply`: reaplicar con `ContractOK=false` si falla y `restoreFrozen` si fallan los efectos; `TestContractFreezeFailureOpensGate` sigue verde. (R9-R11)
+- [x] T6 `fakeContract.err` y el caso de `Last` con error. (R12)

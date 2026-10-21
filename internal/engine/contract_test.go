@@ -167,7 +167,7 @@ func TestContractReadyFreezesAndAdvances(t *testing.T) {
 }
 
 func TestContractReadyPreStepSkipCounts(t *testing.T) {
-	res := &check.Result{SHA: "abc", Result: "FAIL", Steps: steps("skip", "fail", "pass", "TestResta")}
+	res := &check.Result{SHA: "abc", Result: "FAIL", Steps: steps("skip", "fail", "pass", "--- FAIL: TestResta (0.00s)")}
 	v, id := contractEnv(t, contractYAML, &fakeContract{res: res, fresh: true})
 	if o, err := contractReady(v, id); err != nil || o.To != flow.Implementing {
 		t.Fatalf("un paso previo en skip cuenta como bien: %v %+v", err, o)
