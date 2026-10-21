@@ -4,13 +4,13 @@ bflow separa lo que **requiere criterio** (entender el problema, diseñar, progr
 
 ## Qué hace
 
-- **Máquina de estados con gates humanos.** Cada tarea recorre fases; en los puntos de decisión (aprobar la spec, aprobar el contrato, aprobar el PR…) el flujo se detiene hasta que una persona decide.
+- **Máquina de estados con gates humanos.** Cada tarea recorre fases; en los puntos de decisión (aprobar la spec, responder las preguntas de producto, aprobar el PR…) el flujo se detiene hasta que una persona decide.
 - **Carriles.** Una feature normal (`full`), una pequeña (`light`) o un defecto ya mergeado (`hotfix`) recorren fases distintas. Ninguno se salta la revisión de calidad.
 - **`next`: una sola instrucción para el agente.** Cada comando responde qué preguntar (con las opciones y el comando exacto de cada una), qué agentes lanzar (con sus argumentos y cómo deben reportar), qué esperar o que no hay nada pendiente.
 - **Tracker y git sin el modelo.** Mueve la tarea en el tracker, sella la fecha de inicio, comenta los rechazos, crea la rama al aprobar la spec, abre el PR con el review-map y el walkthrough, y cierra la tarea cuando el PR se mergea.
 - **Compuerta de calidad determinista (`bflow check`).** Corre los pasos del proyecto (lint, pruebas, build, vulnerabilidades, secretos), resume los fallos en pocas líneas y liga el resultado a un commit. El agente no puede reportar "terminé" sin un check verde del código actual.
-- **Reglas que se cumplen con código (`bflow guard`).** Un hook bloquea antes de que ocurra: `git reset --hard`, push forzado o a ramas protegidas, editar `.env` o `.bflow/`, modificar las pruebas que se aprobaron en el contrato, que un subagente apruebe, rechace, desbloquee o empiece tareas (eso lo responde una persona) y, con una tarea en curso, crear ramas o PR a mano (eso lo hace bflow). Sin bloquear, tras correr la prueba del stack directo (`go test`, `npm test`...) sugiere `bflow check --quick <paquete>` una vez por sesión, si el repo define `check.quick`. Las pruebas congeladas también se verifican sin hook: `report DONE` y `check --verify` comparan su contenido con el del contrato, y solo una persona acepta un cambio con `bflow freeze`.
-- **Métricas.** Tiempo por fase separado en trabajo del agente, espera del humano y bloqueo; iteraciones (rechazos por gate, rondas, decisiones); hotfixes ligados a la feature que corrigen (`start --fixes`); fricción (pedidos que el flujo rechazó y bloqueos de `guard`), y tokens por fase, por agente y por modelo leídos de los transcripts, con lo nuevo separado de la caché leída. Cómo se reparten los tokens entre tareas: [marcas-sesion.md](marcas-sesion.md).
+- **Reglas que se cumplen con código (`bflow guard`).** Un hook bloquea antes de que ocurra: `git reset --hard`, push forzado o a ramas protegidas, editar `.env` o `.bflow/`, modificar las pruebas congeladas del contrato (también desde Bash: `sed -i`, redirecciones, `tee`, intérpretes), que un subagente apruebe, rechace, desbloquee o empiece tareas (eso lo responde una persona) y, con una tarea en curso, crear ramas o PR a mano (eso lo hace bflow). Sin bloquear, tras correr la prueba del stack directo (`go test`, `npm test`...) sugiere `bflow check --quick <paquete>` una vez por sesión, si el repo define `check.quick`. Las pruebas congeladas también se verifican sin hook: `report DONE` y `check --verify` comparan su contenido con el del contrato, y solo una persona acepta un cambio con `bflow freeze`.
+- **Métricas.** Tiempo por fase separado en trabajo del agente, espera del humano y bloqueo; iteraciones (rechazos por gate, rondas, decisiones); hotfixes ligados a la feature que corrigen (`start --fixes`); fricción (pedidos que el flujo rechazó y bloqueos de `guard`), y tokens por fase, por agente y por modelo leídos de los transcripts, con lo nuevo separado de la caché leída. Cómo se reparten los tokens entre tareas: [guía](guia.md#medir).
 - **Salida pensada para gastar pocos tokens.** JSON compacto y sin campos redundantes. Una respuesta típica pesa ~480 bytes, y un check fallido le entrega al agente solo las líneas de fallo, sin repetir; el detalle completo queda en un archivo.
 
 ## Núcleo neutral y adaptadores
@@ -74,7 +74,28 @@ stateDiagram-v2
 
 ## Gates
 
-Una gate es un punto donde el flujo se detiene hasta que una persona decide: carril, discovery, spec, decisiones que un agente no puede tomar, rondas, preguntas de producto y walkthrough; el contrato T1 y la pausa antes de la revisión solo abren gate cuando bflow no puede validar el contrato o cuando se pidió `bflow pause`. Qué ves y qué decides en cada una está en la [guía](guia.md#las-gates-qué-ves-y-qué-decides).
+Una gate es un punto donde el flujo se detiene hasta que una persona decide. Qué ves y qué decides en cada una está en la [guía](guia.md#las-gates-qué-ves-y-qué-decides).
+
+| Carril | Gates fijas | Gates condicionales |
+|---|---|---|
+| `full` | 5: carril, discovery, spec, preguntas de producto y walkthrough | decisión, rondas, `contract`, `pause`, `budget` |
+| `light` | 4: carril, spec, preguntas de producto y walkthrough | decisión, rondas, `pause`, `budget` |
+| `hotfix` | 3: carril, preguntas de producto y walkthrough | decisión, rondas, `pause`, `budget`, `repro` |
+
+La gate de carril no aparece si la tarea se crea o se arranca con `--lane`. Las condicionales:
+
+- **decisión:** un agente devolvió `NEEDS_DECISION`.
+- **rondas:** la revisión de calidad rechazó dos veces seguidas (por defecto 2; `max_quality_rounds` lo cambia).
+- **`contract` (solo full):** bflow no pudo validar el contrato solo. Pasa si no hay checker, si `check.steps` no incluye `check.test_step`, si el paso de pruebas falla con `[build failed]` o `[setup failed]`, o si falla el congelado de las pruebas.
+- **`pause`:** solo si una persona corrió `bflow pause <ID>` (o si un carril de `bflow.yaml` declara la fase `paused`). Detiene la tarea antes de la revisión de calidad.
+- **`budget`:** solo si `flow.budget` está configurado y una fase lo pasa.
+- **`repro` (solo hotfix):** solo si el implementer reporta `DONE --no-repro "<motivo>"`.
+
+### Contrato T1: test-first por contrato
+
+En `full`, T1 escribe antes del código las pruebas de aceptación y los stubs (interfaces y firmas). Al reportar `CONTRACT_READY`, bflow exige el contrato commiteado y un `bflow check` vigente en el que fallen esas pruebas, y las congela. Si no se cumple, rechaza con `contract_stale` (falta el commit o el check), `contract_broken` (falla algo anterior a las pruebas), `contract_green` (las pruebas T1 no fallan) o `contract_hollow` (pruebas vacías o que se saltan siempre). Después solo una persona acepta un cambio a esas pruebas, con `bflow freeze`. Es un contrato de aceptación fijado antes de implementar, no un ciclo de pruebas por función.
+
+En `hotfix`, `report DONE` exige un commit de solo pruebas, anterior al último, cuyo check falló en `check.test_step`, o `--no-repro` con la gate `repro`.
 
 ## El contrato con el agente: `next`
 

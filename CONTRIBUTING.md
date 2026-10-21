@@ -15,7 +15,7 @@ go test ./...        # incluye E2E que compilan el binario y usan git real
 
 ## Reglas del código
 
-- **Pruebas primero.** Cada cambio llega con su prueba; un bug, con la prueba que lo reproduce.
+- **Cada cambio con su prueba.** Cada cambio llega con su prueba; un bug, con la prueba que lo reproduce.
 - **Núcleo neutral.** `internal/...` nunca importa `internal/adapters/...` (lo verifica `internal/archtest`). Solo `cmd/bflow` conecta ambos.
 - **Sin dependencias nuevas** fuera de la biblioteca estándar, `gopkg.in/yaml.v3` y `github.com/zalando/go-keyring`, salvo acuerdo previo en un issue.
 - **Adaptadores externos** se prueban con `httptest` y respuestas grabadas, nunca contra servicios reales. Un tracker nuevo debe pasar la suite de conformidad.
