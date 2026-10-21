@@ -205,11 +205,19 @@ func TestHelperProcess(t *testing.T) {
 	}
 	parts := strings.Split(spec, "|")
 	n, _ := strconv.Atoi(parts[2])
-	if err := increments(Open(parts[0]), parts[1], n); err != nil {
+	if err := increments(openPatient(parts[0]), parts[1], n); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	os.Exit(0)
+}
+
+// openPatient espera el candado mucho más que el valor de producción: en un
+// runner lento de Windows 22 escritores pueden tardar más de 10 s en turnarse.
+func openPatient(root string) *Store {
+	s := Open(root)
+	s.LockTimeout = 2 * time.Minute
+	return s
 }
 
 func increments(s *Store, who string, n int) error {
@@ -258,7 +266,7 @@ func TestConcurrentGoroutinesAndProcesses(t *testing.T) {
 		wg.Add(1)
 		go func(g int) {
 			defer wg.Done()
-			if err := increments(Open(root), fmt.Sprintf("g%d", g), each); err != nil {
+			if err := increments(openPatient(root), fmt.Sprintf("g%d", g), each); err != nil {
 				errs <- err
 			}
 		}(g)
@@ -369,4 +377,45 @@ func TestLockFileUnlockRetriesRemove(t *testing.T) {
 		t.Fatalf("segundo lock: %v tras %v", err, time.Since(start))
 	}
 	u2()
+}
+
+// queueWriters lanza n escritores que duermen dentro de la sección crítica:
+// la cola total (n*hold) simula un runner lento sin depender de su velocidad.
+func queueWriters(root string, n int, hold time.Duration, open func(string) *Store) []error {
+	var wg sync.WaitGroup
+	errs := make([]error, n)
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			_, errs[i] = open(root).Update("Q-1", func(*Record, bool) error {
+				time.Sleep(hold)
+				return nil
+			})
+		}(i)
+	}
+	wg.Wait()
+	return errs
+}
+
+func TestQueuedWritersOutlastShortLockTimeout(t *testing.T) {
+	short := func(root string) *Store {
+		s := Open(root)
+		s.LockTimeout = 200 * time.Millisecond
+		return s
+	}
+	gaveUp := 0
+	for _, err := range queueWriters(testutil.TempDir(t), 8, 100*time.Millisecond, short) {
+		if errors.Is(err, ErrLocked) {
+			gaveUp++
+		}
+	}
+	if gaveUp == 0 {
+		t.Fatal("con una cola mayor que LockTimeout algún escritor debía rendirse")
+	}
+	for i, err := range queueWriters(testutil.TempDir(t), 8, 100*time.Millisecond, openPatient) {
+		if err != nil {
+			t.Errorf("escritor %d con openPatient: %v", i, err)
+		}
+	}
 }
