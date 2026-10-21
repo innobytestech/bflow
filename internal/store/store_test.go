@@ -205,11 +205,19 @@ func TestHelperProcess(t *testing.T) {
 	}
 	parts := strings.Split(spec, "|")
 	n, _ := strconv.Atoi(parts[2])
-	if err := increments(Open(parts[0]), parts[1], n); err != nil {
+	if err := increments(openPatient(parts[0]), parts[1], n); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	os.Exit(0)
+}
+
+// openPatient espera el candado mucho más que el valor de producción: en un
+// runner lento de Windows 22 escritores pueden tardar más de 10 s en turnarse.
+func openPatient(root string) *Store {
+	s := Open(root)
+	s.LockTimeout = 2 * time.Minute
+	return s
 }
 
 func increments(s *Store, who string, n int) error {
@@ -258,7 +266,7 @@ func TestConcurrentGoroutinesAndProcesses(t *testing.T) {
 		wg.Add(1)
 		go func(g int) {
 			defer wg.Done()
-			if err := increments(Open(root), fmt.Sprintf("g%d", g), each); err != nil {
+			if err := increments(openPatient(root), fmt.Sprintf("g%d", g), each); err != nil {
 				errs <- err
 			}
 		}(g)
