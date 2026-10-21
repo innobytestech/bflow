@@ -13,6 +13,9 @@ jobs:
     # Windows para poder firmar los .exe con signtool; Go compila las demás
     # plataformas desde aquí.
     runs-on: windows-latest
+    # Settings → Environments → release pide aprobación de un mantenedor antes
+    # de publicar: un tag de alguien con escritura no basta.
+    environment: release
     env:
       TAG: ${{ github.ref_name }}
       CERT: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
