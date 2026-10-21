@@ -92,13 +92,13 @@ func firstN(s []string, n int) []string {
 	return s
 }
 
-// contractT1 son los nombres con que una línea de fallo nombra una prueba T1.
+// contractT1 son los nombres con que una línea de fallo nombra una prueba del contrato.
 type contractT1 struct {
-	Funcs []string // funciones Test* de los archivos T1 .go
-	Paths []string // rutas (con /) de los archivos T1 que no son .go
+	Funcs []string // funciones Test* de los archivos .go del contrato
+	Paths []string // rutas (con /) de los archivos del contrato que no son .go
 }
 
-// contractTestNames separa los archivos T1 en funciones Test* (Go) y rutas.
+// contractTestNames separa los archivos del contrato en funciones Test* (Go) y rutas.
 func contractTestNames(root string, files []string) contractT1 {
 	var out contractT1
 	for _, f := range files {
@@ -127,7 +127,7 @@ func (c contractT1) names() []string {
 	return append(slices.Clone(c.Funcs), c.Paths...)
 }
 
-// failed dice si la línea de fallo nombra con exactitud una prueba T1.
+// failed dice si la línea de fallo nombra con exactitud una prueba del contrato.
 func (c contractT1) failed(line string) bool {
 	t := strings.TrimSpace(line)
 	for _, f := range c.Funcs {
