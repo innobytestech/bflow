@@ -1,5 +1,7 @@
 # Byteflow · `bflow`
 
+> [Leer en español](docs/es/README.md)
+
 **Motor de flujo Spec-Driven Development para trabajar con agentes de IA.** Un solo binario en Go que lleva cada tarea de la idea al PR mergeado (discovery, spec, implementación, revisión, walkthrough; en el carril full, también un contrato de pruebas de aceptación que se congela antes del código), decide las transiciones, habla con tu tracker y con git, y le dice al agente exactamente qué hacer después, en pocas líneas de JSON.
 
 > Estado: **v0.1.0**, la primera versión publicada. Funciona de punta a punta con el tracker local, Plane y GitHub, y con Claude Code y OpenCode como agente. La API de comandos puede cambiar antes de la 1.0. Si lo vas a probar, empieza por [cómo probar y reportar](docs/como-probar-y-reportar.md).
