@@ -445,3 +445,36 @@ func TestWorktreeRemoveMissingDir(t *testing.T) {
 		t.Errorf("el worktree sigue listado:\n%s", list)
 	}
 }
+
+// Traer la rama base con merge no invalida el check: solo cuentan los
+// cambios de la propia rama.
+func TestChangedSinceIgnoresBaseMerge(t *testing.T) {
+	work, _ := fixture(t)
+	g := New(work)
+	ctx := context.Background()
+	if _, err := g.EnsureBranch(ctx, "feature/X-2", "dev"); err != nil {
+		t.Fatal(err)
+	}
+	sha, _ := g.HeadSHA(ctx)
+
+	sh(t, work, "checkout", "-q", "dev")
+	write(t, work, "internal/from_dev.go", "package a\n")
+	sh(t, work, "add", ".")
+	sh(t, work, "commit", "-m", "dev avanza")
+	sh(t, work, "push", "origin", "dev")
+	sh(t, work, "checkout", "-q", "feature/X-2")
+	sh(t, work, "merge", "--no-ff", "-m", "trae dev", "origin/dev")
+
+	changed, err := g.ChangedSince(ctx, sha, []string{"internal"})
+	if err != nil || len(changed) != 0 {
+		t.Fatalf("lo que llega por merge de la base no cuenta: %v %v", changed, err)
+	}
+
+	write(t, work, "internal/own.go", "package a\n")
+	sh(t, work, "add", ".")
+	sh(t, work, "commit", "-m", "propio")
+	changed, err = g.ChangedSince(ctx, sha, []string{"internal"})
+	if err != nil || strings.Join(changed, ",") != "internal/own.go" {
+		t.Errorf("el cambio propio sí cuenta: %v %v", changed, err)
+	}
+}
