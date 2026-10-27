@@ -42,6 +42,7 @@ func TestBuildDefaultFlow(t *testing.T) {
 		"DONE exige `bflow check <id>`",
 		"quedan congeladas",
 		"comando literal `bflow freeze --allow <archivo>`",
+		"No ofrezcas aceptar el contrato sin check",
 		"`.bflow/tasks/<id>/contract.md` y `.bflow/tasks/<id>/reports/impl.md`",
 		"Tu respuesta final es solo la salida de `bflow report`",
 		"## Oficio\n",
