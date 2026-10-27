@@ -19,6 +19,7 @@ import (
 	"innobytes.tech/bflow/internal/agents"
 	"innobytes.tech/bflow/internal/config"
 	"innobytes.tech/bflow/internal/envcheck"
+	"innobytes.tech/bflow/internal/i18n"
 	"innobytes.tech/bflow/internal/metrics"
 	"innobytes.tech/bflow/internal/output"
 	"innobytes.tech/bflow/internal/setup"
@@ -97,7 +98,7 @@ func gitOut(dir string, args ...string) string {
 func init() {
 	Register(&Command{Name: "init", Summary: "crea bflow.yaml detectando stack, remoto, rama base y pasos de check: init [--yes] [--profile p] [--tracker local|plane|github] [--project P (github: owner/N)]|plane] [--project P]",
 		Setup: func(fs *flag.FlagSet) {
-			for _, f := range []string{"stack", "tracker", "project", "url", "workspace", "profile", "host", "base", "agent"} {
+			for _, f := range []string{"stack", "tracker", "project", "url", "workspace", "profile", "host", "base", "agent", "lang"} {
 				fs.String(f, "", "")
 			}
 			fs.Bool("yes", false, "no preguntar: usar lo detectado y los valores por defecto")
@@ -169,9 +170,25 @@ func runInit(c *Ctx) output.Envelope {
 		return output.Fail("usage", err)
 	}
 	p := newPrompter(c, str(c.Flags, "yes") == "true")
+
+	// Idioma / Language
+	langFlag := str(c.Flags, "lang")
+	if langFlag != "" && !slices.Contains(i18n.Supported, langFlag) {
+		return output.Fail("usage", fmt.Errorf("idioma/lang %q no existe (disponibles: %s)", langFlag, strings.Join(i18n.Supported, ", ")))
+	}
+	if langFlag == "" {
+		if !p.yes {
+			langOpts := []string{"en (English)", "es (Español)"}
+			langIdx := p.choose("Language / Idioma", langOpts, 0)
+			langFlag = i18n.Supported[langIdx]
+		} else {
+			langFlag = i18n.Default
+		}
+	}
+
 	det := setup.Detect(root, setup.Tools{Has: func(n string) bool { _, err := exec.LookPath(n); return err == nil }})
 
-	a := setup.Answers{Stack: det.Stack, Steps: det.Steps, Quick: det.Quick, RequireEnv: det.DBEnv}
+	a := setup.Answers{Stack: det.Stack, Steps: det.Steps, Quick: det.Quick, RequireEnv: det.DBEnv, Lang: langFlag}
 	if s := str(c.Flags, "stack"); s != "" {
 		a.Stack = s
 	}
