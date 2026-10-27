@@ -300,3 +300,26 @@ func TestReportMarkdown(t *testing.T) {
 		t.Errorf("resumen: %s", s)
 	}
 }
+
+// vitest pinta «FAIL» con ANSI y repite cada archivo; el último fallo no es T1.
+// Las líneas únicas deben traer todos los archivos fallidos.
+func TestTailVitestANSIKeepsAllFailures(t *testing.T) {
+	var b strings.Builder
+	for _, f := range []string{"a.t1.spec.ts", "b.t1.spec.ts"} {
+		b.WriteString("\x1b[41m\x1b[1m FAIL \x1b[22m\x1b[49m src/" + f + " > suite > prueba\n")
+	}
+	for i := 0; i < 80; i++ {
+		b.WriteString("\x1b[41m FAIL \x1b[49m src/otro" + string(rune('a'+i%26)) + string(rune('a'+i/26)) + ".spec.ts > x\n")
+	}
+	b.WriteString("\x1b[41m FAIL \x1b[49m src/ajena.spec.ts > inestable\n")
+	_, fails := (&Runner{}).tail(b.String())
+	joined := strings.Join(fails, "\n")
+	for _, want := range []string{"src/a.t1.spec.ts", "src/b.t1.spec.ts", "src/ajena.spec.ts"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("falta %s en las líneas de fallo", want)
+		}
+	}
+	if strings.Contains(joined, "\x1b") {
+		t.Error("quedaron códigos ANSI")
+	}
+}
