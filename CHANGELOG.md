@@ -4,6 +4,10 @@ Los cambios de bflow que ve quien lo usa. Las versiones siguen [semver](https://
 
 ## Sin publicar
 
+### Cambiado
+
+- **Un rojo que ya estaba en la base no bloquea el contrato T1.** Al reportar CONTRACT_READY, un paso anterior a `check.test_step` que falló ya no rechaza con `contract_broken` si todos sus hallazgos caen en archivos que git rastrea y que la rama no tocó (diff contra la base como el baseline `new-only`, más lo que borró o renombró y lo sin commitear). Sigue rechazando si el paso compila, revisa tipos, corre pruebas o busca vulnerabilidades; si la salida no nombra archivos, nombra uno tocado o trae un pánico, una excepción o un error de compilación; si una señal cortó el proceso; si la rama tocó un archivo en la misma carpeta que un hallazgo, un manifiesto de dependencias, un archivo oculto, una configuración conocida (`tsconfig`, `eslint.config.*`…), un archivo de la raíz que no sea texto o algo en la carpeta de la herramienta del paso; o si no se puede calcular el diff. El paso ignorado sale como aviso al aceptar, en el texto de cualquier rechazo posterior y en `log.jsonl` (`data.preexisting_red`). `bflow check` guarda en `check.json` a qué archivos apunta la salida de cada paso previo a las pruebas que falla (`blame`); con un check anterior hay que repetirlo. El resultado del check y el DONE no cambian. Sin cambios de comandos ni de configuración.
+
 ## v0.1.0 (2026-10-21)
 
 ### Documentación

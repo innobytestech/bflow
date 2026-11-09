@@ -162,6 +162,21 @@ func (g *Git) DiffKept(ctx context.Context, base string, paths []string) ([]stri
 	return lines(out), err
 }
 
+// DiffRemoved lista lo que base...HEAD borra, incluida la ruta vieja de un renombre.
+func (g *Git) DiffRemoved(ctx context.Context, base string) ([]string, error) {
+	out, err := g.run(ctx, "-c", "core.quotepath=off", "diff", "--name-only", "--no-renames", "--diff-filter=D", base+"...HEAD")
+	return lines(out), err
+}
+
+// Tracked devuelve, de paths, los que git rastrea.
+func (g *Git) Tracked(ctx context.Context, paths []string) ([]string, error) {
+	if len(paths) == 0 {
+		return nil, nil
+	}
+	out, err := g.run(ctx, append([]string{"-c", "core.quotepath=off", "ls-files", "--"}, paths...)...)
+	return lines(out), err
+}
+
 // Commits lista los commits sin merges de base..HEAD, del más viejo al más nuevo.
 func (g *Git) Commits(ctx context.Context, base string) ([]string, error) {
 	out, err := g.run(ctx, "rev-list", "--no-merges", "--topo-order", "--reverse", base+"..HEAD")

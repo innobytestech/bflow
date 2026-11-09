@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -18,14 +19,17 @@ import (
 )
 
 type fakeGit struct {
-	branch string
-	dirty  []string
-	calls  []string
-	diff   []string        // DiffNames
-	kept   []string        // DiffKept
-	lines  int             // DiffLines
-	binary []string        // DiffBinaries
-	added  []vcs.AddedLine // DiffAdded
+	branch    string
+	dirty     []string
+	calls     []string
+	diff      []string        // DiffNames
+	diffErr   error           // DiffNames falla
+	removed   []string        // DiffRemoved
+	untracked []string        // Tracked las deja fuera; las demás se rastrean
+	kept      []string        // DiffKept
+	lines     int             // DiffLines
+	binary    []string        // DiffBinaries
+	added     []vcs.AddedLine // DiffAdded
 	// onlyFor: si no está vacío, Dirty solo devuelve dirty cuando se le pregunta
 	// exactamente por esa ruta (la consulta del gate del changelog).
 	onlyFor string
@@ -81,8 +85,18 @@ func (g *fakeGit) HeadSHA(context.Context) (string, error) {
 func (g *fakeGit) DiffKept(context.Context, string, []string) ([]string, error) {
 	return g.kept, nil
 }
-func (g *fakeGit) DiffNames(context.Context, string) ([]string, error) { return g.diff, nil }
-func (g *fakeGit) DiffLines(context.Context, string) (int, error)      { return g.lines, nil }
+func (g *fakeGit) DiffNames(context.Context, string) ([]string, error)   { return g.diff, g.diffErr }
+func (g *fakeGit) DiffRemoved(context.Context, string) ([]string, error) { return g.removed, nil }
+func (g *fakeGit) Tracked(_ context.Context, paths []string) ([]string, error) {
+	var out []string
+	for _, p := range paths {
+		if !slices.Contains(g.untracked, p) {
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}
+func (g *fakeGit) DiffLines(context.Context, string) (int, error) { return g.lines, nil }
 func (g *fakeGit) DiffAdded(context.Context, string, []string) ([]vcs.AddedLine, error) {
 	return g.added, nil
 }

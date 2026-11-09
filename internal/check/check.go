@@ -63,6 +63,7 @@ type StepResult struct {
 	// las arregla el agente por su cuenta: decide una persona.
 	Preexisting bool   `json:"preexisting,omitempty"`
 	Accept      string `json:"accept_file,omitempty"`
+	Blame       *Blame `json:"blame,omitempty"` // solo si falló antes del paso de pruebas
 }
 
 // Result es una corrida de check.
@@ -100,8 +101,16 @@ func (r *Runner) Run(ctx context.Context) (Result, error) {
 	if len(dirty) > 0 {
 		res.SHA = "DIRTY"
 	}
+	testStep := r.Cfg.TestStep
+	if testStep == "" {
+		testStep = "test"
+	}
+	beforeTests := true
 	for _, st := range r.Cfg.Steps {
-		sr := r.step(ctx, st, &res)
+		if st.Name == testStep {
+			beforeTests = false
+		}
+		sr := r.step(ctx, st, &res, beforeTests)
 		if sr.Status == "fail" {
 			res.Result = "FAIL"
 		}
@@ -117,7 +126,7 @@ func (r *Runner) Quick(ctx context.Context, pkg string) (Result, error) {
 	}
 	res := Result{Date: r.now(), Result: "PASS"}
 	for i, line := range r.Cfg.Quick {
-		sr := r.step(ctx, config.Step{Name: fmt.Sprintf("quick %d", i+1), Run: strings.ReplaceAll(line, "{pkg}", pkg)}, &res)
+		sr := r.step(ctx, config.Step{Name: fmt.Sprintf("quick %d", i+1), Run: strings.ReplaceAll(line, "{pkg}", pkg)}, &res, false)
 		if sr.Status == "fail" {
 			res.Result = "FAIL"
 		}
@@ -132,7 +141,8 @@ func (r *Runner) degrade(res *Result, msg string) {
 	}
 }
 
-func (r *Runner) step(ctx context.Context, st config.Step, res *Result) StepResult {
+// step corre un paso; con blame, si falla, guarda a qué archivos apunta su salida.
+func (r *Runner) step(ctx context.Context, st config.Step, res *Result, blame bool) StepResult {
 	sr := StepResult{Name: st.Name, Cmd: st.Run}
 	if st.Needs != "" && r.LookPath != nil {
 		if _, err := r.LookPath(st.Needs); err != nil {
@@ -182,6 +192,7 @@ func (r *Runner) step(ctx context.Context, st config.Step, res *Result) StepResu
 	if isVulnStep(st) && !r.depsTouched(ctx) {
 		sr.Preexisting, sr.Accept = true, st.Accept
 	}
+	raw := out
 	if st.Baseline == "new-only" {
 		mine := r.onlyTouched(ctx, out)
 		if mine == "" {
@@ -192,6 +203,9 @@ func (r *Runner) step(ctx context.Context, st config.Step, res *Result) StepResu
 		out = mine
 	}
 	sr.Tail, sr.Fails = r.tail(out)
+	if blame {
+		sr.Blame = r.blame(st, raw, exit, err) // la salida sin filtrar: más conservador
+	}
 	return sr
 }
 
@@ -334,12 +348,17 @@ func (r *Runner) depsTouched(ctx context.Context) bool {
 	files, _ := r.Git.DiffNames(ctx, r.Base)
 	dirty, _ := r.Git.Dirty(ctx, nil)
 	for _, f := range append(files, dirty...) {
-		base := filepath.Base(strings.ReplaceAll(f, `\`, "/"))
-		if slices.Contains(depManifests, base) || strings.HasSuffix(base, ".csproj") || strings.HasPrefix(base, "requirements") {
+		if IsDepManifest(f) {
 			return true
 		}
 	}
 	return false
+}
+
+// IsDepManifest dice si el archivo fija versiones de dependencias o del toolchain.
+func IsDepManifest(file string) bool {
+	base := filepath.Base(strings.ReplaceAll(file, `\`, "/"))
+	return slices.Contains(depManifests, base) || strings.HasSuffix(base, ".csproj") || strings.HasPrefix(base, "requirements")
 }
 
 // PreexistingHint le dice al agente qué hacer con un paso de vulnerabilidades

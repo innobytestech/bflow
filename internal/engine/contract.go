@@ -2,13 +2,16 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 
+	"innobytes.tech/bflow/internal/check"
 	"innobytes.tech/bflow/internal/config"
 	"innobytes.tech/bflow/internal/flow"
 )
@@ -19,11 +22,12 @@ var goTestFunc = regexp.MustCompile(`(?m)^func (Test\w+)\(`)
 
 // contractCheck valida el contrato antes de aceptar CONTRACT_READY. verified
 // es true si el último check confirma que las pruebas del contrato fallan contra los stubs; false
-// sin rechazo significa que no se pudo validar y decide la gate contract.
-func (e *Engine) contractCheck(ctx context.Context, id string) (verified bool, rej *flow.Rejection) {
+// sin rechazo significa que no se pudo validar y decide la gate contract. ignored son los pasos
+// previos en rojo que no se le cobran a la tarea porque el rojo ya estaba en la base.
+func (e *Engine) contractCheck(ctx context.Context, id string) (verified bool, ignored []baseRed, rej *flow.Rejection) {
 	files := e.taskTests(ctx)
 	if hollow := hollowTests(e.Cfg.Root, files); len(hollow) > 0 {
-		return false, &flow.Rejection{Code: "contract_hollow", Reason: "el contrato tiene pruebas que se saltan siempre o no tienen cuerpo; al aprobarlo se congelan y ya no se pueden completar:" + "\n" +
+		return false, nil, &flow.Rejection{Code: "contract_hollow", Reason: "el contrato tiene pruebas que se saltan siempre o no tienen cuerpo; al aprobarlo se congelan y ya no se pueden completar:" + "\n" +
 			strings.Join(hollow, "\n") + "\n" + "Escribe su cuerpo real (preparar, actuar, verificar contra las firmas) para que fallen contra los stubs, y reporta otra vez."}
 	}
 	testStep := e.Cfg.Check.TestStep
@@ -31,7 +35,7 @@ func (e *Engine) contractCheck(ctx context.Context, id string) (verified bool, r
 		testStep = "test"
 	}
 	if !e.contractValidable() {
-		return false, nil
+		return false, nil, nil
 	}
 	res, fresh, detail, err := e.Contract.Last(ctx, id)
 	if err != nil {
@@ -39,17 +43,35 @@ func (e *Engine) contractCheck(ctx context.Context, id string) (verified bool, r
 		fresh = false
 	}
 	if !fresh {
-		return false, &flow.Rejection{Code: "contract_stale", Reason: "CONTRACT_READY exige el contrato commiteado y un check vigente sobre él: " + detail +
+		return false, nil, &flow.Rejection{Code: "contract_stale", Reason: "CONTRACT_READY exige el contrato commiteado y un check vigente sobre él: " + detail +
 			"\nHaz commit del contrato, corre `bflow check " + id + "` (las T1 deben fallar) y reporta otra vez."}
 	}
+	var touched []string
+	var touchedErr error
+	loaded := false
 	for _, s := range res.Steps {
 		if s.Name == testStep {
 			break
 		}
-		if s.Status == "fail" {
-			return false, &flow.Rejection{Code: "contract_broken", Reason: fmt.Sprintf("el paso %q del check falló antes de las pruebas: el contrato debe compilar y pasar lo previo, y fallar solo en las T1.\n%s\nCorrígelo, haz commit, corre `bflow check %s` y reporta otra vez.",
-				s.Name, strings.Join(failLines(s.Fails, s.Tail, contractFailLines), "\n"), id)}
+		if s.Status != "fail" {
+			continue
 		}
+		if !loaded {
+			touched, touchedErr = e.branchFiles(ctx)
+			loaded = true
+		}
+		var why string
+		if touchedErr != nil {
+			why = "no se pudo calcular qué archivos tocó la rama: " + touchedErr.Error()
+		} else {
+			var found []string
+			if found, why = e.redFromBase(ctx, s, touched); why == "" {
+				ignored = append(ignored, baseRed{Step: s.Name, Files: found})
+				continue
+			}
+		}
+		return false, ignored, &flow.Rejection{Code: "contract_broken", Reason: fmt.Sprintf("el paso %q del check falló antes de las pruebas: el contrato debe compilar y pasar lo previo, y fallar solo en las T1.\n%s\nNo cuenta como un rojo que ya estaba en la base: %s.%s\nCorrígelo, haz commit, corre `bflow check %s` y reporta otra vez.",
+			s.Name, strings.Join(failLines(s.Fails, s.Tail, contractFailLines), "\n"), why, ignoredNote(ignored), id)}
 	}
 	t1 := contractTestNames(e.Cfg.Root, files)
 	names := t1.names()
@@ -59,14 +81,234 @@ func (e *Engine) contractCheck(ctx context.Context, id string) (verified bool, r
 		}
 		lines := failLines(s.Fails, s.Tail, -1)
 		if buildFailed(lines) {
-			return false, nil
+			return false, ignored, nil
 		}
 		if slices.ContainsFunc(lines, t1.failed) {
-			return true, nil
+			return true, ignored, nil
 		}
 	}
-	return false, &flow.Rejection{Code: "contract_green", Reason: fmt.Sprintf("el paso %q no falla por ninguna prueba T1 (%s): las T1 deben fallar contra los stubs; si pasan no verifican nada.\nAjusta las pruebas, haz commit, corre `bflow check %s` y reporta otra vez.",
-		testStep, strings.Join(firstN(names, 5), ", "), id)}
+	return false, ignored, &flow.Rejection{Code: "contract_green", Reason: fmt.Sprintf("el paso %q no falla por ninguna prueba T1 (%s): las T1 deben fallar contra los stubs; si pasan no verifican nada.%s\nAjusta las pruebas, haz commit, corre `bflow check %s` y reporta otra vez.",
+		testStep, strings.Join(firstN(names, 5), ", "), ignoredNote(ignored), id)}
+}
+
+// baseRed es un paso previo a las pruebas que falló solo por archivos que la
+// rama no tocó: el rojo ya estaba en la base y el contrato no se lo cobra a la tarea.
+type baseRed struct {
+	Step  string
+	Files []string
+}
+
+func (b baseRed) String() string {
+	files := strings.Join(firstN(b.Files, 10), ", ")
+	if n := len(b.Files) - 10; n > 0 {
+		files += fmt.Sprintf(" y %d más", n)
+	}
+	return fmt.Sprintf("se ignoró el paso %q del check: falla solo en archivos que esta rama no tocó (el rojo ya estaba en la base): %s", b.Step, files)
+}
+
+func ignoredNote(ignored []baseRed) string {
+	var b strings.Builder
+	for _, r := range ignored {
+		b.WriteString("\n" + r.String() + ".")
+	}
+	return b.String()
+}
+
+// branchFiles son los archivos que tocó la rama: el diff contra la base más lo
+// que está sin commitear, como el baseline new-only del check, y además la ruta
+// vieja de lo que borró o renombró.
+func (e *Engine) branchFiles(ctx context.Context) ([]string, error) {
+	if e.Git == nil {
+		return nil, errors.New("el repo no tiene git")
+	}
+	base := e.diffBase()
+	if base == "" {
+		return nil, errors.New("no hay rama base (vcs.base_branch) contra la cual comparar")
+	}
+	diff, err := e.Git.DiffNames(ctx, base)
+	if err != nil {
+		return nil, err
+	}
+	removed, err := e.Git.DiffRemoved(ctx, base)
+	if err != nil {
+		return nil, err
+	}
+	dirty, err := e.Git.Dirty(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	out := []string{}
+	for _, f := range slices.Concat(diff, removed, dirty) {
+		if strings.HasPrefix(strings.TrimSpace(f), `"`) || gitOctal.MatchString(f) {
+			return nil, errors.New("git citó la ruta " + f + " (caracteres fuera de ASCII) y no se puede comparar")
+		}
+		if f = strings.ReplaceAll(strings.TrimSpace(f), `\`, "/"); f != "" && !slices.Contains(out, f) {
+			out = append(out, f)
+		}
+	}
+	return out, nil
+}
+
+// redFromBase dice si el rojo del paso s ya estaba en la base: tiene hallazgos,
+// todos en archivos que git rastrea, su salida no nombra ningún archivo que la
+// rama tocó y la rama no tocó lo que configura al paso. Si no, why dice por
+// qué. Ante la duda, no.
+func (e *Engine) redFromBase(ctx context.Context, s check.StepResult, touched []string) (files []string, why string) {
+	b := s.Blame
+	switch {
+	case b != nil && b.Opaque != "":
+		return nil, b.Opaque
+	case b == nil || len(b.Findings) == 0:
+		return nil, "la salida no tiene hallazgos atribuibles a archivos del repo (o el check es de una versión de bflow que no los registraba)"
+	case b.More:
+		return nil, "la salida nombra más rutas de las que bflow guarda"
+	}
+	for i, p := range slices.Concat(b.Findings, b.Mentions) {
+		if t := touchedBy(p, touched, i < len(b.Findings)); t != "" {
+			return nil, "la salida nombra " + t + ", que esta rama tocó"
+		}
+	}
+	for _, f := range b.Findings {
+		dir := strings.ToLower(path.Dir(f))
+		for _, m := range b.Mentions {
+			if strings.HasPrefix(m, "./") || strings.HasPrefix(m, "../") {
+				if t := touchedBy(path.Join(dir, m), touched, false); t != "" {
+					return nil, "la salida nombra " + t + ", que esta rama tocó"
+				}
+			}
+		}
+		for _, t := range touched {
+			if strings.ToLower(path.Dir(t)) == dir {
+				return nil, "la rama tocó " + t + ", junto a " + f + ": un archivo vecino puede cambiar lo que se revisa"
+			}
+		}
+	}
+	if t := e.toolingTouched(s, touched); t != "" {
+		return nil, "la rama tocó " + t + ", que puede cambiar lo que revisa el paso"
+	}
+	for _, f := range b.Findings {
+		if !e.repoFile(f) {
+			return nil, "el hallazgo en " + f + " no es de un archivo del repo"
+		}
+	}
+	tracked, err := e.Git.Tracked(ctx, b.Findings)
+	if err != nil {
+		return nil, "no se pudo saber qué archivos rastrea git: " + err.Error()
+	}
+	for _, f := range b.Findings {
+		if !slices.Contains(tracked, f) {
+			return nil, "el hallazgo en " + f + " es de un archivo que git no rastrea (generado o ignorado)"
+		}
+	}
+	return b.Findings, ""
+}
+
+var (
+	// configName: archivos que suelen configurar herramientas, en cualquier carpeta.
+	configName = regexp.MustCompile(`(?i)^tsconfig|^(eslint|stylelint|prettier|biome|vite|vitest|jest|karma|webpack|babel|postcss|tailwind|ruff|golangci)[.-]`)
+	// proseName: lo único de la raíz que no configura nada.
+	proseName = regexp.MustCompile(`(?i)\.(md|txt)$|^licen[cs]e`)
+	// gitOctal: un byte escapado por git en una ruta citada (\303\255).
+	gitOctal = regexp.MustCompile(`\\[0-3][0-7]{2}`)
+	// scriptExt: una mención con esta extensión puede ser la herramienta del paso.
+	scriptExt = regexp.MustCompile(`(?i)\.(js|mjs|cjs|ts|py|sh|go|ps1|rb|pl)$`)
+)
+
+// toolingTouched devuelve un archivo tocado que puede volver rojo un archivo
+// intacto sin aparecer en la salida del paso: un manifiesto de dependencias,
+// un archivo oculto, una configuración conocida, cualquier archivo de la raíz
+// que no sea texto, o algo dentro de la carpeta de la herramienta del paso (la
+// que nombra su comando o el script que menciona la salida, con su línea base).
+func (e *Engine) toolingTouched(s check.StepResult, touched []string) string {
+	var toolDirs []string
+	addDir := func(d string) {
+		if d = strings.ToLower(strings.Trim(d, "/")); d != "" && d != "." && !slices.Contains(toolDirs, d) {
+			toolDirs = append(toolDirs, d)
+		}
+	}
+	for _, p := range strings.Fields(s.Cmd) {
+		p = strings.TrimSuffix(strings.TrimPrefix(strings.ReplaceAll(p, `\`, "/"), "./"), "/...")
+		if st, err := os.Stat(filepath.Join(e.Cfg.Root, filepath.FromSlash(p))); err == nil && e.inRepo(p) {
+			if st.IsDir() {
+				addDir(p)
+			} else {
+				addDir(path.Dir(p))
+			}
+		}
+	}
+	if s.Blame != nil {
+		for _, m := range s.Blame.Mentions {
+			if scriptExt.MatchString(m) && e.repoFile(m) {
+				addDir(path.Dir(m))
+			}
+		}
+	}
+	for _, t := range touched {
+		lt, base := strings.ToLower(t), path.Base(t)
+		root := !strings.Contains(t, "/")
+		if check.IsDepManifest(t) || strings.HasPrefix(base, ".") || configName.MatchString(base) || (root && !proseName.MatchString(base)) ||
+			slices.ContainsFunc(toolDirs, func(d string) bool { return strings.HasPrefix(lt, d+"/") }) {
+			return t
+		}
+	}
+	return ""
+}
+
+// touchedBy devuelve el archivo tocado al que se refiere la ruta p, sin
+// distinguir mayúsculas: la misma ruta, una absoluta o relativa a un
+// subdirectorio que termina igual, lo contenido en un directorio tocado, o un
+// import sin extensión que coincide en sus dos últimos tramos. Con dirs, también
+// un directorio que lo contiene (no para menciones: el alcance de un comando,
+// como «src/app», contiene casi todo).
+func touchedBy(p string, touched []string, dirs bool) string {
+	p = strings.ToLower(strings.TrimSuffix(strings.ReplaceAll(p, `\`, "/"), "/"))
+	if p == "" {
+		return ""
+	}
+	tail := lastSegments(p, 2)
+	for _, t := range touched {
+		lt := strings.ToLower(t)
+		if p == lt || strings.HasSuffix(p, "/"+lt) || strings.HasSuffix(lt, "/"+p) || strings.HasPrefix(p, lt+"/") || dirs && strings.HasPrefix(lt, p+"/") {
+			return t
+		}
+		if tail != "" && (tail == lastSegments(lt, 2) || tail == lastSegments(strings.TrimSuffix(lt, path.Ext(lt)), 2)) {
+			return t
+		}
+	}
+	return ""
+}
+
+// lastSegments son los últimos n tramos de p sin «.» ni «..»; "" si tiene menos.
+func lastSegments(p string, n int) string {
+	segs := slices.DeleteFunc(strings.Split(p, "/"), func(s string) bool { return s == "" || s == "." || s == ".." })
+	if len(segs) < n {
+		return ""
+	}
+	return strings.Join(segs[len(segs)-n:], "/")
+}
+
+// repoFile dice si f es un archivo del repo (no un enlace), relativo a la raíz
+// y fuera de las dependencias instaladas.
+func (e *Engine) repoFile(f string) bool {
+	if !e.inRepo(f) {
+		return false
+	}
+	st, err := os.Lstat(filepath.Join(e.Cfg.Root, filepath.FromSlash(f)))
+	return err == nil && st.Mode().IsRegular()
+}
+
+// inRepo dice si la ruta f es relativa a la raíz y queda fuera de las
+// dependencias instaladas.
+func (e *Engine) inRepo(f string) bool {
+	if f == "" || path.IsAbs(f) || filepath.VolumeName(filepath.FromSlash(f)) != "" {
+		return false
+	}
+	for _, seg := range strings.Split(f, "/") {
+		if seg == ".." || seg == "node_modules" || seg == ".git" {
+			return false
+		}
+	}
+	return true
 }
 
 // failLines son las líneas de fallo del paso: Fails, o las del Tail si no hay.

@@ -291,6 +291,29 @@ func TestDiffKeptSkipsDeleted(t *testing.T) {
 	}
 }
 
+// Un renombre cuenta su ruta vieja como borrada; ls-files dice qué se rastrea.
+func TestDiffRemovedAndTracked(t *testing.T) {
+	work, _ := fixture(t)
+	ctx := context.Background()
+	g := &Git{Dir: work, Remote: "origin"}
+	sh(t, work, "mv", "internal/a.go", "internal/b.go")
+	sh(t, work, "rm", "-q", "README.md")
+	sh(t, work, "commit", "-m", "x")
+	got, err := g.DiffRemoved(ctx, "origin/dev")
+	slices.Sort(got)
+	if err != nil || strings.Join(got, ",") != "README.md,internal/a.go" {
+		t.Errorf("diffRemoved: %v %v", got, err)
+	}
+	write(t, work, "suelto.txt", "x\n")
+	got, err = g.Tracked(ctx, []string{"internal/b.go", "suelto.txt", "no-existe.go"})
+	if err != nil || strings.Join(got, ",") != "internal/b.go" {
+		t.Errorf("tracked: %v %v", got, err)
+	}
+	if got, err := g.Tracked(ctx, nil); err != nil || got != nil {
+		t.Errorf("sin rutas: %v %v", got, err)
+	}
+}
+
 func TestDiffAdded(t *testing.T) {
 	work, _ := fixture(t)
 	g := New(work)
