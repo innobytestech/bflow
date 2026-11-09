@@ -378,3 +378,34 @@ func (g *Git) IsIgnored(ctx context.Context, path string) (bool, error) {
 	}
 	return false, err
 }
+
+// WorktreeAddLocked crea un worktree desacoplado en sha, bloqueado con reason
+// (git rechaza entonces `worktree remove --force` con una sola -f) y sin correr
+// los ganchos del repo: core.hooksPath apunta a hooks, una carpeta vacía.
+func (g *Git) WorktreeAddLocked(ctx context.Context, dir, sha, reason, hooks string) error {
+	_, err := g.run(ctx, "-c", "core.hooksPath="+hooks, "worktree", "add", "--detach", "--lock", "--reason", reason, dir, sha)
+	return err
+}
+
+// WorktreeForget desbloquea el worktree dir (si lo estaba) y poda los registros
+// de worktrees cuya carpeta ya no existe.
+func (g *Git) WorktreeForget(ctx context.Context, dir string) error {
+	_, _ = g.run(ctx, "worktree", "unlock", dir)
+	_, err := g.run(ctx, "worktree", "prune")
+	return err
+}
+
+// Worktrees lista las carpetas de los worktrees registrados (la principal incluida).
+func (g *Git) Worktrees(ctx context.Context) ([]string, error) {
+	out, err := g.run(ctx, "worktree", "list", "--porcelain")
+	if err != nil {
+		return nil, err
+	}
+	var dirs []string
+	for _, l := range lines(out) {
+		if d, ok := strings.CutPrefix(l, "worktree "); ok {
+			dirs = append(dirs, d)
+		}
+	}
+	return dirs, nil
+}

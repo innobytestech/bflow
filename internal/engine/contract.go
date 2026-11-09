@@ -121,32 +121,7 @@ func (e *Engine) branchFiles(ctx context.Context) ([]string, error) {
 	if e.Git == nil {
 		return nil, errors.New("el repo no tiene git")
 	}
-	base := e.diffBase()
-	if base == "" {
-		return nil, errors.New("no hay rama base (vcs.base_branch) contra la cual comparar")
-	}
-	diff, err := e.Git.DiffNames(ctx, base)
-	if err != nil {
-		return nil, err
-	}
-	removed, err := e.Git.DiffRemoved(ctx, base)
-	if err != nil {
-		return nil, err
-	}
-	dirty, err := e.Git.Dirty(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	out := []string{}
-	for _, f := range slices.Concat(diff, removed, dirty) {
-		if strings.HasPrefix(strings.TrimSpace(f), `"`) || gitOctal.MatchString(f) {
-			return nil, errors.New("git citó la ruta " + f + " (caracteres fuera de ASCII) y no se puede comparar")
-		}
-		if f = strings.ReplaceAll(strings.TrimSpace(f), `\`, "/"); f != "" && !slices.Contains(out, f) {
-			out = append(out, f)
-		}
-	}
-	return out, nil
+	return check.BranchFiles(ctx, e.Git, e.diffBase())
 }
 
 // redFromBase dice si el rojo del paso s ya estaba en la base: tiene hallazgos,
@@ -164,7 +139,7 @@ func (e *Engine) redFromBase(ctx context.Context, s check.StepResult, touched []
 		return nil, "la salida nombra más rutas de las que bflow guarda"
 	}
 	for i, p := range slices.Concat(b.Findings, b.Mentions) {
-		if t := touchedBy(p, touched, i < len(b.Findings)); t != "" {
+		if t := check.TouchedBy(p, touched, i < len(b.Findings)); t != "" {
 			return nil, "la salida nombra " + t + ", que esta rama tocó"
 		}
 	}
@@ -172,22 +147,20 @@ func (e *Engine) redFromBase(ctx context.Context, s check.StepResult, touched []
 		dir := strings.ToLower(path.Dir(f))
 		for _, m := range b.Mentions {
 			if strings.HasPrefix(m, "./") || strings.HasPrefix(m, "../") {
-				if t := touchedBy(path.Join(dir, m), touched, false); t != "" {
+				if t := check.TouchedBy(path.Join(dir, m), touched, false); t != "" {
 					return nil, "la salida nombra " + t + ", que esta rama tocó"
 				}
 			}
 		}
-		for _, t := range touched {
-			if strings.ToLower(path.Dir(t)) == dir {
-				return nil, "la rama tocó " + t + ", junto a " + f + ": un archivo vecino puede cambiar lo que se revisa"
-			}
+		if t := check.SameDir(f, touched); t != "" {
+			return nil, "la rama tocó " + t + ", junto a " + f + ": un archivo vecino puede cambiar lo que se revisa"
 		}
 	}
-	if t := e.toolingTouched(s, touched); t != "" {
+	if t := check.ToolingTouched(e.Cfg.Root, []string{s.Cmd}, b.Mentions, touched); t != "" {
 		return nil, "la rama tocó " + t + ", que puede cambiar lo que revisa el paso"
 	}
 	for _, f := range b.Findings {
-		if !e.repoFile(f) {
+		if !check.RepoFile(e.Cfg.Root, f) {
 			return nil, "el hallazgo en " + f + " no es de un archivo del repo"
 		}
 	}
@@ -201,114 +174,6 @@ func (e *Engine) redFromBase(ctx context.Context, s check.StepResult, touched []
 		}
 	}
 	return b.Findings, ""
-}
-
-var (
-	// configName: archivos que suelen configurar herramientas, en cualquier carpeta.
-	configName = regexp.MustCompile(`(?i)^tsconfig|^(eslint|stylelint|prettier|biome|vite|vitest|jest|karma|webpack|babel|postcss|tailwind|ruff|golangci)[.-]`)
-	// proseName: lo único de la raíz que no configura nada.
-	proseName = regexp.MustCompile(`(?i)\.(md|txt)$|^licen[cs]e`)
-	// gitOctal: un byte escapado por git en una ruta citada (\303\255).
-	gitOctal = regexp.MustCompile(`\\[0-3][0-7]{2}`)
-	// scriptExt: una mención con esta extensión puede ser la herramienta del paso.
-	scriptExt = regexp.MustCompile(`(?i)\.(js|mjs|cjs|ts|py|sh|go|ps1|rb|pl)$`)
-)
-
-// toolingTouched devuelve un archivo tocado que puede volver rojo un archivo
-// intacto sin aparecer en la salida del paso: un manifiesto de dependencias,
-// un archivo oculto, una configuración conocida, cualquier archivo de la raíz
-// que no sea texto, o algo dentro de la carpeta de la herramienta del paso (la
-// que nombra su comando o el script que menciona la salida, con su línea base).
-func (e *Engine) toolingTouched(s check.StepResult, touched []string) string {
-	var toolDirs []string
-	addDir := func(d string) {
-		if d = strings.ToLower(strings.Trim(d, "/")); d != "" && d != "." && !slices.Contains(toolDirs, d) {
-			toolDirs = append(toolDirs, d)
-		}
-	}
-	for _, p := range strings.Fields(s.Cmd) {
-		p = strings.TrimSuffix(strings.TrimPrefix(strings.ReplaceAll(p, `\`, "/"), "./"), "/...")
-		if st, err := os.Stat(filepath.Join(e.Cfg.Root, filepath.FromSlash(p))); err == nil && e.inRepo(p) {
-			if st.IsDir() {
-				addDir(p)
-			} else {
-				addDir(path.Dir(p))
-			}
-		}
-	}
-	if s.Blame != nil {
-		for _, m := range s.Blame.Mentions {
-			if scriptExt.MatchString(m) && e.repoFile(m) {
-				addDir(path.Dir(m))
-			}
-		}
-	}
-	for _, t := range touched {
-		lt, base := strings.ToLower(t), path.Base(t)
-		root := !strings.Contains(t, "/")
-		if check.IsDepManifest(t) || strings.HasPrefix(base, ".") || configName.MatchString(base) || (root && !proseName.MatchString(base)) ||
-			slices.ContainsFunc(toolDirs, func(d string) bool { return strings.HasPrefix(lt, d+"/") }) {
-			return t
-		}
-	}
-	return ""
-}
-
-// touchedBy devuelve el archivo tocado al que se refiere la ruta p, sin
-// distinguir mayúsculas: la misma ruta, una absoluta o relativa a un
-// subdirectorio que termina igual, lo contenido en un directorio tocado, o un
-// import sin extensión que coincide en sus dos últimos tramos. Con dirs, también
-// un directorio que lo contiene (no para menciones: el alcance de un comando,
-// como «src/app», contiene casi todo).
-func touchedBy(p string, touched []string, dirs bool) string {
-	p = strings.ToLower(strings.TrimSuffix(strings.ReplaceAll(p, `\`, "/"), "/"))
-	if p == "" {
-		return ""
-	}
-	tail := lastSegments(p, 2)
-	for _, t := range touched {
-		lt := strings.ToLower(t)
-		if p == lt || strings.HasSuffix(p, "/"+lt) || strings.HasSuffix(lt, "/"+p) || strings.HasPrefix(p, lt+"/") || dirs && strings.HasPrefix(lt, p+"/") {
-			return t
-		}
-		if tail != "" && (tail == lastSegments(lt, 2) || tail == lastSegments(strings.TrimSuffix(lt, path.Ext(lt)), 2)) {
-			return t
-		}
-	}
-	return ""
-}
-
-// lastSegments son los últimos n tramos de p sin «.» ni «..»; "" si tiene menos.
-func lastSegments(p string, n int) string {
-	segs := slices.DeleteFunc(strings.Split(p, "/"), func(s string) bool { return s == "" || s == "." || s == ".." })
-	if len(segs) < n {
-		return ""
-	}
-	return strings.Join(segs[len(segs)-n:], "/")
-}
-
-// repoFile dice si f es un archivo del repo (no un enlace), relativo a la raíz
-// y fuera de las dependencias instaladas.
-func (e *Engine) repoFile(f string) bool {
-	if !e.inRepo(f) {
-		return false
-	}
-	st, err := os.Lstat(filepath.Join(e.Cfg.Root, filepath.FromSlash(f)))
-	return err == nil && st.Mode().IsRegular()
-}
-
-// inRepo dice si la ruta f es relativa a la raíz y queda fuera de las
-// dependencias instaladas.
-func (e *Engine) inRepo(f string) bool {
-	if f == "" || path.IsAbs(f) || filepath.VolumeName(filepath.FromSlash(f)) != "" {
-		return false
-	}
-	for _, seg := range strings.Split(f, "/") {
-		if seg == ".." || seg == "node_modules" || seg == ".git" {
-			return false
-		}
-	}
-	return true
 }
 
 // failLines son las líneas de fallo del paso: Fails, o las del Tail si no hay.
