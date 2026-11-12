@@ -43,6 +43,9 @@ func build(dir string) (*engine.Engine, error) {
 		return nil, err
 	}
 	e := &engine.Engine{Cfg: cfg, Store: store.Open(cfg.Root), Tracker: tr, Now: time.Now}
+	if bundle != nil {
+		e.Loc = bundle.New(cfg.Lang())
+	}
 	if g != nil {
 		e.Git = g
 	}

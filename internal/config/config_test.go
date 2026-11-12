@@ -11,6 +11,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"innobytes.tech/bflow/internal/flow"
+	"innobytes.tech/bflow/internal/i18n"
 	"innobytes.tech/bflow/internal/review"
 )
 
@@ -637,4 +638,40 @@ func TestCheckTestStepDefault(t *testing.T) {
 	if c.Check.TestStep != "unit" {
 		t.Errorf("el repo sobrescribe test_step: %q", c.Check.TestStep)
 	}
+}
+
+func TestValidateUILang(t *testing.T) {
+	_, err := Load(fixture(t, "", "ui:\n  lang: fr\n"))
+	if err == nil || !strings.Contains(err.Error(), "ui.lang \"fr\" no existe") {
+		t.Fatalf("expected error for unsupported ui.lang, got %v", err)
+	}
+	c, err := Load(fixture(t, "", "ui:\n  lang: en\n"))
+	if err != nil {
+		t.Fatalf("valid ui.lang 'en' failed: %v", err)
+	}
+	if c.UI.Lang != "en" {
+		t.Errorf("expected Lang to be en, got %q", c.UI.Lang)
+	}
+}
+
+func TestLangLegacyRepo(t *testing.T) {
+	for _, k := range []string{"BFLOW_LANG", "LC_MESSAGES", "LC_ALL", "LANG"} {
+		t.Setenv(k, "")
+	}
+	check := func(global, repo, want, why string) {
+		t.Helper()
+		c, err := Load(fixture(t, global, repo))
+		if err != nil {
+			t.Fatalf("%s: %v", why, err)
+		}
+		if got := c.Lang(); got != want {
+			t.Errorf("%s: Lang() = %q, want %q", why, got, want)
+		}
+	}
+	check("", "stack: go\n", i18n.Legacy, "repo sin ui.lang conserva el idioma anterior")
+	check("", "stack: go\nui:\n  lang: en\n", "en", "ui.lang del repo manda")
+	check("ui:\n  lang: es\n", "stack: go\n", "es", "ui.lang global manda")
+	check("", "", i18n.Default, "sin bflow.yaml vuelve a la detección")
+	t.Setenv("BFLOW_LANG", "en")
+	check("", "stack: go\n", "en", "BFLOW_LANG manda sobre el repo anterior")
 }

@@ -20,6 +20,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"innobytes.tech/bflow/internal/flow"
+	"innobytes.tech/bflow/internal/i18n"
 	"innobytes.tech/bflow/internal/review"
 )
 
@@ -116,6 +117,8 @@ type UI struct {
 	// Notificación del sistema cuando una tarea espera a la persona. Encendida
 	// salvo notify: false; nunca en CI ni sin escritorio.
 	Notify *bool `yaml:"notify,omitempty"`
+	// Lang es el idioma de la interfaz y de los agentes: en, es.
+	Lang string `yaml:"lang,omitempty"`
 }
 
 type Doctor struct {
@@ -393,6 +396,12 @@ func Load(dir string) (*Config, error) {
 	return c, nil
 }
 
+// Lang resuelve el idioma activo. Un bflow.yaml sin ui.lang viene de antes de
+// i18n y se queda en español; los repos nuevos fijan ui.lang desde init.
+func (c *Config) Lang() string {
+	return i18n.DetectLangForRepo(c.UI.Lang, c.Sources.Repo != "")
+}
+
 func readGlobal(path string) (map[string]any, map[string]map[string]any, error) {
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -628,6 +637,9 @@ func (c *Config) Validate() error {
 	}
 	validateModels(add, c.Models, "")
 	validateModels(add, c.PersonalModels, " (en "+GlobalPath()+")")
+	if c.UI.Lang != "" && !slices.Contains(i18n.Supported, c.UI.Lang) {
+		add("ui.lang %q no existe (disponibles: %s)", c.UI.Lang, strings.Join(i18n.Supported, ", "))
+	}
 	for i, s := range c.Check.Steps {
 		if s.Name == "" {
 			add("check.steps[%d].name es obligatorio", i)

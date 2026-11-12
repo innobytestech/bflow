@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -15,6 +16,7 @@ import (
 
 	"innobytes.tech/bflow/internal/flow"
 	"innobytes.tech/bflow/internal/guard"
+	"innobytes.tech/bflow/internal/i18n"
 	"innobytes.tech/bflow/internal/store"
 )
 
@@ -75,7 +77,7 @@ func (e *Engine) Refreeze(id string) (int, error) {
 	}
 	files := e.Frozen(id)
 	if len(files) == 0 {
-		return 0, errors.New(id + " no tiene pruebas congeladas")
+		return 0, fmt.Errorf("%s", e.loc().T("engine.freeze.no_frozen_tests", id))
 	}
 	if err := e.writeFrozen(id, files); err != nil {
 		return 0, err
@@ -93,7 +95,7 @@ func (e *Engine) AllowFrozen(id, file string) error {
 	file = strings.ReplaceAll(filepath.ToSlash(filepath.Clean(file)), `\`, "/")
 	m := e.readFrozen(id)
 	if _, ok := m[file]; !ok {
-		return errors.New(file + " no es una prueba congelada de " + id + " (bflow status " + id + " --json las lista)")
+		return fmt.Errorf("%s", e.loc().T("engine.freeze.not_frozen_test", file, id, id))
 	}
 	m[file] = allowed
 	if err := e.saveFrozen(id, m); err != nil {
@@ -217,9 +219,9 @@ func (e *Engine) FrozenChanged(id string) []string {
 	return changed
 }
 
-func frozenRejection(changed []string) *flow.Rejection {
-	return &flow.Rejection{Code: "frozen_changed", Reason: "cambiaron pruebas congeladas al aprobar el contrato: " + strings.Join(changed, ", ") +
-		". Déjalas como estaban; si una prueba está mal, reporta NEEDS_DECISION. Si una persona aprueba el cambio, que corra bflow freeze --allow <archivo> desde su terminal."}
+func frozenRejection(changed []string, locs ...*i18n.Localizer) *flow.Rejection {
+	loc := locOf(locs...)
+	return &flow.Rejection{Code: "frozen_changed", Reason: loc.T("engine.freeze.changed_rejection", strings.Join(changed, ", "))}
 }
 
 // testHash normaliza los finales de línea para que un checkout con autocrlf
@@ -286,14 +288,17 @@ func (e *Engine) RestoreFrozen(id string) FrozenRestore {
 }
 
 // FrozenRestoreReason es el aviso al agente tras restaurar (o no poder).
-func FrozenRestoreReason(r FrozenRestore) string {
+func FrozenRestoreReason(r FrozenRestore, locs ...*i18n.Localizer) string {
+	loc := i18n.DefaultLocalizer()
+	if len(locs) > 0 && locs[0] != nil {
+		loc = locs[0]
+	}
 	var parts []string
 	if ch := slices.Concat(r.Restored, r.Deleted); len(ch) > 0 {
-		parts = append(parts, strings.Join(ch, ", ")+" son pruebas congeladas y el último comando las cambió: bflow las restauró (o borró, si no existían al congelar). "+
-			"No las cambies; si una prueba está mal, reporta NEEDS_DECISION. Si una persona aprueba el cambio, que corra bflow freeze --allow <archivo> desde su terminal.")
+		parts = append(parts, loc.T("engine.frozen_restore_changed", strings.Join(ch, ", ")))
 	}
 	if len(r.Missing) > 0 {
-		parts = append(parts, "no hay copia para restaurar "+strings.Join(r.Missing, ", ")+": déjalos como estaban (git diff) antes de reportar DONE.")
+		parts = append(parts, loc.T("engine.frozen_restore_missing", strings.Join(r.Missing, ", ")))
 	}
 	return strings.Join(parts, " ")
 }
