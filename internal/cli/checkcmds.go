@@ -155,7 +155,19 @@ func runCheck(c *Ctx) output.Envelope {
 			b.WriteString(s.PreexistingHint() + "\n")
 		}
 		b.WriteString(short)
+		if s.Rerun != nil && s.Rerun.Why != "" {
+			f["not_preexisting"] = s.Rerun.Why
+			b.WriteString("\nno cuenta como un rojo que ya estaba en la base: " + s.Rerun.Why)
+		}
 		failed = append(failed, f)
+	}
+	for _, s := range res.Steps {
+		if s.Status == "pass" && s.Rerun.Accepted() {
+			b.WriteString("\n⚠ " + s.Name + ": " + s.Rerun.String())
+		}
+		if s.Rerun != nil && s.Rerun.Cleanup != "" {
+			b.WriteString("\n⚠ " + s.Name + ": " + s.Rerun.Cleanup)
+		}
 	}
 	for _, w := range res.Warnings {
 		b.WriteString("\n⚠ " + w)

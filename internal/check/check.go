@@ -63,6 +63,10 @@ type StepResult struct {
 	// las arregla el agente por su cuenta: decide una persona.
 	Preexisting bool   `json:"preexisting,omitempty"`
 	Accept      string `json:"accept_file,omitempty"`
+	Blame       *Blame `json:"blame,omitempty"` // solo si falló antes del paso de pruebas
+	// Rerun: el paso de pruebas falló y se volvieron a correr sobre la base
+	// los archivos en rojo que la rama no tocó (solo con rerun en bflow.yaml).
+	Rerun *Rerun `json:"rerun,omitempty"`
 }
 
 // Result es una corrida de check.
@@ -100,14 +104,26 @@ func (r *Runner) Run(ctx context.Context) (Result, error) {
 	if len(dirty) > 0 {
 		res.SHA = "DIRTY"
 	}
+	testStep := r.testStep()
+	beforeTests := true
 	for _, st := range r.Cfg.Steps {
-		sr := r.step(ctx, st, &res)
+		if st.Name == testStep {
+			beforeTests = false
+		}
+		sr := r.step(ctx, st, &res, beforeTests)
 		if sr.Status == "fail" {
 			res.Result = "FAIL"
 		}
 		res.Steps = append(res.Steps, sr)
 	}
 	return res, nil
+}
+
+func (r *Runner) testStep() string {
+	if r.Cfg.TestStep == "" {
+		return "test"
+	}
+	return r.Cfg.TestStep
 }
 
 // Quick corre los pasos rápidos sobre un paquete, sin registrar resultado.
@@ -117,7 +133,7 @@ func (r *Runner) Quick(ctx context.Context, pkg string) (Result, error) {
 	}
 	res := Result{Date: r.now(), Result: "PASS"}
 	for i, line := range r.Cfg.Quick {
-		sr := r.step(ctx, config.Step{Name: fmt.Sprintf("quick %d", i+1), Run: strings.ReplaceAll(line, "{pkg}", pkg)}, &res)
+		sr := r.step(ctx, config.Step{Name: fmt.Sprintf("quick %d", i+1), Run: strings.ReplaceAll(line, "{pkg}", pkg)}, &res, false)
 		if sr.Status == "fail" {
 			res.Result = "FAIL"
 		}
@@ -132,7 +148,8 @@ func (r *Runner) degrade(res *Result, msg string) {
 	}
 }
 
-func (r *Runner) step(ctx context.Context, st config.Step, res *Result) StepResult {
+// step corre un paso; con blame, si falla, guarda a qué archivos apunta su salida.
+func (r *Runner) step(ctx context.Context, st config.Step, res *Result, blame bool) StepResult {
 	sr := StepResult{Name: st.Name, Cmd: st.Run}
 	if st.Needs != "" && r.LookPath != nil {
 		if _, err := r.LookPath(st.Needs); err != nil {
@@ -182,6 +199,7 @@ func (r *Runner) step(ctx context.Context, st config.Step, res *Result) StepResu
 	if isVulnStep(st) && !r.depsTouched(ctx) {
 		sr.Preexisting, sr.Accept = true, st.Accept
 	}
+	raw := out
 	if st.Baseline == "new-only" {
 		mine := r.onlyTouched(ctx, out)
 		if mine == "" {
@@ -192,6 +210,18 @@ func (r *Runner) step(ctx context.Context, st config.Step, res *Result) StepResu
 		out = mine
 	}
 	sr.Tail, sr.Fails = r.tail(out)
+	if blame {
+		sr.Blame = r.blame(st, raw, exit, err) // la salida sin filtrar: más conservador
+	}
+	if st.Rerun != nil && st.Name == r.testStep() && st.Baseline == "" && st.Accept == "" {
+		if sr.Rerun = r.rerunBase(ctx, st, raw, exit, err); sr.Rerun.Accepted() {
+			sr.Status = "pass"
+			r.degrade(res, st.Name+": "+sr.Rerun.String())
+		}
+		if sr.Rerun.Cleanup != "" {
+			r.degrade(res, st.Name+": "+sr.Rerun.Cleanup)
+		}
+	}
 	return sr
 }
 
@@ -334,12 +364,17 @@ func (r *Runner) depsTouched(ctx context.Context) bool {
 	files, _ := r.Git.DiffNames(ctx, r.Base)
 	dirty, _ := r.Git.Dirty(ctx, nil)
 	for _, f := range append(files, dirty...) {
-		base := filepath.Base(strings.ReplaceAll(f, `\`, "/"))
-		if slices.Contains(depManifests, base) || strings.HasSuffix(base, ".csproj") || strings.HasPrefix(base, "requirements") {
+		if IsDepManifest(f) {
 			return true
 		}
 	}
 	return false
+}
+
+// IsDepManifest dice si el archivo fija versiones de dependencias o del toolchain.
+func IsDepManifest(file string) bool {
+	base := filepath.Base(strings.ReplaceAll(file, `\`, "/"))
+	return slices.Contains(depManifests, base) || strings.HasSuffix(base, ".csproj") || strings.HasPrefix(base, "requirements")
 }
 
 // PreexistingHint le dice al agente qué hacer con un paso de vulnerabilidades
@@ -438,9 +473,34 @@ func Verify(ctx context.Context, g GitReader, codePaths []string, res *Result) (
 	case res.SHA == "DIRTY":
 		return false, "el check corrió con código sin commitear: commitea y vuelve a correr bflow check"
 	case res.Result != "PASS":
-		return false, "el último check no pasó"
+		return false, "el último check no pasó" + res.rerunNote()
 	}
 	return Fresh(ctx, g, codePaths, res)
+}
+
+// rerunNote dice qué pasó con el rojo del paso de pruebas al compararlo con la base.
+func (res Result) rerunNote() string {
+	var b strings.Builder
+	for _, s := range res.Steps {
+		switch {
+		case s.Status == "fail" && s.Rerun != nil && s.Rerun.Why != "":
+			b.WriteString(" (" + s.Name + ": no cuenta como un rojo que ya estaba en la base: " + s.Rerun.Why + ")")
+		case s.Status == "pass" && s.Rerun.Accepted():
+			b.WriteString(" (" + s.Name + ": " + s.Rerun.String() + ")")
+		}
+	}
+	return b.String()
+}
+
+// Ignored son, por paso, las pruebas que no se cobraron porque ya fallaban en la base.
+func (res Result) Ignored() map[string]*Rerun {
+	out := map[string]*Rerun{}
+	for _, s := range res.Steps {
+		if s.Status == "pass" && s.Rerun.Accepted() {
+			out[s.Name] = s.Rerun
+		}
+	}
+	return out
 }
 
 // Markdown es el reporte legible (bflow show check).
@@ -471,10 +531,19 @@ func (res Result) Markdown() string {
 		}
 	}
 	for _, s := range res.Steps {
+		if s.Status == "pass" && s.Rerun.Accepted() {
+			fmt.Fprintf(&b, "\n## ⚠️ %s: rojo que ya estaba en la base %s (ignorado)\nSe volvieron a correr ahí: %s\n", s.Name, short(s.Rerun.Base), strings.Join(s.Rerun.Files, ", "))
+			for _, t := range s.Rerun.Ignored {
+				b.WriteString("- " + t + "\n")
+			}
+		}
 		if s.Status == "fail" {
 			fmt.Fprintf(&b, "\n## ❌ %s\n`%s`\n", s.Name, s.Cmd)
 			if s.Preexisting {
 				b.WriteString("\n" + s.PreexistingHint() + "\n")
+			}
+			if s.Rerun != nil && s.Rerun.Why != "" {
+				b.WriteString("\nNo cuenta como un rojo que ya estaba en la base: " + s.Rerun.Why + "\n")
 			}
 			fmt.Fprintf(&b, "```\n%s\n```\n", s.Tail)
 		}

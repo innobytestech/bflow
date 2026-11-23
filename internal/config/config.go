@@ -193,7 +193,24 @@ type Step struct {
 	Needs    string `yaml:"needs,omitempty"`    // binario requerido (para detectar el degradado)
 	Accept   string `yaml:"accept_file,omitempty"`
 	Baseline string `yaml:"baseline,omitempty"` // "new-only": solo cuentan hallazgos en archivos tocados
+	Rerun    *Rerun `yaml:"rerun,omitempty"`    // solo en el paso de pruebas: cómo volver a correr unos archivos sobre la base
 }
+
+// Rerun dice cómo correr solo algunos archivos de prueba. Con él, si el paso de
+// pruebas falla únicamente en archivos que la rama no tocó, bflow los vuelve a
+// correr sobre el merge-base y no cuenta las pruebas que ya fallaban ahí.
+type Rerun struct {
+	Run    string   `yaml:"run"`              // comando filtrado; {files} se reemplaza por los archivos
+	Each   string   `yaml:"each,omitempty"`   // cómo va cada archivo en {files}; {file} es el archivo (por defecto, el archivo solo)
+	Format string   `yaml:"format,omitempty"` // salida que bflow sabe leer: vitest (por defecto)
+	Share  []string `yaml:"share,omitempty"`  // lo ignorado por git que la corrida en la base toma del repo (por defecto, node_modules)
+}
+
+// RerunFormats son las salidas de pruebas que bflow sabe leer para rerun.
+var RerunFormats = []string{"vitest"}
+
+// rerunShellMeta: operadores de shell (los mismos que hacen que check corra el paso con shell).
+var rerunShellMeta = regexp.MustCompile(`[|&;<>()$` + "`" + `]`)
 
 type Check struct {
 	Steps         []Step   `yaml:"steps,omitempty"`
@@ -638,6 +655,9 @@ func (c *Config) Validate() error {
 		if s.Baseline != "" && s.Baseline != "new-only" {
 			add("check.steps[%d].baseline solo admite new-only", i)
 		}
+		if s.Rerun != nil {
+			validateRerun(add, i, s, c.Check.TestStep)
+		}
 	}
 	if p := c.Flow.ConsumerChangelog; p != "" && (filepath.IsAbs(p) || strings.HasPrefix(filepath.ToSlash(filepath.Clean(p)), ".bflow/") || strings.HasPrefix(filepath.Clean(p), "..")) {
 		add("flow.consumer_changelog debe ser una ruta del repo fuera de .bflow/ (se versiona)")
@@ -787,5 +807,56 @@ func validateModels(add func(string, ...any), m map[string]map[string]string, su
 				add("models.%s.%s está vacío%s", table, alias, suffix)
 			}
 		}
+	}
+}
+
+// validateRerun revisa check.steps[i].rerun: va solo en el paso de pruebas, sin
+// otro filtro de hallazgos, y su plantilla tiene dónde poner los archivos.
+func validateRerun(add func(string, ...any), i int, s Step, testStep string) {
+	if testStep == "" {
+		testStep = "test"
+	}
+	r := s.Rerun
+	if s.Name != testStep {
+		add("check.steps[%d].rerun solo va en el paso de pruebas (check.test_step: %s)", i, testStep)
+	}
+	if s.Baseline != "" || s.Accept != "" {
+		add("check.steps[%d].rerun no se combina con baseline ni con accept_file", i)
+	}
+	if n := strings.Count(r.Run, "{files}"); n != 1 || !slices.Contains(strings.Fields(r.Run), "{files}") {
+		add("check.steps[%d].rerun.run debe llevar {files} una vez, separado por espacios (p. ej. \"npm test -- {files}\")", i)
+	}
+	if rerunShellMeta.MatchString(s.Run) || rerunShellMeta.MatchString(r.Run) || rerunShellMeta.MatchString(r.Each) {
+		add("check.steps[%d]: con rerun, run, rerun.run y rerun.each van sin operadores de shell (el código de salida lo deben explicar solo las pruebas)", i)
+	}
+	if strings.Contains(s.Run+" "+r.Run+" "+r.Each, "--bail") {
+		add("check.steps[%d]: rerun no se combina con --bail (las pruebas que no corrieron no se pueden comparar)", i)
+	}
+	if !slices.Equal(strings.Fields(r.Run), append(strings.Fields(s.Run), "{files}")) {
+		add("check.steps[%d].rerun.run debe ser run más {files} (%q), para que la base corra con los mismos flags", i, s.Run+" {files}")
+	}
+	if r.Each != "" && !strings.Contains(r.Each, "{file}") {
+		add("check.steps[%d].rerun.each debe llevar {file} (p. ej. \"--include={file}\")", i)
+	}
+	if strings.Contains(r.Each, "{files}") {
+		add("check.steps[%d].rerun.each lleva {file}, no {files}", i)
+	}
+	if r.Format != "" && !slices.Contains(RerunFormats, r.Format) {
+		add("check.steps[%d].rerun.format %q no existe (disponibles: %s)", i, r.Format, strings.Join(RerunFormats, ", "))
+	}
+	var seen []string
+	for _, p := range r.Share {
+		cl := filepath.ToSlash(filepath.Clean(p))
+		if p == "" || filepath.IsAbs(p) || strings.HasPrefix(p, "/") || filepath.VolumeName(p) != "" || cl == "." || cl == ".." || strings.HasPrefix(cl, "../") ||
+			cl == ".git" || strings.HasPrefix(cl, ".git/") || strings.HasPrefix(cl, ".bflow") {
+			add("check.steps[%d].rerun.share: %q debe ser una ruta del repo (sin .., absoluta, .git ni .bflow)", i, p)
+			continue
+		}
+		for _, o := range seen {
+			if o == cl || strings.HasPrefix(o, cl+"/") || strings.HasPrefix(cl, o+"/") {
+				add("check.steps[%d].rerun.share repite o anida %q y %q", i, o, cl)
+			}
+		}
+		seen = append(seen, cl)
 	}
 }

@@ -34,6 +34,11 @@ type Git interface {
 	ChangedSince(ctx context.Context, sha string, paths []string) ([]string, error)
 	// DiffNames lista archivos cambiados entre base y HEAD (triple punto).
 	DiffNames(ctx context.Context, base string) ([]string, error)
+	// DiffRemoved lista los archivos que base...HEAD borra, incluida la ruta
+	// vieja de un renombre.
+	DiffRemoved(ctx context.Context, base string) ([]string, error)
+	// Tracked devuelve, de paths (relativas a la raíz), los que git rastrea.
+	Tracked(ctx context.Context, paths []string) ([]string, error)
 	// DiffKept lista archivos agregados o modificados (no borrados) entre base y HEAD bajo paths.
 	DiffKept(ctx context.Context, base string, paths []string) ([]string, error)
 	// DiffLines suma las líneas agregadas y borradas entre base y HEAD (triple

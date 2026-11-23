@@ -60,6 +60,23 @@ Validation aggregates all problems into a single message, indicates line numbers
 - `--verify`: does not run steps; verifies that the last check passed and corresponds to the current code (and that frozen tests have not changed).
 - A step with `needs` depends on an external tool: if missing and the step is `optional: true`, it is skipped with a warning; if not optional, it fails.
 - A vulnerability check step marks preexisting vulnerabilities untouched by the task as preexisting (see [guide](guide.md#when-something-gets-stuck)).
+- `rerun` (optional, only on the `check.test_step` step): tells how to run just some test files. If the step fails, bflow takes the failing test files; if the branch touched none of them, it runs them again on the merge-base with the base branch and does not charge the tests that also fail there under the same name and with the same error (its first line, without paths or line numbers). The step ends as `pass`, the check marks what it ignored as degraded, and `report DONE` warns about it and stores it in `log.jsonl` (`data.preexisting_tests`). Without `rerun`, the test step works as always.
+  - `run`: the filtered command. It is the step's `run` plus `{files}` at the end, so the base runs with the same flags. Neither the step, `rerun.run`, nor `each` may chain commands (`&&`, `;`, `|`) or use `--bail`.
+  - `each` (defaults to `{file}`): how each file goes into `{files}`, with `{file}` as the file; use it to repeat a flag.
+  - `format` (defaults to `vitest`): the output bflow can read. Today only `vitest`, with its default reporter.
+  - `share` (defaults to `[node_modules]`): what git ignores that the base run takes from the repo; if git does not ignore it or the branch touched it, nothing is ignored. A folder is linked (a junction on Windows, a symlink elsewhere) and a file is copied. Nothing is reinstalled: the run is short and does not do `npm ci`. bflow removes the link before the worktree, because removing the worktree with the link inside can delete what it points to.
+  - It runs in a temporary git worktree in the system temp folder, locked (`git worktree remove --force` does not remove it) and without the repo's hooks. It is always removed, also when something fails or on Ctrl+C: first every link inside, without entering it, then the folder, and finally only its own git registration is deleted, without pruning other worktrees. It never uses `git worktree remove`. If bflow is killed, the next `bflow check` with `rerun` cleans up leftovers whose process no longer exists. Whatever could not be removed shows up as a warning, with how to remove it by hand.
+  - When in doubt it ignores nothing and the check says why: if a failing test is in a file the branch touched (diff against the base, what it deleted or renamed, and uncommitted changes), something in its folder was touched, or the failure output names a touched file; if the branch touched a dependency manifest, a hidden file, a known config file, or a root file that is not text; if a failure is not a named test (a whole file or a hook) or the summary counts failures the output does not name; if two failing tests share a name; if the summary has files that neither failed nor passed (skipped or cut by `bail`); if the repo uses npm, pnpm, or yarn workspaces; if the output has errors outside the tests, a broken coverage threshold, a compile error, a killed process, or anything else after the summary; if more than 25 files fail; if the base run cannot be done, is not filtered to those files, or one of the tests passes there or fails with another error.
+  - A bflow older than this key cannot read a `bflow.yaml` that has it: update everyone's binary before adding it.
+
+  ```yaml
+  - name: test
+    run: npm test -- --watch=false
+    rerun:
+      run: npm test -- --watch=false {files}
+      each: --include={file}
+      share: [node_modules, src/environments/version.ts]
+  ```
 
 ## Connecting a tracker
 

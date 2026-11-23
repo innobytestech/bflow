@@ -638,3 +638,38 @@ func TestCheckTestStepDefault(t *testing.T) {
 		t.Errorf("el repo sobrescribe test_step: %q", c.Check.TestStep)
 	}
 }
+
+func TestRerunValidated(t *testing.T) {
+	step := func(name, extra string) string {
+		return "check:\n  steps:\n    - name: " + name + "\n      run: npm test\n" + extra
+	}
+	bad := map[string]string{
+		"solo va en el paso de pruebas":   step("unit", "      rerun: { run: \"npm test -- {files}\" }\n"),
+		"debe llevar {files} una vez":     step("test", "      rerun: { run: \"npm test\" }\n"),
+		"separado por espacios":           step("test", "      rerun: { run: \"npm test --include={files}\" }\n"),
+		"rerun.each debe llevar {file}":   step("test", "      rerun: { run: \"npm test {files}\", each: \"--include\" }\n"),
+		"rerun.each lleva {file}, no":     step("test", "      rerun: { run: \"npm test {files}\", each: \"--include={files}\" }\n"),
+		"rerun.format \"jest\" no existe": step("test", "      rerun: { run: \"npm test {files}\", format: jest }\n"),
+		"no se combina con baseline":      step("test", "      baseline: new-only\n      rerun: { run: \"npm test {files}\" }\n"),
+		"rerun.share: \"../x\"":           step("test", "      rerun: { run: \"npm test {files}\", share: [\"../x\"] }\n"),
+		"rerun.share: \".git/hooks\"":     step("test", "      rerun: { run: \"npm test {files}\", share: [\".git/hooks\"] }\n"),
+		"rerun.share: \"/abs\"":           step("test", "      rerun: { run: \"npm test {files}\", share: [\"/abs\"] }\n"),
+		"repite o anida":                  step("test", "      rerun: { run: \"npm test {files}\", share: [node_modules, node_modules/x] }\n"),
+		"sin operadores de shell":         step("test", "      rerun: { run: \"npm test {files} && npm run lint\" }\n"),
+		"no se combina con --bail":        step("test", "      rerun: { run: \"npm test --bail=1 {files}\" }\n"),
+		"debe ser run más {files}":        step("test", "      rerun: { run: \"npx vitest run {files}\" }\n"),
+	}
+	for want, yaml := range bad {
+		if _, err := Load(fixture(t, "", yaml)); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%q: %v", want, err)
+		}
+	}
+	c, err := Load(fixture(t, "", "check:\n  test_step: unit\n  steps:\n    - name: unit\n      run: npm test -- --watch=false\n      rerun:\n        run: npm test -- --watch=false {files}\n        each: --include={file}\n        share: [node_modules, src/environments/version.ts]\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := c.Check.Steps[0].Rerun
+	if r == nil || r.Each != "--include={file}" || !slices.Equal(r.Share, []string{"node_modules", "src/environments/version.ts"}) {
+		t.Fatalf("%+v", r)
+	}
+}

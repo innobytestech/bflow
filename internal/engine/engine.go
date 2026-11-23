@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -132,13 +133,19 @@ func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug s
 		freeze := false
 		var prevFrozen map[string]string
 		froze := false
+		var ignored []baseRed
+		var baseTests map[string]*check.Rerun
 		if ev.Kind == flow.EvReport && ev.Verdict == flow.ContractReady && rec.Flow.Phase == flow.Contract {
-			verified, rej := e.contractCheck(ctx, id)
+			verified, ign, rej := e.contractCheck(ctx, id)
 			if rej != nil {
 				return rej
 			}
 			ev.ContractOK = verified
 			freeze = verified
+			ignored = ign
+			for _, r := range ignored {
+				out.Warnings = append(out.Warnings, r.String())
+			}
 		}
 		if ev.Kind == flow.EvReport && ev.Verdict == flow.Split && rec.Flow.Phase == flow.Spec {
 			brief, err := e.specSection(*rec, "brief")
@@ -202,6 +209,10 @@ func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug s
 			}
 			ev.CheckOK = true
 			refreeze = true
+			baseTests = e.preexistingTests(ctx, id)
+			for _, step := range slices.Sorted(maps.Keys(baseTests)) {
+				out.Warnings = append(out.Warnings, "se ignoró el rojo del paso "+strconv.Quote(step)+" del check: "+baseTests[step].String())
+			}
 		}
 
 		var coverage *store.Entry
@@ -270,7 +281,28 @@ func (e *Engine) applyWith(ctx context.Context, id string, ev flow.Event, slug s
 		if before.Phase != rec.Flow.Phase {
 			out.To = rec.Flow.Phase
 		}
-		entries = append(entries, e.entry(id, ev, before, rec.Flow))
+		en := e.entry(id, ev, before, rec.Flow)
+		if len(ignored) > 0 {
+			red := map[string]any{}
+			for _, r := range ignored {
+				red[r.Step] = r.Files
+			}
+			if en.Data == nil {
+				en.Data = map[string]any{}
+			}
+			en.Data["preexisting_red"] = red
+		}
+		if len(baseTests) > 0 {
+			red := map[string]any{}
+			for step, rr := range baseTests {
+				red[step] = map[string]any{"base": rr.Base, "files": rr.Files, "tests": rr.Ignored}
+			}
+			if en.Data == nil {
+				en.Data = map[string]any{}
+			}
+			en.Data["preexisting_tests"] = red
+		}
+		entries = append(entries, en)
 		if coverage != nil {
 			entries = append(entries, *coverage)
 		}
@@ -347,6 +379,19 @@ func (e *Engine) entry(id string, ev flow.Event, before, after flow.State) store
 		en.Data["gate_opened"] = string(after.Gate.Name)
 	}
 	return en
+}
+
+// preexistingTests son, por paso, las pruebas en rojo que el último check no
+// cobró porque ya fallaban en la base (check.steps[].rerun).
+func (e *Engine) preexistingTests(ctx context.Context, id string) map[string]*check.Rerun {
+	if e.Contract == nil {
+		return nil
+	}
+	res, _, _, err := e.Contract.Last(ctx, id)
+	if err != nil || res == nil {
+		return nil
+	}
+	return res.Ignored()
 }
 
 func (e *Engine) verify(ctx context.Context, id string) (bool, string, error) {

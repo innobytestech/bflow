@@ -162,6 +162,21 @@ func (g *Git) DiffKept(ctx context.Context, base string, paths []string) ([]stri
 	return lines(out), err
 }
 
+// DiffRemoved lista lo que base...HEAD borra, incluida la ruta vieja de un renombre.
+func (g *Git) DiffRemoved(ctx context.Context, base string) ([]string, error) {
+	out, err := g.run(ctx, "-c", "core.quotepath=off", "diff", "--name-only", "--no-renames", "--diff-filter=D", base+"...HEAD")
+	return lines(out), err
+}
+
+// Tracked devuelve, de paths, los que git rastrea.
+func (g *Git) Tracked(ctx context.Context, paths []string) ([]string, error) {
+	if len(paths) == 0 {
+		return nil, nil
+	}
+	out, err := g.run(ctx, append([]string{"-c", "core.quotepath=off", "ls-files", "--"}, paths...)...)
+	return lines(out), err
+}
+
 // Commits lista los commits sin merges de base..HEAD, del más viejo al más nuevo.
 func (g *Git) Commits(ctx context.Context, base string) ([]string, error) {
 	out, err := g.run(ctx, "rev-list", "--no-merges", "--topo-order", "--reverse", base+"..HEAD")
@@ -362,4 +377,35 @@ func (g *Git) IsIgnored(ctx context.Context, path string) (bool, error) {
 		return false, nil
 	}
 	return false, err
+}
+
+// WorktreeAddLocked crea un worktree desacoplado en sha, bloqueado con reason
+// (git rechaza entonces `worktree remove --force` con una sola -f) y sin correr
+// los ganchos del repo: core.hooksPath apunta a hooks, una carpeta vacía.
+func (g *Git) WorktreeAddLocked(ctx context.Context, dir, sha, reason, hooks string) error {
+	_, err := g.run(ctx, "-c", "core.hooksPath="+hooks, "worktree", "add", "--detach", "--lock", "--reason", reason, dir, sha)
+	return err
+}
+
+// WorktreeForget desbloquea el worktree dir (si lo estaba) y poda los registros
+// de worktrees cuya carpeta ya no existe.
+func (g *Git) WorktreeForget(ctx context.Context, dir string) error {
+	_, _ = g.run(ctx, "worktree", "unlock", dir)
+	_, err := g.run(ctx, "worktree", "prune")
+	return err
+}
+
+// Worktrees lista las carpetas de los worktrees registrados (la principal incluida).
+func (g *Git) Worktrees(ctx context.Context) ([]string, error) {
+	out, err := g.run(ctx, "worktree", "list", "--porcelain")
+	if err != nil {
+		return nil, err
+	}
+	var dirs []string
+	for _, l := range lines(out) {
+		if d, ok := strings.CutPrefix(l, "worktree "); ok {
+			dirs = append(dirs, d)
+		}
+	}
+	return dirs, nil
 }

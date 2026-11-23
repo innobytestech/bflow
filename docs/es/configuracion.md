@@ -60,6 +60,23 @@ La validación junta todos los problemas en un solo mensaje, indica la línea de
 - `--verify`: no corre los pasos; comprueba que el último check pasó y corresponde al código actual (y que las pruebas congeladas no cambiaron).
 - Un paso con `needs` depende de una herramienta: si falta y el paso es `optional: true`, se omite con aviso; si no es opcional, falla.
 - Un paso de vulnerabilidades marca como preexistentes las que la tarea no tocó (ver la [guía](guia.md#cuando-algo-se-atora)).
+- `rerun` (opcional, solo en el paso `check.test_step`): dice cómo correr solo algunos archivos de prueba. Si el paso falla, bflow toma los archivos de prueba en rojo; si la rama no tocó ninguno, los vuelve a correr sobre el merge-base con la base y no cobra las pruebas que también fallan ahí con el mismo nombre y el mismo error (la primera línea, sin rutas ni números de línea). El paso queda en `pass`, el check marca lo ignorado como degradado y `report DONE` lo avisa y lo guarda en `log.jsonl` (`data.preexisting_tests`). Sin `rerun`, el paso de pruebas funciona como siempre.
+  - `run`: el comando filtrado. Es el `run` del paso más `{files}` al final, para que la base corra con los mismos flags. Ni el paso, ni `rerun.run`, ni `each` pueden encadenar comandos (`&&`, `;`, `|`) ni llevar `--bail`.
+  - `each` (por defecto `{file}`): cómo va cada archivo en `{files}`, con `{file}` como el archivo; sirve para repetir una bandera.
+  - `format` (por defecto `vitest`): la salida que bflow sabe leer. Hoy solo `vitest`, con su reporter por defecto.
+  - `share` (por defecto `[node_modules]`): lo ignorado por git que la corrida en la base toma del repo; si git no lo ignora o la rama lo tocó, no se ignora nada. Una carpeta se enlaza (junction en Windows, enlace simbólico en los demás) y un archivo se copia. No se reinstala nada: la corrida es corta y no hace `npm ci`. bflow quita el enlace antes que el worktree, porque quitar el worktree con el enlace adentro puede borrar lo que apunta.
+  - Corre en un worktree temporal de git en la carpeta temporal del sistema, bloqueado (`git worktree remove --force` no lo quita) y sin los ganchos del repo. Se quita siempre, también si algo falla o si se interrumpe con Ctrl+C: primero cada enlace que haya adentro, sin entrar en él, luego la carpeta, y al final se borra solo su registro en git, sin podar los demás worktrees. Nunca usa `git worktree remove`. Si a bflow lo matan, el siguiente `bflow check` con `rerun` limpia los restos cuyo proceso ya no existe. Lo que no pudo quitar sale como aviso, con cómo quitarlo a mano.
+  - Ante cualquier duda no ignora nada y el check dice por qué: si una prueba en rojo está en un archivo que la rama tocó (diff contra la base, lo borrado o renombrado y lo sin commitear), en su carpeta hay algo tocado o la descripción de las fallas nombra un archivo tocado; si la rama tocó un manifiesto de dependencias, un archivo oculto, una configuración conocida o un archivo de la raíz que no sea texto; si una falla no es de una prueba con nombre (un archivo completo o un hook) o el resumen cuenta fallas que la salida no nombra; si dos pruebas en rojo tienen el mismo nombre; si el resumen trae archivos que no fallaron ni pasaron (saltados o cortados por `bail`); si el repo usa workspaces de npm, pnpm o yarn; si la salida trae errores fuera de las pruebas, un umbral de cobertura roto, un error de compilación, un proceso cortado o algo más después del resumen; si fallan más de 25 archivos; si la corrida en la base no se puede hacer, no queda filtrada a esos archivos o una de las pruebas pasa ahí o falla con otro error.
+  - Un bflow anterior a esta llave no lee un `bflow.yaml` que la tenga: actualiza el binario de todos antes de agregarla.
+
+  ```yaml
+  - name: test
+    run: npm test -- --watch=false
+    rerun:
+      run: npm test -- --watch=false {files}
+      each: --include={file}
+      share: [node_modules, src/environments/version.ts]
+  ```
 
 ## Conectar un tracker
 
