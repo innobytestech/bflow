@@ -284,6 +284,8 @@ func (r *Runner) packages(ctx context.Context) ([]GoPackage, error) {
 	return r.pkgs, r.pkgsErr
 }
 
+var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*[A-Za-z]`)
+
 // tail resume la salida: primero las líneas de fallo (hasta 60), luego las
 // últimas 25, como gate.mjs.
 func (r *Runner) tail(out string) (string, []string) {
@@ -295,18 +297,20 @@ func (r *Runner) tail(out string) (string, []string) {
 	if err != nil {
 		re = regexp.MustCompile(DefaultFailPattern)
 	}
-	lines := strings.Split(strings.TrimRight(strings.ReplaceAll(out, "\r\n", "\n"), "\n"), "\n")
+	// Sin códigos ANSI: vitest pinta «FAIL» con color y el patrón no lo vería.
+	lines := strings.Split(strings.TrimRight(ansiRe.ReplaceAllString(strings.ReplaceAll(out, "\r\n", "\n"), ""), "\n"), "\n")
 	var fails, uniq []string
 	seen := map[string]bool{}
 	for _, l := range lines {
 		if re.MatchString(l) {
-			fails = append(fails, l)
-			if k := strings.TrimSpace(l); !seen[k] && k != "FAIL" {
+			// Solo el resumen se recorta a 60; las líneas únicas se guardan casi todas
+			// porque el contrato las usa para saber qué T1 fallaron.
+			if len(fails) < 60 {
+				fails = append(fails, l)
+			}
+			if k := strings.TrimSpace(l); !seen[k] && k != "FAIL" && len(uniq) < 1000 {
 				seen[k] = true
 				uniq = append(uniq, k)
-			}
-			if len(fails) == 60 {
-				break
 			}
 		}
 	}

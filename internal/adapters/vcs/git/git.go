@@ -147,9 +147,26 @@ func (g *Git) Commit(ctx context.Context, paths []string, msg string) (bool, err
 	return true, nil
 }
 
+// ChangedSince lista los archivos que la propia rama cambió desde sha. Lo que
+// llega al traer la rama base con merge (segundo padre) no cuenta: se mira solo
+// la línea first-parent. Si sha no es ancestro de HEAD (rebase), compara los
+// árboles como antes.
 func (g *Git) ChangedSince(ctx context.Context, sha string, paths []string) ([]string, error) {
-	out, err := g.run(ctx, append([]string{"diff", "--name-only", sha, "HEAD", "--"}, paths...)...)
-	return lines(out), err
+	if !g.ok(ctx, "merge-base", "--is-ancestor", sha, "HEAD") {
+		out, err := g.run(ctx, append([]string{"diff", "--name-only", sha, "HEAD", "--"}, paths...)...)
+		return lines(out), err
+	}
+	out, err := g.run(ctx, append([]string{"log", "--first-parent", "--no-merges", "--name-only", "--format=", sha + "..HEAD", "--"}, paths...)...)
+	if err != nil {
+		return nil, err
+	}
+	var uniq []string
+	for _, f := range lines(out) {
+		if !slices.Contains(uniq, f) {
+			uniq = append(uniq, f)
+		}
+	}
+	return uniq, nil
 }
 
 func (g *Git) DiffNames(ctx context.Context, base string) ([]string, error) {
